@@ -1,0 +1,39 @@
+                    ┌───────────────┐
+                    │     JOBS      │
+                    ├───────────────┤
+                    │ id            │
+                    │ url           │
+                    │ company       │
+                    │ title         │
+                    │ location      │
+                    │ description   │
+                    │ match_score   │
+                    │ decision      │
+                    │ status        │
+                    └───────┬───────┘
+                            │
+                            │ 1
+                            │
+                            │
+                            │ 1
+                    ┌───────▼────────┐
+                    │ APPLICATIONS   │
+                    ├────────────────┤
+                    │ id             │
+                    │ job_id         │
+                    │ resume_id      │
+                    │ status         │
+                    │ applied_at     │
+                    └───────┬────────┘
+                            │
+                            │ many
+                            │
+                    ┌───────▼────────┐
+                    │    RESUMES     │
+                    ├────────────────┤
+                    │ id             │
+                    │ name           │
+                    │ file           │
+                    │ resume_type    │
+                    │ is_master      │
+                    └────────────────┘
