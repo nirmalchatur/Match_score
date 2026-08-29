@@ -37,7 +37,9 @@ class Job(models.Model):
         null=True,
         blank=True
     )
-
+    match_result = models.JSONField(
+    null=True,
+    blank=True )
     decision = models.CharField(
         max_length=50,
         choices=DECISION_CHOICES,

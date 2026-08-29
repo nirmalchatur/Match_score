@@ -40,12 +40,10 @@ class MatchEngine:
 
         return {
             "score": round(score, 2),
-
             "skills": skill_result,
             "experience": experience_result,
             "requirements": requirement_result,
             "education": education_result,
-
             "decision": cls._decision(score),
         }
 
@@ -65,7 +63,11 @@ class MatchEngine:
         matched = sorted(resume & jd)
         missing = sorted(jd - resume)
 
-        score = (len(matched) / len(jd)) * 100
+        score = (
+            len(matched)
+            / len(jd)
+            * 100
+        )
 
         return {
             "score": round(score, 2),
@@ -74,36 +76,68 @@ class MatchEngine:
         }
 
     @staticmethod
-    def _experience_match(resume_experience, required_years):
+    def _experience_match(
+        resume_experience,
+        required_years,
+    ):
 
         if required_years is None:
+
+            candidate_years = (
+                resume_experience.get(
+                    "total_years",
+                    0.0,
+                )
+                if isinstance(
+                    resume_experience,
+                    dict,
+                )
+                else 0.0
+            )
+
             return {
                 "score": 100.0,
                 "required_years": None,
-                "candidate_years": resume_experience.get(
-                    "total_years", 0.0
-                ) if isinstance(resume_experience, dict) else 0.0,
-                "note": "No explicit experience requirement",
+                "candidate_years": candidate_years,
+                "note": (
+                    "No explicit experience "
+                    "requirement"
+                ),
             }
 
-        if not isinstance(resume_experience, dict):
+        if not isinstance(
+            resume_experience,
+            dict,
+        ):
+
             return {
                 "score": 0.0,
                 "required_years": required_years,
                 "candidate_years": 0.0,
-                "note": "Resume experience could not be determined",
+                "note": (
+                    "Resume experience could "
+                    "not be determined"
+                ),
             }
 
-        candidate_years = resume_experience.get(
-            "total_years",
-            0.0,
+        candidate_years = float(
+            resume_experience.get(
+                "total_years",
+                0.0,
+            )
         )
 
         if required_years <= 0:
+
             score = 100.0
+
         else:
+
             score = min(
-                (candidate_years / required_years) * 100,
+                (
+                    candidate_years
+                    / required_years
+                ) * 100,
                 100.0,
             )
 
@@ -111,15 +145,25 @@ class MatchEngine:
             "score": round(score, 2),
             "required_years": required_years,
             "candidate_years": candidate_years,
-            "note": "Experience requirement detected",
+            "note": (
+                "Experience requirement "
+                "detected"
+            ),
         }
 
     @staticmethod
-    def _requirement_match(resume_profile, jd_profile):
+    def _requirement_match(
+        resume_profile,
+        jd_profile,
+    ):
 
-        requirements = jd_profile.get("requirements", [])
+        requirements = jd_profile.get(
+            "requirements",
+            [],
+        )
 
         if not requirements:
+
             return {
                 "score": 100.0,
                 "matched": [],
@@ -128,55 +172,106 @@ class MatchEngine:
             }
 
         resume_skills = set(
-            resume_profile.get("skills", [])
+            resume_profile.get(
+                "skills",
+                [],
+            )
         )
 
         jd_skills = set(
-            jd_profile.get("skills", [])
+            jd_profile.get(
+                "skills",
+                [],
+            )
         )
 
         matched = []
         partially_matched = []
         unmatched = []
 
+        credits = []
+
+        experience_pattern = (
+            r"(\d+(?:\.\d+)?)\+?\s*"
+            r"(?:years?|yrs?)"
+        )
+
+        education_keywords = (
+            "bachelor",
+            "b.tech",
+            "btech",
+            "master",
+            "m.tech",
+            "mtech",
+            "degree",
+            "undergraduate",
+            "graduate",
+            "ph.d",
+            "phd",
+            "doctorate",
+        )
+
+        resume_experience = (
+            resume_profile.get(
+                "experience",
+                {},
+            )
+        )
+
+        candidate_years = float(
+            resume_experience.get(
+                "total_years",
+                0,
+            )
+        )
+
         for requirement in requirements:
 
-            requirement_lower = requirement.lower()
+            requirement_lower = (
+                requirement.lower()
+            )
+
+            # -----------------------------------------
+            # Education is handled separately
+            # -----------------------------------------
+
+            if any(
+                keyword in requirement_lower
+                for keyword in education_keywords
+            ):
+                continue
+
+            # -----------------------------------------
+            # Experience is handled separately
+            # -----------------------------------------
+
+            experience_match = re.search(
+                experience_pattern,
+                requirement_lower,
+            )
+
+            if (
+                experience_match
+                and "experience"
+                in requirement_lower
+            ):
+                # Skip: Experience is scored by
+                # _experience_match() separately
+                # to avoid double-counting
+                continue
+
+            # -----------------------------------------
+            # Technical / skill requirements
+            # -----------------------------------------
 
             relevant_skills = [
                 skill
                 for skill in jd_skills
-                if skill.lower() in requirement_lower
+                if skill.lower()
+                in requirement_lower
             ]
 
-            if not relevant_skills:
-                # No identifiable skill in this requirement.
-                # Use conservative text matching.
-                resume_text = " ".join(
-                    str(value)
-                    for value in resume_profile.values()
-                    if isinstance(value, str)
-                ).lower()
-
-                words = [
-                    word
-                    for word in requirement_lower.split()
-                    if len(word) > 3
-                ]
-
-                matches = sum(
-                    1
-                    for word in words
-                    if word in resume_text
-                )
-
-                ratio = (
-                    matches / len(words)
-                    if words
-                    else 1
-                )
-
-            else:
+            if relevant_skills:
 
                 matched_skills = [
                     skill
@@ -189,28 +284,106 @@ class MatchEngine:
                     / len(relevant_skills)
                 )
 
-            if ratio >= 0.99:
-                matched.append(requirement)
+                credits.append(ratio)
 
-            elif ratio > 0:
-                partially_matched.append(requirement)
+                if ratio >= 1.0:
+
+                    matched.append(
+                        requirement
+                    )
+
+                elif ratio > 0:
+
+                    partially_matched.append(
+                        requirement
+                    )
+
+                else:
+
+                    unmatched.append(
+                        requirement
+                    )
+
+                continue
+
+            # -----------------------------------------
+            # Generic requirement
+            # -----------------------------------------
+
+            resume_text = " ".join(
+                str(value)
+                for value in resume_profile.values()
+                if isinstance(value, str)
+            ).lower()
+
+            words = [
+                word
+                for word in requirement_lower.split()
+                if len(word) > 3
+            ]
+
+            if not words:
+
+                credit = 0.0
 
             else:
-                unmatched.append(requirement)
 
-        total = (
-            len(matched)
-            + len(partially_matched)
-            + len(unmatched)
+                ratio = (
+                    sum(
+                        word in resume_text
+                        for word in words
+                    )
+                    / len(words)
+                )
+
+                if ratio >= 0.75:
+
+                    credit = 1.0
+
+                elif ratio > 0:
+
+                    credit = 0.5
+
+                else:
+
+                    credit = 0.0
+
+            credits.append(credit)
+
+            if credit >= 1.0:
+
+                matched.append(
+                    requirement
+                )
+
+            elif credit > 0:
+
+                partially_matched.append(
+                    requirement
+                )
+
+            else:
+
+                unmatched.append(
+                    requirement
+                )
+
+        # All requirements were either
+        # education or experience requirements.
+        if not credits:
+
+            return {
+                "score": 100.0,
+                "matched": [],
+                "partially_matched": [],
+                "unmatched": [],
+            }
+
+        score = (
+            sum(credits)
+            / len(credits)
+            * 100
         )
-
-        if total == 0:
-            score = 100.0
-        else:
-            score = (
-                len(matched)
-                + (0.5 * len(partially_matched))
-            ) / total * 100
 
         return {
             "score": round(score, 2),
@@ -218,24 +391,217 @@ class MatchEngine:
             "partially_matched": partially_matched,
             "unmatched": unmatched,
         }
+
     @staticmethod
-    def _education_match(resume_education, jd_education):
+    def _education_requirement_credit(
+        requirement,
+        education,
+    ):
+
+        education_keywords = (
+            "bachelor",
+            "b.tech",
+            "btech",
+            "master",
+            "m.tech",
+            "mtech",
+            "degree",
+            "undergraduate",
+            "graduate",
+            "ph.d",
+            "phd",
+            "doctorate",
+        )
+
+        if not any(
+            keyword in requirement
+            for keyword in education_keywords
+        ):
+
+            return None
+
+        if not education:
+
+            return 0.0
+
+        required_level = (
+            MatchEngine._education_level(
+                requirement
+            )
+        )
+
+        candidate_level = (
+            MatchEngine._education_level(
+                education
+            )
+        )
+
+        if (
+            required_level
+            and candidate_level < required_level
+        ):
+
+            return 0.0
+
+        fields = (
+            "computer science",
+            "computer engineering",
+            "information technology",
+            "physics",
+            "mathematics",
+            "electrical engineering",
+            "mechanical engineering",
+        )
+
+        required_fields = [
+            field
+            for field in fields
+            if field in requirement
+        ]
+
+        if not required_fields:
+
+            return (
+                1.0
+                if candidate_level
+                else 0.0
+            )
+
+        if any(
+            field in education
+            for field in required_fields
+        ):
+
+            return 1.0
+
+        if (
+            "computer science"
+            in required_fields
+            and any(
+                field in education
+                for field in (
+                    "computer engineering",
+                    "information technology",
+                )
+            )
+        ):
+
+            return 0.5
+
+        return 0.0
+
+    @staticmethod
+    def _education_level(text):
+
+        if any(
+            term in text
+            for term in (
+                "ph.d",
+                "phd",
+                "doctorate",
+            )
+        ):
+
+            return 3
+
+        if any(
+            term in text
+            for term in (
+                "master",
+                "m.tech",
+                "mtech",
+            )
+        ):
+
+            return 2
+
+        if any(
+            term in text
+            for term in (
+                "bachelor",
+                "b.tech",
+                "btech",
+                "undergraduate",
+                "degree",
+            )
+        ):
+
+            return 1
+
+        return 0
+
+    @staticmethod
+    def _education_match(
+        resume_education,
+        jd_education,
+    ):
 
         if not jd_education:
+
             return {
                 "score": 100.0,
-                "note": "No explicit education requirement",
+                "note": (
+                    "No explicit education "
+                    "requirement"
+                ),
             }
 
-        if not resume_education:
+        education = str(
+            resume_education or ""
+        ).lower()
+
+        requirements = [
+            str(item).lower()
+            for item in jd_education
+        ]
+
+        if not education:
+
             return {
                 "score": 0.0,
-                "note": "Education requirement exists",
+                "note": (
+                    "Education requirement exists"
+                ),
             }
 
+        credits = []
+
+        for requirement in requirements:
+
+            credit = (
+                MatchEngine
+                ._education_requirement_credit(
+                    requirement,
+                    education,
+                )
+            )
+
+            if credit is not None:
+
+                credits.append(credit)
+
+        if not credits:
+
+            return {
+                "score": 100.0,
+                "note": (
+                    "No specific education "
+                    "requirement detected"
+                ),
+            }
+
+        score = (
+            sum(credits)
+            / len(credits)
+            * 100
+        )
+
         return {
-            "score": 100.0,
-            "note": "Resume contains education information",
+            "score": round(score, 2),
+            "note": (
+                "Education requirement "
+                "evaluated"
+            ),
         }
 
     @staticmethod
@@ -244,4 +610,10 @@ class MatchEngine:
         if score >= 95:
             return "USE_MASTER"
 
-        return "TAILOR"
+        if score >= 70:
+            return "TAILOR"
+
+        if score >= 50:
+            return "REVIEW"
+
+        return "SKIP"

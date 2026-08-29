@@ -31,8 +31,6 @@ class JobSerializer(serializers.ModelSerializer):
 
 class JobMatchSerializer(serializers.Serializer):
 
-    resume_id = serializers.IntegerField()
-
     url = serializers.URLField()
 
     company = serializers.CharField(

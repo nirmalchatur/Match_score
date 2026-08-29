@@ -3,70 +3,49 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from apps.resumes.models import Resume
-from apps.resumes.services.parser import ResumeParser
-from apps.resumes.services.resume_profile import ResumeProfile
 
-from apps.jobs.services.jd_profile import JDProfile
-from apps.jobs.services.match_engine import MatchEngine
 
+from apps.jobs.services.job_collector import JobCollector
+from apps.jobs.services.job_processor import JobProcessor
 from .models import Job
-from .serializers import JobMatchSerializer
+from .serializers import JobMatchSerializer, JobSerializer
 
 
 class JobMatchView(APIView):
 
     def post(self, request):
 
-        serializer = JobMatchSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        serializer = JobMatchSerializer(
+            data=request.data
+        )
 
-        resume_id = serializer.validated_data["resume_id"]
-        url = serializer.validated_data["url"]
-        company = serializer.validated_data["company"]
-        title = serializer.validated_data["title"]
-        location = serializer.validated_data.get("location", "")
-        jd_text = serializer.validated_data["jd_text"]
+        serializer.is_valid(
+            raise_exception=True
+        )
 
         try:
-            # 1. Get master resume
-            resume = Resume.objects.get(
-                id=resume_id,
-                is_master=True,
-            )
 
-            # 2. Parse resume
-            resume_text = ResumeParser.extract_text(
-                resume.file.path
-            )
+            # 1. Convert API input into JobData
+            collector = JobCollector()
 
-            # 3. Build resume profile
-            resume_profile = ResumeProfile.build(
-                resume_text
-            )
+            job_data = collector.collect({
+                "url": serializer.validated_data["url"],
+                "company": serializer.validated_data["company"],
+                "title": serializer.validated_data["title"],
+                "location": serializer.validated_data.get(
+                    "location",
+                    ""
+                ),
+                "description": serializer.validated_data[
+                    "jd_text"
+                ],
+            })
 
-            # 4. Build JD profile
-            jd_profile = JDProfile.build(
-                jd_text
-            )
-
-            # 5. Calculate match
-            result = MatchEngine.calculate(
-                resume_profile,
-                jd_profile,
-            )
-
-            # 6. Save job
-            job, created = Job.objects.update_or_create(
-                url=url,
-                defaults={
-                    "company": company,
-                    "title": title,
-                    "location": location,
-                    "description": jd_text,
-                    "match_score": result["score"],
-                    "decision": result["decision"],
-                    "status": "READY",
-                },
+            # 2. Process job
+            job, result, created = (
+                JobProcessor.process(
+                    job_data
+                )
             )
 
             return Response(
@@ -79,29 +58,43 @@ class JobMatchView(APIView):
             )
 
         except Resume.DoesNotExist:
+
             return Response(
                 {
-                    "error": "Master resume not found"
+                    "error": "No master resume found"
                 },
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        except Resume.MultipleObjectsReturned:
+
+            return Response(
+                {
+                    "error": (
+                        "Multiple master resumes found. "
+                        "Please keep only one."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         except Exception as exc:
+
             return Response(
                 {
                     "error": str(exc)
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-from .models import Job
-from .serializers import JobSerializer
 
 
 class JobListView(APIView):
 
     def get(self, request):
 
-        jobs = Job.objects.all().order_by("-created_at")
+        jobs = Job.objects.all().order_by(
+            "-created_at"
+        )
 
         serializer = JobSerializer(
             jobs,
@@ -112,19 +105,30 @@ class JobListView(APIView):
             serializer.data,
             status=status.HTTP_200_OK,
         )
+
+
 class JobDetailView(APIView):
 
     def get(self, request, pk):
 
         try:
-            job = Job.objects.get(pk=pk)
+
+            job = Job.objects.get(
+                pk=pk
+            )
+
         except Job.DoesNotExist:
+
             return Response(
-                {"error": "Job not found"},
+                {
+                    "error": "Job not found"
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        serializer = JobSerializer(job)
+        serializer = JobSerializer(
+            job
+        )
 
         return Response(
             serializer.data,
