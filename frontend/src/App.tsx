@@ -10,10 +10,11 @@ import type { Job, ViewKey } from './lib/types'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
 import { Toasts } from './components/Toasts'
-import { IconRefresh } from './components/Icons'
+import { IconPlus, IconRefresh } from './components/Icons'
 import { DashboardPage } from './pages/DashboardPage'
 import { AnalyzePage } from './pages/AnalyzePage'
 import { JobsPage } from './pages/JobsPage'
+import { ApplicationsPage } from './pages/ApplicationsPage'
 import { ResumesPage } from './pages/ResumesPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { LandingPage } from './pages/LandingPage'
@@ -21,12 +22,13 @@ import { LoginPage } from './pages/LoginPage'
 import { SignupPage } from './pages/SignupPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 
-const HEADINGS: Record<ViewKey, { eyebrow: string; title: string }> = {
-  dashboard: { eyebrow: 'Workspace', title: 'Dashboard' },
-  analyze: { eyebrow: 'Pipeline', title: 'New Analysis' },
-  jobs: { eyebrow: 'Library', title: 'Jobs' },
-  resumes: { eyebrow: 'Library', title: 'Resumes' },
-  settings: { eyebrow: 'Account', title: 'Settings' },
+const HEADINGS: Record<ViewKey, { title: string; search: string }> = {
+  dashboard: { title: 'Dashboard', search: 'Search jobs, companies…' },
+  analyze: { title: 'Analyze a New Job', search: 'Search jobs, companies…' },
+  jobs: { title: 'Jobs', search: 'Search jobs…' },
+  resumes: { title: 'Resumes', search: 'Search resumes…' },
+  applications: { title: 'Applications', search: 'Search applications…' },
+  settings: { title: 'Settings', search: '' },
 }
 
 const PATHS: Record<ViewKey, string> = {
@@ -34,6 +36,7 @@ const PATHS: Record<ViewKey, string> = {
   analyze: '/app/analyze',
   jobs: '/app/jobs',
   resumes: '/app/resumes',
+  applications: '/app/applications',
   settings: '/app/settings',
 }
 
@@ -47,15 +50,16 @@ const PATH_TO_VIEW = Object.entries(PATHS).reduce<Record<string, ViewKey>>(
  * the dashboard pages for whichever /app route is active.
  */
 function AppShell() {
-  const { markSessionExpired } = useAuth()
+  const { markSessionExpired, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeError, setAnalyzeError] = useState('')
   const [analyzeResult, setAnalyzeResult] = useState<Job | null>(null)
+  const [shellSearch, setShellSearch] = useState('')
 
-  const { jobs, loading, error, online, refresh } = useJobs()
+  const { jobs, loading, error, refresh } = useJobs()
   const {
     resumes,
     master,
@@ -67,6 +71,8 @@ function AppShell() {
 
   const view = (PATH_TO_VIEW[location.pathname] ?? 'dashboard') as ViewKey
   const heading = HEADINGS[view] ?? HEADINGS.dashboard
+
+  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(' ')
 
   const handleNavigate = useCallback(
     (key: ViewKey) => {
@@ -110,12 +116,21 @@ function AppShell() {
     <div className="app-shell">
       <div className="bg-fx" aria-hidden="true" />
 
-      <Sidebar view={view} onNavigate={handleNavigate} jobCount={jobs.length} online={online} />
+      <Sidebar
+        view={view}
+        onNavigate={handleNavigate}
+        jobCount={jobs.length}
+        email={user?.email ?? ''}
+        displayName={displayName}
+      />
 
       <div className="main-panel">
         <Topbar
-          eyebrow={heading.eyebrow}
           title={heading.title}
+          search={heading.search || undefined}
+          searchValue={shellSearch}
+          onSearchChange={setShellSearch}
+          avatarLabel={displayName || user?.email}
           actions={
             <>
               <button
@@ -128,13 +143,16 @@ function AppShell() {
               >
                 {loading ? <span className="spinner" /> : <IconRefresh size={16} />}
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => handleNavigate('analyze')}
-              >
-                New analysis
-              </button>
+              {view === 'jobs' ? (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => handleNavigate('analyze')}
+                >
+                  <IconPlus size={15} />
+                  Analyze New Job
+                </button>
+              ) : null}
             </>
           }
         />
@@ -162,6 +180,10 @@ function AppShell() {
         ) : null}
 
         {view === 'jobs' ? <JobsPage /> : null}
+
+        {view === 'applications' ? (
+          <ApplicationsPage jobs={jobs} analyzing={analyzing} onAnalyze={(url) => void handleAnalyze(url)} />
+        ) : null}
 
         {view === 'resumes' ? (
           <ResumesPage
@@ -204,6 +226,7 @@ export default function App() {
             <Route path="analyze" element={<AppShell />} />
             <Route path="jobs" element={<AppShell />} />
             <Route path="resumes" element={<AppShell />} />
+            <Route path="applications" element={<AppShell />} />
             <Route path="settings" element={<AppShell />} />
             <Route index element={<Navigate to="/app/dashboard" replace />} />
           </Route>

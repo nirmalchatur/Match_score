@@ -181,3 +181,74 @@ export const IconMenu = (p: IconProps) => (
   </Svg>
 )
 
+export const IconArrowRight = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 12h15" />
+    <path d="m13 6 6 6-6 6" />
+  </Svg>
+)
+
+export const IconArrowLeft = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 12H5" />
+    <path d="m11 18-6-6 6-6" />
+  </Svg>
+)
+
+export const IconGitHub = (p: IconProps) => (
+  <Svg {...p} strokeWidth={1.6}>
+    <path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21" />
+  </Svg>
+)
+
+export const IconHelp = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.6 9.5a2.5 2.5 0 0 1 4.9.8c0 1.7-2.5 2.5-2.5 2.5" />
+    <path d="M12 17h.01" />
+  </Svg>
+)
+
+export const IconBell = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5" />
+    <path d="M13.7 20a2 2 0 0 1-3.4 0" />
+  </Svg>
+)
+
+export const IconKanban = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="5" height="16" rx="1.5" />
+    <rect x="10" y="4" width="5" height="10" rx="1.5" />
+    <rect x="17" y="4" width="4" height="13" rx="1.5" />
+  </Svg>
+)
+
+export const IconPlus = (p: IconProps) => (
+  <Svg {...p} strokeWidth={2}>
+    <path d="M12 5v14M5 12h14" />
+  </Svg>
+)
+
+export const IconFilter = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 5h18l-7 8v6l-4 2v-8z" />
+  </Svg>
+)
+
+export const IconUser = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21a8 8 0 0 1 16 0" />
+  </Svg>
+)
+
+export const IconPalette = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3a9 9 0 1 0 0 18 2 2 0 0 0 2-2 2 2 0 0 0-2-2h-1.5a1.5 1.5 0 0 1 0-3H13a8 8 0 0 0 0-16z" />
+    <circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none" />
+    <circle cx="10" cy="7.5" r="1" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="8" r="1" fill="currentColor" stroke="none" />
+  </Svg>
+)
+

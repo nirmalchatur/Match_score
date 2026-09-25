@@ -58,7 +58,7 @@ export interface AnalyzeResponse {
   job: Job
 }
 
-export type ViewKey = 'dashboard' | 'analyze' | 'jobs' | 'resumes' | 'settings'
+export type ViewKey = 'dashboard' | 'analyze' | 'jobs' | 'resumes' | 'applications' | 'settings'
 
 export type ToastVariant = 'success' | 'error' | 'info'
 

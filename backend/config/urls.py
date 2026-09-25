@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.conf import settings
+from django.conf.urls.static import static
 from django.urls import path, include
 
 
@@ -25,3 +27,12 @@ urlpatterns = [
     ),
 
 ]
+
+
+# Django does not serve media on its own. In development this is handled
+# automatically; on Render/Gunicorn we must add the route explicitly, since
+# there is no separate web server in front.
+urlpatterns += static(
+    settings.MEDIA_URL,
+    document_root=settings.MEDIA_ROOT,
+)

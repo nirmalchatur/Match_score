@@ -3,18 +3,9 @@ import type { ReactNode } from 'react'
 import { IconLogo } from '../components/Icons'
 
 const PROOF = [
-  {
-    title: 'One master resume',
-    body: 'Upload a PDF once. Every analysis scores against it.',
-  },
-  {
-    title: 'Real job data',
-    body: 'Greenhouse postings are collected and parsed, not pasted by hand.',
-  },
-  {
-    title: 'Your workspace',
-    body: 'Jobs, resumes, and scores stay private to your account.',
-  },
+  'Job postings collected and parsed',
+  'Scored against your master resume',
+  'Every analysis saved to your workspace',
 ]
 
 /** Split layout shared by sign-in and sign-up. */
@@ -42,21 +33,21 @@ export function AuthLayout({
         </Link>
 
         <h2 className="auth-pitch">
-          One resume.
+          Build applications
           <br />
-          Every job.
-          <br />
-          <span className="gradient-text">A smarter workflow.</span>
+          around the job <span className="gradient-text">not the other way around.</span>
         </h2>
 
+        <p className="auth-sub">
+          Your career workspace is waiting. Sign in to keep analysing, matching, and improving.
+        </p>
+
         <ul className="auth-proof">
+          <div className="auth-proof-label">What you get</div>
           {PROOF.map((item) => (
-            <li key={item.title}>
+            <li key={item}>
               <span className="auth-proof-dot" />
-              <div>
-                <strong>{item.title}</strong>
-                <p>{item.body}</p>
-              </div>
+              {item}
             </li>
           ))}
         </ul>

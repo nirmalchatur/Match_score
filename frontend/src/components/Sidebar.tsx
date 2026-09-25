@@ -1,8 +1,11 @@
 import type { ViewKey } from '../lib/types'
+import { initials } from '../lib/format'
 import {
   IconBriefcase,
   IconDashboard,
   IconFile,
+  IconHelp,
+  IconKanban,
   IconLogo,
   IconRadar,
   IconSettings,
@@ -17,12 +20,14 @@ type NavItem = {
 
 const PRIMARY: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', Icon: IconDashboard },
-  { key: 'analyze', label: 'Analyze Job', Icon: IconRadar },
-]
-
-const SECONDARY: NavItem[] = [
   { key: 'jobs', label: 'Jobs', Icon: IconBriefcase },
   { key: 'resumes', label: 'Resumes', Icon: IconFile },
+  { key: 'applications', label: 'Applications', Icon: IconKanban },
+]
+
+// Rendered below a divider, matching the reference sidebar grouping.
+const SECONDARY: NavItem[] = [
+  { key: 'analyze', label: 'Analyze Job', Icon: IconRadar },
   { key: 'settings', label: 'Settings', Icon: IconSettings },
 ]
 
@@ -30,12 +35,14 @@ export function Sidebar({
   view,
   onNavigate,
   jobCount,
-  online,
+  email,
+  displayName,
 }: {
   view: ViewKey
   onNavigate: (view: ViewKey) => void
   jobCount: number
-  online: boolean
+  email: string
+  displayName: string
 }) {
   const renderItem = ({ key, label, Icon, count }: NavItem) => (
     <button
@@ -44,8 +51,9 @@ export function Sidebar({
       className={`nav-item${view === key ? ' active' : ''}`}
       onClick={() => onNavigate(key)}
       aria-current={view === key ? 'page' : undefined}
+      title={label}
     >
-      <Icon size={18} />
+      <Icon size={17} />
       <span>{label}</span>
       {count != null && count > 0 ? <span className="nav-count">{count}</span> : null}
     </button>
@@ -53,30 +61,39 @@ export function Sidebar({
 
   return (
     <aside className="sidebar">
-      <div className="brand">
-        <span className="brand-mark">
-          <IconLogo size={19} />
+      <div className="sidebar-brand">
+        <span className="brand">
+          <span className="brand-mark">
+            <IconLogo size={17} />
+          </span>
+          <span className="brand-name">TailorUp</span>
         </span>
-        <span className="brand-name">MatchScore</span>
       </div>
 
       <nav className="nav" aria-label="Main navigation">
-        {PRIMARY.map(renderItem)}
-        <div className="nav-label">Library</div>
-        {SECONDARY.map((item) => renderItem({ ...item, count: item.key === 'jobs' ? jobCount : 0 }))}
+        {PRIMARY.map((item) =>
+          renderItem({ ...item, count: item.key === 'jobs' ? jobCount : 0 }),
+        )}
+        <div className="nav-divider" />
+        {SECONDARY.map(renderItem)}
+        <div className="nav-divider" />
+        <a className="nav-item" href="/docs/README.md" target="_blank" rel="noreferrer">
+          <IconHelp size={17} />
+          <span>Help</span>
+        </a>
       </nav>
 
       <div className="sidebar-footer">
-        <div className="api-status">
-          <span className={`api-dot ${online ? 'online' : 'offline'}`} />
-          <div>
-            <strong>{online ? 'API connected' : 'API offline'}</strong>
-            <span className="mono" style={{ fontSize: 11 }}>
-              Django · :8000
-            </span>
-          </div>
+        <div className="user-chip">
+          <span className="user-avatar">{initials(displayName || email)}</span>
+          <span className="user-meta">
+            <span className="user-name">{displayName || 'Your account'}</span>
+            <span className="user-email">{email}</span>
+          </span>
         </div>
       </div>
     </aside>
   )
 }
+
+export default Sidebar

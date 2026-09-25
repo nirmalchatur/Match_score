@@ -1,0 +1,51 @@
+# Render blueprint for the TailorUp Django API.
+#
+# Deploy with:  Render Dashboard > New > Blueprint > point at this repo
+# The database is created and linked automatically; DATABASE_URL is injected.
+#
+# NOTE: uploaded resumes are written to MEDIA_ROOT. On the free tier the
+# filesystem is ephemeral and files are lost on redeploy. Attach a persistent
+# disk (see below) or move to object storage before going live.
+
+services:
+  - type: web
+    name: tailorup-api
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: >-
+      python manage.py migrate --noinput &&
+      python manage.py collectstatic --noinput &&
+      gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    healthCheckPath: /api/auth/me/
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        # Replaced with your own API hostname after the first deploy.
+        value: "onrender.com"
+      - key: FRONTEND_ORIGIN
+        # Set to your Vercel URL, e.g. https://tailorup.vercel.app
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://tailorup.vercel.app"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://tailorup.vercel.app"
+    # Uncomment once on a paid plan to keep uploaded resumes across deploys.
+    # disk:
+    #   name: media
+    #   mountPath: /opt/render/project/src/media
+    #   sizeGB: 1
+
+databases:
+  - name: tailorup-db
+    databaseName: tailorup
+    user: tailorup
+    plan: free
+    postgresMajorVersion: "16"

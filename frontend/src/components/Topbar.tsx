@@ -1,21 +1,51 @@
 import type { ReactNode } from 'react'
+import { initials } from '../lib/format'
+import { IconBell, IconSearch } from './Icons'
 
 export function Topbar({
-  eyebrow,
   title,
+  search,
+  searchValue,
+  onSearchChange,
+  avatarLabel,
   actions,
 }: {
-  eyebrow: string
-  title: string
+  title?: string
+  search?: string
+  searchValue?: string
+  onSearchChange?: (value: string) => void
+  avatarLabel?: string
   actions?: ReactNode
 }) {
   return (
     <header className="topbar">
-      <div className="topbar-copy">
-        <p className="eyebrow">{eyebrow}</p>
-        <h1>{title}</h1>
+      {title ? <h1>{title}</h1> : null}
+
+      {search ? (
+        <div className="topbar-search">
+          <IconSearch size={16} />
+          <input
+            type="search"
+            value={searchValue ?? ''}
+            onChange={(event) => onSearchChange?.(event.target.value)}
+            placeholder={search}
+            aria-label={search}
+          />
+        </div>
+      ) : null}
+
+      <div className="topbar-actions">
+        {actions}
+        <span className="bell" role="img" aria-label="Notifications">
+          <IconBell size={18} />
+        </span>
+        <span className="topbar-avatar" aria-hidden="true">
+          {initials(avatarLabel || '')}
+        </span>
       </div>
-      {actions ? <div className="topbar-actions">{actions}</div> : null}
     </header>
   )
 }
+
+export default Topbar
+

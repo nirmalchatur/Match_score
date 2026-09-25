@@ -58,7 +58,7 @@ export function AnalyzePage({ analyzing, error, result, onAnalyze }: Props) {
         }}
       >
         {STAGES.map(({ Icon, title, body }) => (
-          <div className="stat" key={title}>
+          <div className="stat-boxed" key={title}>
             <span className="stat-icon">
               <Icon size={16} />
             </span>
