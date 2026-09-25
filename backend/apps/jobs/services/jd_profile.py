@@ -1,9 +1,26 @@
+"""
+Job Description Profile Builder.
+
+Parses raw job description text and extracts:
+
+- Skills (matched against known list)
+- Experience (years)
+- Education (dedicated section or keywords)
+- Responsibilities (section-based)
+- Requirements (section-based)
+
+Handles both multi-line and cleaned single-line JD formats.
+"""
+
 import re
 
 from apps.resumes.services.skill_normalizer import SkillNormalizer
 
 
 class JDProfile:
+    """
+    Extracts structured profile data from raw job description text.
+    """
 
     SECTION_ALIASES = {
         "requirements": [
@@ -13,6 +30,10 @@ class JDProfile:
             "must have",
             "what we're looking for",
             "what we are looking for",
+            "you should have",
+            "you'll have",
+            "you will have",
+            "your qualifications",
         ],
         "responsibilities": [
             "responsibilities",
@@ -21,16 +42,44 @@ class JDProfile:
             "what you will do",
             "your role",
             "role responsibilities",
+            "what you'll be doing",
+            "what you will be doing",
         ],
         "education": [
             "education",
             "educational qualifications",
             "academic qualifications",
+            "educational background",
         ],
     }
 
+    # Headings that are not extracted sections,
+    # but should stop section extraction.
+    BOUNDARY_HEADINGS = [
+        "who will love this job",
+        "who we are",
+        "about us",
+        "about the company",
+        "about the team",
+        "our culture",
+        "our values",
+        "our mission",
+        "our story",
+        "why work here",
+        "why join us",
+        "what we offer",
+        "equal employment opportunity",
+        "equal opportunity employer",
+        "diversity & inclusion",
+        "diversity and inclusion",
+        "diversity statement",
+    ]
+
     @staticmethod
     def build(text: str) -> dict:
+        """
+        Build a structured profile dict from raw JD text.
+        """
 
         if not text or not text.strip():
             raise ValueError(
@@ -63,6 +112,9 @@ class JDProfile:
 
     @staticmethod
     def _extract_skills(text: str) -> list:
+        """
+        Extract skills by matching against a known list.
+        """
 
         known_skills = [
             "Python",
@@ -107,14 +159,25 @@ class JDProfile:
 
         text_lower = text.lower()
 
-        return sorted({
-            skill
-            for skill in known_skills
-            if skill.lower() in text_lower
-        })
+        return sorted(
+            {
+                skill
+                for skill in known_skills
+                if skill.lower() in text_lower
+            }
+        )
 
     @staticmethod
     def _extract_experience(text: str):
+        """
+        Extract years of experience.
+
+        Handles:
+        - X years of experience
+        - X yrs experience
+        - minimum X years
+        - at least X years
+        """
 
         patterns = [
             r"(\d+(?:\.\d+)?)\+?\s*"
@@ -133,7 +196,6 @@ class JDProfile:
         matches = []
 
         for pattern in patterns:
-
             matches.extend(
                 re.findall(
                     pattern,
@@ -152,6 +214,16 @@ class JDProfile:
 
     @staticmethod
     def _extract_education(text: str) -> list:
+        """
+        Extract education requirements from the JD.
+        """
+
+        # Normalize curly apostrophes.
+        text = (
+            text
+            .replace("\u2019", "'")
+            .replace("\u2018", "'")
+        )
 
         education_keywords = [
             "bachelor",
@@ -169,8 +241,7 @@ class JDProfile:
             "doctorate",
         ]
 
-        # First try to extract as a dedicated
-        # section (like responsibilities)
+        # First try dedicated education section.
         education_section = (
             JDProfile._extract_section(
                 text,
@@ -181,16 +252,18 @@ class JDProfile:
         if education_section:
             return education_section
 
-        # If no dedicated section, extract from
-        # requirements that contain education
-        # keywords
+        # Normalize whitespace.
         normalized_text = re.sub(
             r"\s+",
             " ",
             text.strip(),
         )
 
-        lines = normalized_text.split(" - ")
+        # Check hyphen-separated content.
+        lines = re.split(
+            r"\s+[-\u2013\u2014]\s+",
+            normalized_text,
+        )
 
         education_lines = [
             line.strip()
@@ -204,8 +277,7 @@ class JDProfile:
         if education_lines:
             return education_lines
 
-        # Fallback: check original splitlines
-        # for multi-line JDs
+        # Fallback to original lines.
         lines = text.splitlines()
 
         return [
@@ -218,18 +290,114 @@ class JDProfile:
         ]
 
     @staticmethod
+    def _normalize_text(text: str) -> str:
+        """
+        Normalize common Unicode punctuation that can
+        interfere with section detection.
+        """
+
+        return (
+            text
+            .replace("\u2019", "'")
+            .replace("\u2018", "'")
+            .replace("\u201c", '"')
+            .replace("\u201d", '"')
+        )
+
+    @staticmethod
+    def _all_stop_headings() -> list:
+        """
+        Return all section aliases and boundary headings.
+        """
+
+        headings = []
+
+        for values in (
+            JDProfile.SECTION_ALIASES.values()
+        ):
+            headings.extend(values)
+
+        headings.extend(
+            JDProfile.BOUNDARY_HEADINGS
+        )
+
+        return sorted(
+            set(headings),
+            key=len,
+            reverse=True,
+        )
+
+    @staticmethod
+    def _is_heading(
+        line: str,
+        headings: list,
+    ) -> bool:
+        """
+        Determine whether a line represents a section
+        or boundary heading.
+        """
+
+        normalized = (
+            line.strip()
+            .lower()
+            .rstrip(":")
+        )
+
+        for heading in headings:
+            if (
+                normalized == heading
+                or normalized.startswith(
+                    heading + " "
+                )
+                or normalized.endswith(
+                    " " + heading
+                )
+            ):
+                return True
+
+        return False
+
+    @staticmethod
     def _extract_section(
         text: str,
         section_name: str,
     ) -> list:
+        """
+        Extract a named section from the JD.
 
-        aliases = JDProfile.SECTION_ALIASES[
-            section_name
-        ]
+        Supports:
 
-        # -------------------------------------------------
-        # First try the normal multi-line format
-        # -------------------------------------------------
+        1. Normal multiline JDs
+        2. Cleaned single-line JDs
+        3. ASCII '-' bullets
+        4. En-dash '–' bullets
+        5. Em-dash '—' bullets
+
+        Inline hyphens such as:
+            trade-offs
+            full-stack
+            user-facing
+
+        are preserved.
+        """
+
+        text = JDProfile._normalize_text(text)
+
+        aliases = sorted(
+            JDProfile.SECTION_ALIASES[
+                section_name
+            ],
+            key=len,
+            reverse=True,
+        )
+
+        all_stop_headings = (
+            JDProfile._all_stop_headings()
+        )
+
+        # =================================================
+        # MULTI-LINE FORMAT
+        # =================================================
 
         lines = text.splitlines()
 
@@ -247,11 +415,11 @@ class JDProfile:
 
                 if (
                     normalized == alias
-                    or normalized.endswith(
-                        " " + alias
-                    )
                     or normalized.startswith(
                         alias + " "
+                    )
+                    or normalized.endswith(
+                        " " + alias
                     )
                 ):
                     start = index + 1
@@ -264,13 +432,6 @@ class JDProfile:
 
             section_lines = []
 
-            all_aliases = []
-
-            for values in (
-                JDProfile.SECTION_ALIASES.values()
-            ):
-                all_aliases.extend(values)
-
             for line in lines[start:]:
 
                 normalized = (
@@ -279,26 +440,15 @@ class JDProfile:
                     .rstrip(":")
                 )
 
-                # Stop at another section
-                if normalized in all_aliases:
+                # Stop at another section or
+                # boundary heading.
+                if normalized in all_stop_headings:
                     break
 
-                is_heading = False
-
-                for alias in all_aliases:
-
-                    if (
-                        normalized.endswith(
-                            " " + alias
-                        )
-                        or normalized.startswith(
-                            alias + " "
-                        )
-                    ):
-                        is_heading = True
-                        break
-
-                if is_heading:
+                if JDProfile._is_heading(
+                    line,
+                    all_stop_headings,
+                ):
                     break
 
                 if line.strip():
@@ -309,9 +459,9 @@ class JDProfile:
             if section_lines:
                 return section_lines
 
-        # -------------------------------------------------
-        # Single-line JD support
-        # -------------------------------------------------
+        # =================================================
+        # SINGLE-LINE FORMAT
+        # =================================================
 
         normalized_text = re.sub(
             r"\s+",
@@ -319,39 +469,61 @@ class JDProfile:
             text.strip(),
         )
 
-        # Find the requested section
-        # and the next major section.
+        # -------------------------------------------------
+        # Build the section header pattern.
+        # -------------------------------------------------
+
+        alias_pattern = "|".join(
+            re.escape(alias)
+            for alias in aliases
+        )
+
         section_pattern = (
             r"(?:^|\s)"
             r"(?P<header>"
-            + "|".join(
-                re.escape(alias)
-                for alias in aliases
-            )
+            + alias_pattern
             + r")"
             r"(?:\s*:\s*|\s+)"
             r"(?P<content>.*?)"
         )
+
+        # -------------------------------------------------
+        # Build stop headings.
+        #
+        # Do NOT include the current section aliases,
+        # because we need to capture after them.
+        # -------------------------------------------------
 
         next_sections = []
 
         for section_type, values in (
             JDProfile.SECTION_ALIASES.items()
         ):
-
             if section_type == section_name:
                 continue
 
-            for alias in values:
-                next_sections.append(
-                    re.escape(alias)
-                )
+            next_sections.extend(values)
+
+        next_sections.extend(
+            JDProfile.BOUNDARY_HEADINGS
+        )
+
+        next_sections = sorted(
+            set(next_sections),
+            key=len,
+            reverse=True,
+        )
 
         if next_sections:
 
+            next_section_pattern = "|".join(
+                re.escape(heading)
+                for heading in next_sections
+            )
+
             section_pattern += (
                 r"(?=\s+(?:"
-                + "|".join(next_sections)
+                + next_section_pattern
                 + r")"
                 r"(?:\s*:|\s|$))"
             )
@@ -372,15 +544,50 @@ class JDProfile:
         if not content:
             return []
 
-        # Remove bullet formatting
+        # =================================================
+        # SPLIT SINGLE-LINE BULLETS
+        # =================================================
+
+        # Handle:
+        #
+        # - item one
+        # - item two
+        #
+        # without destroying:
+        #
+        # trade-offs
+        # full-stack
+        # user-facing
+        #
+        # We only split when the dash has whitespace
+        # on BOTH sides.
         content = re.sub(
-            r"\s*-\s*",
+            r"\s+[-\u2013\u2014]\s+",
             "\n",
             content,
         )
 
-        return [
+        # =================================================
+        # CLEAN RESULT
+        # =================================================
+
+        items = [
             line.strip()
             for line in content.splitlines()
             if line.strip()
         ]
+
+        if len(items) <= 1:
+            sentence_items = [
+                item.strip()
+                for item in re.split(
+                    r"(?<=[.!?])\s+|(?<=[a-z0-9])\s+(?=[A-Z])",
+                    content,
+                )
+                if item.strip()
+            ]
+
+            if len(sentence_items) > 1:
+                return sentence_items
+
+        return items

@@ -16,8 +16,11 @@ class JobSerializer(serializers.ModelSerializer):
             "location",
             "description",
             "match_score",
+            "match_result",
             "decision",
             "status",
+            "error_message",
+            "pipeline_steps",
             "created_at",
             "updated_at",
         ]
@@ -29,22 +32,26 @@ class JobSerializer(serializers.ModelSerializer):
         ]
 
 
+class AnalyzeJobSerializer(serializers.Serializer):
+    url = serializers.URLField()
+
+
 class JobMatchSerializer(serializers.Serializer):
 
     url = serializers.URLField()
 
     company = serializers.CharField(
-        max_length=255
+        max_length=255,
     )
 
     title = serializers.CharField(
-        max_length=255
+        max_length=255,
     )
 
     location = serializers.CharField(
         max_length=255,
         required=False,
-        allow_blank=True
+        allow_blank=True,
     )
 
     jd_text = serializers.CharField()
