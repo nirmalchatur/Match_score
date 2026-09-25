@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'apps.jobs',
     'apps.resumes',
+    'apps.users',
 ]
 
 MIDDLEWARE = [
@@ -79,6 +80,35 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+
+
+# Django REST Framework
+#
+# SessionAuthentication is used instead of token auth so the browser holds
+# an HttpOnly session cookie and no secret is readable from JavaScript.
+# CSRF is enforced by Django for all unsafe methods on session requests.
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+}
+
+
+# CORS — the Vite dev server runs on a different port, so credentials and
+# CSRF trust must be declared explicitly for session auth to work.
+
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
 
 
 # Database
@@ -127,6 +157,22 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Uploaded resumes. Files are stored per-account under media/<user_id>/.
+
+MEDIA_URL = '/media/'
+
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# 10 MB ceiling for an uploaded master resume.
+MAX_RESUME_UPLOAD_BYTES = 10 * 1024 * 1024
+
+ALLOWED_RESUME_CONTENT_TYPES = {
+    'application/pdf',
+    'application/x-pdf',
+}
+
+ALLOWED_RESUME_EXTENSIONS = {'.pdf'}
 
 
 # Email

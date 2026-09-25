@@ -13,6 +13,7 @@ import requests
 
 from django.core.exceptions import ObjectDoesNotExist
 
+from django.contrib.auth.models import User
 from apps.jobs.models import Job
 from apps.jobs.services.sources.greenhouse import GreenhouseCollector
 from apps.jobs.services.job_processor import JobProcessor
@@ -25,7 +26,13 @@ class GreenhouseJobProcessorPipelineTest(TestCase):
     def setUp(self):
         """Set up test data: master resume and profile."""
         # Create master resume
+        self.user = User.objects.create_user(
+            username="pipeline@example.com",
+            email="pipeline@example.com",
+            password="pipeline-pass-123",
+        )
         self.master_resume = Resume.objects.create(
+            user=self.user,
             name="Master Resume",
             resume_type="MASTER",
             is_master=True,
@@ -112,7 +119,7 @@ class GreenhouseJobProcessorPipelineTest(TestCase):
 
         # Act: Run the pipeline
         job_data = GreenhouseCollector.collect(url)
-        job, result, created = JobProcessor.process(job_data)
+        job, result, created = JobProcessor.process(job_data, self.user)
 
         # Assert: Job was created
         self.assertTrue(created)
@@ -159,7 +166,7 @@ class GreenhouseJobProcessorPipelineTest(TestCase):
 
         # Act: First run
         job_data_1 = GreenhouseCollector.collect(url)
-        job_1, result_1, created_1 = JobProcessor.process(job_data_1)
+        job_1, result_1, created_1 = JobProcessor.process(job_data_1, self.user)
 
         # Assert: First run creates
         self.assertTrue(created_1)
@@ -167,7 +174,7 @@ class GreenhouseJobProcessorPipelineTest(TestCase):
 
         # Act: Second run (same URL)
         job_data_2 = GreenhouseCollector.collect(url)
-        job_2, result_2, created_2 = JobProcessor.process(job_data_2)
+        job_2, result_2, created_2 = JobProcessor.process(job_data_2, self.user)
 
         # Assert: Second run updates, not creates
         self.assertFalse(created_2)
@@ -202,7 +209,7 @@ class GreenhouseJobProcessorPipelineTest(TestCase):
 
         # Act & Assert: Should raise error
         with self.assertRaises(Resume.DoesNotExist):
-            JobProcessor.process(job_data)
+            JobProcessor.process(job_data, self.user)
 
     def test_4_missing_resume_profile(self):
         """Test case 4: Error when master resume has no profile."""
@@ -225,7 +232,7 @@ class GreenhouseJobProcessorPipelineTest(TestCase):
         from django.core.exceptions import ObjectDoesNotExist
 
         with self.assertRaises(ObjectDoesNotExist):
-            JobProcessor.process(job_data)
+            JobProcessor.process(job_data, self.user)
 
     @patch(
         "apps.jobs.services.sources.greenhouse.requests.get"
@@ -282,7 +289,7 @@ class GreenhouseJobProcessorPipelineTest(TestCase):
 
         # Act: Run pipeline
         job_data = GreenhouseCollector.collect(url)
-        job, result, created = JobProcessor.process(job_data)
+        job, result, created = JobProcessor.process(job_data, self.user)
 
         # Refresh from database
         job.refresh_from_db()
@@ -334,7 +341,13 @@ class GreenhouseJobProcessorErrorHandlingTest(TestCase):
 
     def setUp(self):
         """Set up test master resume."""
+        self.user = User.objects.create_user(
+            username="pipeline@example.com",
+            email="pipeline@example.com",
+            password="pipeline-pass-123",
+        )
         self.master_resume = Resume.objects.create(
+            user=self.user,
             name="Master Resume",
             resume_type="MASTER",
             is_master=True,
@@ -397,7 +410,13 @@ class GreenhouseJobProcessorMultipleJobsTest(TestCase):
 
     def setUp(self):
         """Set up test master resume."""
+        self.user = User.objects.create_user(
+            username="pipeline@example.com",
+            email="pipeline@example.com",
+            password="pipeline-pass-123",
+        )
         self.master_resume = Resume.objects.create(
+            user=self.user,
             name="Master Resume",
             resume_type="MASTER",
             is_master=True,
@@ -456,7 +475,7 @@ class GreenhouseJobProcessorMultipleJobsTest(TestCase):
         mock_get.return_value = mock_response_1
 
         job_data_1 = GreenhouseCollector.collect(url_1)
-        job_1, _, created_1 = JobProcessor.process(job_data_1)
+        job_1, _, created_1 = JobProcessor.process(job_data_1, self.user)
 
         self.assertTrue(created_1)
         self.assertEqual(job_1.url, url_1)
@@ -477,7 +496,7 @@ class GreenhouseJobProcessorMultipleJobsTest(TestCase):
         mock_get.return_value = mock_response_2
 
         job_data_2 = GreenhouseCollector.collect(url_2)
-        job_2, _, created_2 = JobProcessor.process(job_data_2)
+        job_2, _, created_2 = JobProcessor.process(job_data_2, self.user)
 
         self.assertTrue(created_2)
         self.assertEqual(job_2.url, url_2)

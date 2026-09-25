@@ -1,3 +1,4 @@
+import { useCallback, useMemo, useState } from 'react'
 import { formatScore } from '../lib/format'
 import type { Job, Resume } from '../lib/types'
 import {
@@ -17,11 +18,9 @@ type Props = {
   loading: boolean
   error: string
   refreshing: boolean
-  selectedJob: Job | null
   masterResume: Resume | null
   analyzing: boolean
   onRefresh: () => void
-  onSelectJob: (job: Job) => void
   onAnalyze: (url: string) => void
 }
 
@@ -30,13 +29,22 @@ export function DashboardPage({
   loading,
   error,
   refreshing,
-  selectedJob,
   masterResume,
   analyzing,
   onRefresh,
-  onSelectJob,
   onAnalyze,
 }: Props) {
+  // Selection is derived, not synced: the picked job, else the newest.
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const selectedJob = useMemo(
+    () => jobs.find((job) => job.id === selectedId) ?? jobs[0] ?? null,
+    [jobs, selectedId],
+  )
+
+  const handleSelectJob = useCallback((job: Job) => {
+    setSelectedId(job.id)
+  }, [])
+
   const scored = jobs.filter((job) => job.match_score != null)
   const average = scored.length
     ? scored.reduce((sum, job) => sum + (job.match_score ?? 0), 0) / scored.length
@@ -125,7 +133,7 @@ export function DashboardPage({
                   key={job.id}
                   job={job}
                   selected={selectedJob?.id === job.id}
-                  onSelect={onSelectJob}
+                  onSelect={handleSelectJob}
                 />
               ))}
             </div>

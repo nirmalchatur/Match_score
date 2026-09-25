@@ -5,6 +5,7 @@ import {
   IconFile,
   IconLogo,
   IconRadar,
+  IconSettings,
 } from './Icons'
 
 type NavItem = {
@@ -22,6 +23,7 @@ const PRIMARY: NavItem[] = [
 const SECONDARY: NavItem[] = [
   { key: 'jobs', label: 'Jobs', Icon: IconBriefcase },
   { key: 'resumes', label: 'Resumes', Icon: IconFile },
+  { key: 'settings', label: 'Settings', Icon: IconSettings },
 ]
 
 export function Sidebar({

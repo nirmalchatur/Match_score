@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -20,8 +21,18 @@ class Job(models.Model):
         ("SKIP", "Skip"),
         ("REVIEW", "Review"),
     ]
-    # This prevents duplicate job postings from being saved.
-    url = models.URLField(unique=True)
+
+    # Every job belongs to exactly one account. This is the tenant boundary:
+    # API queries must always be scoped by this field.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="jobs",
+    )
+
+    # Prevents duplicate job postings per account. Scoped to the owner so two
+    # different users can analyse the same posting independently.
+    url = models.URLField()
 
     company = models.CharField(max_length=255)
 
@@ -76,3 +87,12 @@ class Job(models.Model):
 
     def __str__(self):
         return f"{self.company} - {self.title}"
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "url"],
+                name="unique_job_url_per_user",
+            ),
+        ]

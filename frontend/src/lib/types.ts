@@ -58,7 +58,7 @@ export interface AnalyzeResponse {
   job: Job
 }
 
-export type ViewKey = 'dashboard' | 'analyze' | 'jobs' | 'resumes'
+export type ViewKey = 'dashboard' | 'analyze' | 'jobs' | 'resumes' | 'settings'
 
 export type ToastVariant = 'success' | 'error' | 'info'
 
@@ -68,3 +68,34 @@ export interface Toast {
   title: string
   message?: string
 }
+
+/* ---------- Auth ---------- */
+
+export interface UserProfile {
+  headline: string
+  discipline: string
+  target_locations: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface User {
+  id: number
+  email: string
+  first_name: string
+  last_name: string
+  date_joined: string
+  profile: UserProfile | null
+  has_master_resume: boolean
+  job_count: number
+}
+
+export interface MeResponse {
+  user: User | null
+  authenticated: boolean
+}
+
+export interface AuthResponse {
+  user: User
+}
+

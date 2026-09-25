@@ -7,11 +7,19 @@ from apps.resumes.models import Resume
 class JobProcessor:
 
     @staticmethod
-    def process(job_data):
+    def process(job_data, user):
+        """
+        Run the analysis pipeline for a single account.
 
-        # Get master resume
+        Both the master resume lookup and the Job upsert are scoped to
+        `user`, so one account can never score against another account's
+        resume, nor overwrite another account's saved job.
+        """
+
+        # Get this account's master resume
         resume = Resume.objects.get(
-            is_master=True
+            user=user,
+            is_master=True,
         )
 
         # Get structured resume profile
@@ -44,8 +52,9 @@ class JobProcessor:
             jd_profile,
         )
 
-        # Save/update Job
+        # Save/update Job (scoped to the owner)
         job, created = Job.objects.update_or_create(
+            user=user,
             url=job_data.url,
             defaults={
                 "company": job_data.company,

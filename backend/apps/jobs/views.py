@@ -2,6 +2,7 @@ from urllib.parse import urlparse
 
 from django.db.models import Q
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -21,11 +22,14 @@ from .serializers import (
 class JobAnalyzeView(APIView):
     """Dashboard entry point for analyzing a Greenhouse job URL."""
 
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         serializer = AnalyzeJobSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         url = serializer.validated_data["url"]
+        user = request.user
 
         try:
             parsed = urlparse(url)
@@ -35,6 +39,7 @@ class JobAnalyzeView(APIView):
             job_data = GreenhouseCollector.collect(url)
 
             job, created = Job.objects.update_or_create(
+                user=user,
                 url=job_data.url,
                 defaults={
                     "company": job_data.company,
@@ -54,7 +59,7 @@ class JobAnalyzeView(APIView):
                 },
             )
 
-            job, result, _ = JobProcessor.process(job_data)
+            job, result, _ = JobProcessor.process(job_data, user)
             job.status = "COMPLETED" if result.get("score") is not None else "READY"
             job.error_message = ""
             job.pipeline_steps = [
@@ -105,6 +110,8 @@ class JobAnalyzeView(APIView):
 
 class JobMatchView(APIView):
 
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
 
         serializer = JobMatchSerializer(
@@ -135,6 +142,7 @@ class JobMatchView(APIView):
             job, result, created = (
                 JobProcessor.process(
                     job_data,
+                    request.user,
                 )
             )
 
@@ -180,8 +188,13 @@ class JobMatchView(APIView):
 
 class JobListView(APIView):
 
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
-        jobs = Job.objects.all()
+        # Tenant boundary: only ever this account's jobs.
+        jobs = Job.objects.filter(
+            user=request.user
+        )
 
         query = request.query_params.get("q")
         status_filter = request.query_params.get("status")
@@ -219,12 +232,17 @@ class JobListView(APIView):
 
 class JobDetailView(APIView):
 
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, pk):
 
         try:
 
+            # Scoping the lookup prevents IDOR: a guessed pk belonging to
+            # another account resolves to 404, not someone else's data.
             job = Job.objects.get(
                 pk=pk,
+                user=request.user,
             )
 
         except Job.DoesNotExist:

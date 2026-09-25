@@ -10,6 +10,11 @@ urlpatterns = [
     ),
 
     path(
+        "api/auth/",
+        include("apps.users.urls"),
+    ),
+
+    path(
         "api/jobs/",
         include("apps.jobs.urls"),
     ),

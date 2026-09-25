@@ -1,5 +1,9 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, api } from './lib/api'
+import { AuthProvider } from './auth/AuthProvider'
+import { useAuth } from './auth/useAuth'
+import { RequireAnonymous, RequireAuth, RequireMasterResume } from './auth/guards'
 import { useJobs, useResumes } from './hooks/useData'
 import { useToasts } from './hooks/useToasts'
 import type { Job, ViewKey } from './lib/types'
@@ -11,17 +15,42 @@ import { DashboardPage } from './pages/DashboardPage'
 import { AnalyzePage } from './pages/AnalyzePage'
 import { JobsPage } from './pages/JobsPage'
 import { ResumesPage } from './pages/ResumesPage'
+import { SettingsPage } from './pages/SettingsPage'
+import { LandingPage } from './pages/LandingPage'
+import { LoginPage } from './pages/LoginPage'
+import { SignupPage } from './pages/SignupPage'
+import { OnboardingPage } from './pages/OnboardingPage'
 
 const HEADINGS: Record<ViewKey, { eyebrow: string; title: string }> = {
-  dashboard: { eyebrow: 'Dashboard', title: 'Analyze a Job' },
+  dashboard: { eyebrow: 'Workspace', title: 'Dashboard' },
   analyze: { eyebrow: 'Pipeline', title: 'New Analysis' },
   jobs: { eyebrow: 'Library', title: 'Jobs' },
   resumes: { eyebrow: 'Library', title: 'Resumes' },
+  settings: { eyebrow: 'Account', title: 'Settings' },
 }
 
-export default function App() {
-  const [view, setView] = useState<ViewKey>('dashboard')
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+const PATHS: Record<ViewKey, string> = {
+  dashboard: '/app/dashboard',
+  analyze: '/app/analyze',
+  jobs: '/app/jobs',
+  resumes: '/app/resumes',
+  settings: '/app/settings',
+}
+
+const PATH_TO_VIEW = Object.entries(PATHS).reduce<Record<string, ViewKey>>(
+  (acc, [key, path]) => ({ ...acc, [path]: key as ViewKey }),
+  {},
+)
+
+/**
+ * The authenticated workspace. Owns the shared job/resume state and renders
+ * the dashboard pages for whichever /app route is active.
+ */
+function AppShell() {
+  const { markSessionExpired } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeError, setAnalyzeError] = useState('')
   const [analyzeResult, setAnalyzeResult] = useState<Job | null>(null)
@@ -36,15 +65,15 @@ export default function App() {
   } = useResumes()
   const { toasts, dismiss, notify } = useToasts()
 
-  // Derived: the explicitly picked job, else the newest one in the list.
-  const selectedJob = useMemo(
-    () => jobs.find((job) => job.id === selectedId) ?? jobs[0] ?? null,
-    [jobs, selectedId],
-  )
+  const view = (PATH_TO_VIEW[location.pathname] ?? 'dashboard') as ViewKey
+  const heading = HEADINGS[view] ?? HEADINGS.dashboard
 
-  const handleSelectJob = useCallback((job: Job) => {
-    setSelectedId(job.id)
-  }, [])
+  const handleNavigate = useCallback(
+    (key: ViewKey) => {
+      navigate(PATHS[key] ?? '/app/dashboard')
+    },
+    [navigate],
+  )
 
   const handleAnalyze = useCallback(
     async (url: string) => {
@@ -53,13 +82,19 @@ export default function App() {
       try {
         const data = await api.analyzeJob(url)
         setAnalyzeResult(data.job)
-        setSelectedId(data.job.id)
         notify.success(
           'Analysis complete',
           `${data.job.company || 'Job'} — ${data.job.title || 'untitled role'}`,
         )
         await refresh()
       } catch (err) {
+        // A 401/403 means the session lapsed: send the user to sign in rather
+        // than showing a generic failure.
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          markSessionExpired()
+          navigate('/login', { replace: true })
+          return
+        }
         const message =
           err instanceof ApiError ? err.message : 'Something went wrong while analyzing the job.'
         setAnalyzeError(message)
@@ -68,15 +103,8 @@ export default function App() {
         setAnalyzing(false)
       }
     },
-    [notify, refresh],
+    [markSessionExpired, navigate, notify, refresh],
   )
-
-  const handleNavigate = useCallback((next: ViewKey) => {
-    setView(next)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [])
-
-  const heading = HEADINGS[view]
 
   return (
     <div className="app-shell">
@@ -117,11 +145,9 @@ export default function App() {
             loading={loading}
             error={error}
             refreshing={loading}
-            selectedJob={selectedJob}
             masterResume={master}
             analyzing={analyzing}
             onRefresh={() => void refresh()}
-            onSelectJob={handleSelectJob}
             onAnalyze={(url) => void handleAnalyze(url)}
           />
         ) : null}
@@ -146,9 +172,46 @@ export default function App() {
             onRefresh={() => void refreshResumes()}
           />
         ) : null}
+
+        {view === 'settings' ? <SettingsPage /> : null}
       </div>
 
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
   )
 }
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Routes>
+        {/* Public marketing + auth */}
+        <Route element={<RequireAnonymous />}>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+        </Route>
+
+        {/* Onboarding — signed in, but may not have a master resume yet */}
+        <Route element={<RequireAuth />}>
+          <Route path="/setup/resume" element={<OnboardingPage />} />
+        </Route>
+
+        {/* Private workspace — requires a master resume to be useful */}
+        <Route element={<RequireAuth />}>
+          <Route path="/app" element={<RequireMasterResume />}>
+            <Route path="dashboard" element={<AppShell />} />
+            <Route path="analyze" element={<AppShell />} />
+            <Route path="jobs" element={<AppShell />} />
+            <Route path="resumes" element={<AppShell />} />
+            <Route path="settings" element={<AppShell />} />
+            <Route index element={<Navigate to="/app/dashboard" replace />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AuthProvider>
+  )
+}
+

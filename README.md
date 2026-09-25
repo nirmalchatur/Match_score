@@ -1,15 +1,128 @@
 
-# MatchScore 🚀
+# TailorUp 🚀
 
 ### AI-Powered Job Matching & Resume Optimization Platform
 
-MatchScore is an intelligent job-matching backend that analyzes a candidate's resume against job descriptions, calculates a transparent compatibility score, identifies skill gaps, evaluates experience and education requirements, and determines whether the candidate should use their master resume or tailor it for a specific job.
+> Formerly known as **MatchScore**. The internal Python modules and services keep
+> their original names (`MatchEngine`, `JobProcessor`, `JDProfile`, …) to avoid a
+> risky rename — only the product-facing brand is TailorUp.
 
-The project is being built as a modular backend-first system with Django REST Framework, with plans to integrate AI-powered resume tailoring and automated job application workflows.
+TailorUp is an intelligent job-matching platform that analyzes a candidate's resume against job descriptions, calculates a transparent compatibility score, identifies skill gaps, evaluates experience and education requirements, and determines whether the candidate should use their master resume or tailor it for a specific job.
+
+It is now a **multi-user SaaS application**: accounts, session authentication, and
+strict per-user data isolation, with a public marketing site in front of an
+authenticated workspace.
 
 ---
 
-## ✨ Why MatchScore?
+## 🏗️ Architecture at a glance
+
+```text
+                      TAILORUP
+                         │
+           ┌─────────────┴─────────────┐
+           │                           │
+      Marketing Site              SaaS Application
+           │                           │
+      / (Landing)                  Auth (session + CSRF)
+      /login                            │
+      /signup                           ▼
+                                  /setup/resume  (master resume)
+                                         │
+                                         ▼
+                                  /app/dashboard ── /app/jobs
+                                  /app/resumes      /app/analyze
+                                                         /app/settings
+```
+
+Every job, resume, and analysis is owned by exactly one account. API responses
+are always filtered by `request.user`; see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+| Layer | Technology |
+| --- | --- |
+| Backend | Django 6.1, Django REST Framework 3.18 |
+| Database | SQLite (development) |
+| Frontend | React 19, TypeScript, Vite, React Router 7 |
+| Parsing | pypdf (resumes), BeautifulSoup (job HTML) |
+
+---
+
+## 🚀 Quick start
+
+### 1. Backend
+
+```bash
+cd ai-job-agent
+python -m venv venv
+venv\Scripts\activate            # Windows
+pip install -r backend/requirements.txt
+
+cd backend
+python manage.py migrate
+python manage.py runserver
+```
+
+The API is served on <http://127.0.0.1:8000>.
+
+### 2. Frontend
+
+```bash
+cd ai-job-agent/frontend
+npm install
+npm run dev
+```
+
+Open <http://127.0.0.1:5173>. Vite proxies `/api` and `/media` to Django, so no
+CORS setup is needed for local development.
+
+### 3. First run
+
+1. Go to <http://127.0.0.1:5173/signup> and create an account.
+2. Upload a PDF master resume on `/setup/resume`.
+3. Land on the dashboard and paste a Greenhouse job URL.
+
+> Uploading a master resume is required before the workspace is usable, because
+> every match score is calculated against it.
+
+---
+
+## 🔐 Authentication
+
+Session-based (not token-based): the browser holds an `HttpOnly` session cookie,
+so no secret is ever readable from JavaScript. Django enforces CSRF on every
+unsafe request.
+
+| Endpoint | Method | Auth | Purpose |
+| --- | --- | --- | --- |
+| `/api/auth/register/` | POST | Public | Create an account (auto sign-in) |
+| `/api/auth/login/` | POST | Public | Start a session |
+| `/api/auth/logout/` | POST | Public | End the session |
+| `/api/auth/me/` | GET | Public | Current account, or `{authenticated: false}` |
+| `/api/auth/profile/` | GET/PATCH | Required | Workspace preferences |
+
+Full reference: [`docs/API.md`](docs/API.md).
+
+---
+
+## 🧪 Tests
+
+```bash
+cd backend
+python manage.py test -v 2
+```
+
+Covers the original job pipeline (Greenhouse collection, JD parsing, matching)
+plus authentication and cross-account isolation.
+
+```bash
+cd frontend
+npm run build     # typecheck + production bundle
+npx oxlint        # lint
+```
+
+---
+
+## ✨ Why TailorUp?
 
 Applying to hundreds of jobs manually creates a major problem:
 
@@ -20,9 +133,9 @@ Applying to hundreds of jobs manually creates a major problem:
 - Should I tailor my resume for this job?
 - Is the job worth applying to?
 
-MatchScore aims to automate this decision-making process.
+TailorUp aims to automate this decision-making process.
 
-Instead of simply performing keyword matching, MatchScore builds structured profiles from both the candidate's resume and the job description.
+Instead of simply performing keyword matching, TailorUp builds structured profiles from both the candidate's resume and the job description.
 
 ```text
                  ┌──────────────────────┐

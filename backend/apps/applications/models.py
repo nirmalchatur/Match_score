@@ -1,6 +1,6 @@
 from django.db import models
-from jobs.models import Job
-from resumes.models import Resume
+from apps.jobs.models import Job
+from apps.resumes.models import Resume
 
 
 class Application(models.Model):
