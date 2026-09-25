@@ -10,29 +10,76 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
+def env_bool(name: str, default: bool = False) -> bool:
+    """Read a boolean from the environment."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-p+5n*rakbw!%13ugg*&@t945llh0&3qf3pxm0ns!79o*7v5t&u'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+def env_list(name: str, default: str = "") -> list:
+    """Read a comma-separated list from the environment."""
+    raw = os.environ.get(name, default)
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-]
+# ---------------------------------------------------------------------------
+# Security
+#
+# Local development falls back to the in-repo defaults. In production these
+# MUST come from the environment — never commit a real secret key.
+# ---------------------------------------------------------------------------
+
+SECRET_KEY = os.environ.get(
+    "SECRET_KEY",
+    "django-insecure-development-only-do-not-use-in-production",
+)
+
+DEBUG = env_bool("DEBUG", default=True)
+
+# The Vercel-hosted frontend must be allowed to call the API.
+FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "")
+
+ALLOWED_HOSTS = env_list(
+    "ALLOWED_HOSTS",
+    default="localhost,127.0.0.1,[::1]",
+)
+
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
+    default=(
+        "http://localhost:5173,"
+        "http://127.0.0.1:5173,"
+        "http://localhost:3000,"
+        "http://127.0.0.1:3000"
+    ),
+)
+
+CSRF_TRUSTED_ORIGINS = env_list(
+    "CSRF_TRUSTED_ORIGINS",
+    default="http://localhost:5173,http://127.0.0.1:5173",
+)
+
+# Fold the single frontend origin into both lists when it is provided.
+if FRONTEND_ORIGIN:
+    if FRONTEND_ORIGIN not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(FRONTEND_ORIGIN)
+    if FRONTEND_ORIGIN not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(FRONTEND_ORIGIN)
+
+# Serve uploaded resumes. In production, MEDIA_URL is expected to be handled by
+# the web server (or object storage) rather than by Django.
+if DEBUG:
+    _MEDIA_SERVE = True
+
 
 # Application definition
 
@@ -98,17 +145,9 @@ REST_FRAMEWORK = {
 }
 
 
-# CORS — the Vite dev server runs on a different port, so credentials and
-# CSRF trust must be declared explicitly for session auth to work.
-
+# CORS — credentials must be allowed for the session cookie to cross origins.
+# CSRF_TRUSTED_ORIGINS is configured near the top of this file.
 CORS_ALLOW_CREDENTIALS = True
-
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-]
 
 
 # Database
