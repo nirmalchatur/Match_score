@@ -14,11 +14,11 @@ import { UrlForm } from '../components/UrlForm'
  */
 const COLUMNS = [
   { key: 'saved', label: 'Saved', test: (score: number | null) => score == null || score < 50 },
-  { key: 'applied', label: 'Applied', test: (score: number) => score >= 50 && score < 60 },
-  { key: 'assessment', label: 'Assessment', test: (score: number) => score >= 60 && score < 70 },
-  { key: 'interview', label: 'Interview', test: (score: number) => score >= 70 && score < 80 },
-  { key: 'offer', label: 'Offer', test: (score: number) => score >= 80 && score < 90 },
-  { key: 'rejected', label: 'Rejected', test: (score: number) => score >= 90 },
+  { key: 'applied', label: 'Applied', test: (score: number | null) => score != null && score >= 50 && score < 60 },
+  { key: 'assessment', label: 'Assessment', test: (score: number | null) => score != null && score >= 60 && score < 70 },
+  { key: 'interview', label: 'Interview', test: (score: number | null) => score != null && score >= 70 && score < 80 },
+  { key: 'offer', label: 'Offer', test: (score: number | null) => score != null && score >= 80 && score < 90 },
+  { key: 'rejected', label: 'Rejected', test: (score: number | null) => score != null && score >= 90 },
 ]
 
 type ColumnKey = (typeof COLUMNS)[number]['key']

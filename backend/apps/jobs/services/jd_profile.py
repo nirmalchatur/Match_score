@@ -15,6 +15,7 @@ Handles both multi-line and cleaned single-line JD formats.
 import re
 
 from apps.resumes.services.skill_normalizer import SkillNormalizer
+from apps.resumes.services import skill_catalog
 
 
 class JDProfile:
@@ -113,59 +114,12 @@ class JDProfile:
     @staticmethod
     def _extract_skills(text: str) -> list:
         """
-        Extract skills by matching against a known list.
+        Extract skills by matching against the shared skill vocabulary.
         """
-
-        known_skills = [
-            "Python",
-            "Django",
-            "FastAPI",
-            "REST API",
-            "SQL",
-            "PostgreSQL",
-            "MySQL",
-            "SQLite",
-            "Docker",
-            "Kubernetes",
-            "AWS",
-            "Azure",
-            "GCP",
-            "Git",
-            "GitHub",
-            "Linux",
-            "Java",
-            "C++",
-            "JavaScript",
-            "TypeScript",
-            "React",
-            "Node.js",
-            "HTML",
-            "CSS",
-            "Machine Learning",
-            "Artificial Intelligence",
-            "Pandas",
-            "NumPy",
-            "TensorFlow",
-            "PyTorch",
-            "Spring Boot",
-            "Flask",
-            "MongoDB",
-            "Redis",
-            "Kafka",
-            "Terraform",
-            "Jenkins",
-            "CI/CD",
-        ]
-
-        text_lower = text.lower()
-
-        return sorted(
-            {
-                skill
-                for skill in known_skills
-                if skill.lower() in text_lower
-            }
-        )
+        # Reads the single shared vocabulary (apps.resumes.services
+        # .skill_catalog) instead of a private copy. The result stays sorted
+        # to preserve the historical ordering of this method's output.
+        return sorted(skill_catalog.extract_skills(text))
 
     @staticmethod
     def _extract_experience(text: str):
