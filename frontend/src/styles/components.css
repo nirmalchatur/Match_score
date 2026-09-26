@@ -1521,3 +1521,238 @@
   }
 }
 
+
+/* ==========================================================================
+   Before / After review  (AI resume tailoring)
+
+   Deliberately reuses the existing tokens (--ink, --surface, --border,
+   --text-dim) so the panel reads as part of the job card rather than a
+   separate feature bolted on.
+   ========================================================================== */
+
+.ba {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  background: var(--surface);
+}
+
+.ba-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ba-head .section-title {
+  margin: 0;
+}
+
+.ba-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.ba-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--border);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: ba-spin 0.7s linear infinite;
+  flex: none;
+}
+
+@keyframes ba-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respect the OS setting: no spinner animation for reduced-motion users. */
+@media (prefers-reduced-motion: reduce) {
+  .ba-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+.ba-review {
+  margin-top: 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.ba-verdict {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------- One changed section ---------- */
+
+.ba-entry {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px;
+  background: var(--paper, #fff);
+}
+
+.ba-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.ba-entry-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ba-entry-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.ba-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 720px) {
+  .ba-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ba-col {
+  min-width: 0;
+}
+
+.ba-col-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.ba-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  display: grid;
+  gap: 6px;
+}
+
+.ba-list li {
+  color: var(--text-muted);
+}
+
+.ba-after li {
+  color: var(--text);
+}
+
+/* The removed bullet is struck through: the "before" is visibly superseded
+   rather than silently replaced. */
+.ba-before li {
+  text-decoration: line-through;
+  text-decoration-color: var(--border);
+  text-decoration-thickness: 1px;
+  color: var(--text-dim);
+}
+
+.ba-why {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.ba-why summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ba-why ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+/* ---------- Flags ---------- */
+
+.ba-violations ul,
+.ba-unsupported ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  display: grid;
+  gap: 5px;
+}
+
+.ba-violations li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.ba-sev {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.ba-sev-rejected {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.ba-unsupported {
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+
+.ba-skills {
+  display: grid;
+  gap: 12px;
+}
+
+.ba-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ba-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.ba-actions .stat-hint {
+  flex: 1 1 220px;
+}

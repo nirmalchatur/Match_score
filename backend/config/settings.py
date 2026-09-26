@@ -146,6 +146,40 @@ REST_FRAMEWORK = {
 }
 
 
+# ---------------------------------------------------------------------------
+# AI / resume tailoring
+#
+# The provider is selected by name so no business logic ever needs to know which
+# backend is in use. apps.ai.factory maps AI_PROVIDER onto a provider class, and
+# the provider itself reads its own connection settings from here.
+#
+#   AI_PROVIDER=ollama     local Ollama daemon
+#   AI_PROVIDER=fake       deterministic in-process double, for tests and CI
+#
+# Leaving AI_PROVIDER empty disables tailoring: the API then returns a clear
+# "not configured" error rather than silently degrading to canned text.
+# ---------------------------------------------------------------------------
+
+AI_PROVIDER = (os.environ.get("AI_PROVIDER") or "").strip().lower()
+
+OLLAMA_BASE_URL = (os.environ.get("OLLAMA_BASE_URL") or "").strip()
+
+OLLAMA_MODEL = (os.environ.get("OLLAMA_MODEL") or "").strip()
+
+#: Seconds to wait for the provider. Local models are slow on a cold start, so
+#: this is generous; the API surfaces a timeout rather than hanging.
+OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "180"))
+
+#: Low by default: tailoring must stay close to the source text, not improvise.
+OLLAMA_TEMPERATURE = float(os.environ.get("OLLAMA_TEMPERATURE", "0.2"))
+
+# Default to ollama only when it is actually pointed at something, so local
+# development works out of the box while a misconfigured deployment can never
+# pretend an AI backend exists.
+if not AI_PROVIDER and OLLAMA_BASE_URL and OLLAMA_MODEL:
+    AI_PROVIDER = "ollama"
+
+
 # CORS — credentials must be allowed for the session cookie to cross origins.
 # CSRF_TRUSTED_ORIGINS is configured near the top of this file.
 CORS_ALLOW_CREDENTIALS = True

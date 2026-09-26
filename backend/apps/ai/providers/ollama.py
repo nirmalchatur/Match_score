@@ -205,3 +205,5 @@ class OllamaProvider(AIProvider):
                 detail=f"Keys returned: {sorted(payload.keys())}",
             )
 
+        return content
+

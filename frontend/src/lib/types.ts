@@ -99,3 +99,91 @@ export interface AuthResponse {
   user: User
 }
 
+/* ---------- AI resume tailoring ---------- */
+
+/**
+ * Verdict from the server-side factual validator.
+ *
+ * `warning` is still returned to the user for review; `rejected` never reaches
+ * the browser as a suggestion, because it claimed something the master resume
+ * does not support.
+ */
+export type TailoringVerdict = 'valid' | 'warning' | 'rejected'
+
+export interface TailoringViolation {
+  code: string
+  severity: 'warning' | 'rejected'
+  message: string
+  section: string
+  entry_id: string
+}
+
+export interface TailoringValidation {
+  status: TailoringVerdict
+  rejected: boolean
+  needs_review: boolean
+  violations: TailoringViolation[]
+}
+
+export interface SummaryChange {
+  original: string
+  tailored: string
+  reason: string
+}
+
+export interface EntryChange {
+  entry_id: string
+  original_bullets: string[]
+  tailored_bullets: string[]
+  changes: string[]
+}
+
+export interface SkillChanges {
+  emphasized: string[]
+  deemphasized: string[]
+  unsupported_requirements: string[]
+}
+
+export interface TailoringResult {
+  summary: SummaryChange
+  experience: EntryChange[]
+  projects: EntryChange[]
+  skills: SkillChanges
+  warnings: string[]
+}
+
+/** A source entry as the server read it from the stored master resume. */
+export interface SourceEntry {
+  id: string
+  name?: string
+  label?: string
+  bullets: string[]
+}
+
+export interface SourceResume {
+  summary: string
+  skills: string[]
+  education: string
+  certifications: string
+  experience: SourceEntry[]
+  projects: SourceEntry[]
+}
+
+export interface TailoringResponse {
+  result: TailoringResult
+  validation: TailoringValidation
+  /** The originals come from our database, not from the model's echo. */
+  source: SourceResume
+  provider: { provider?: string; display_name?: string; model?: string | null }
+  job: { id: number; title: string; company: string }
+  master_resume_id: number
+}
+
+export interface TailoringStatus {
+  provider: string | null
+  available: boolean
+  message?: string
+  registered?: string[]
+  display_name?: string
+}
+

@@ -6,6 +6,9 @@ import type {
   MasterResume,
   MeResponse,
   Resume,
+  TailoringResponse,
+  TailoringResult,
+  TailoringStatus,
   UserProfile,
 } from './types'
 
@@ -227,6 +230,39 @@ export const api = {
     if (/^https?:\/\//i.test(path)) return path
     if (path.startsWith('/')) return path
     return `${BASE_URL}/${path}`
+  },
+
+  /* ---------- AI tailoring ---------- */
+
+  /** Is tailoring available at all? Used to disable the button up front. */
+  tailoringStatus(): Promise<TailoringStatus> {
+    return request<TailoringStatus>('/resumes/tailor/status/')
+  },
+
+  /**
+   * Tailor the master resume for a job.
+   *
+   * Only the job id is sent: the resume, the job description and the match
+   * analysis are all loaded server-side from the signed-in account's own rows.
+   */
+  tailorResume(jobId: number): Promise<TailoringResponse> {
+    return request<TailoringResponse>('/resumes/tailor/', {
+      method: 'POST',
+      body: JSON.stringify({ job_id: jobId }),
+    })
+  },
+
+  /**
+   * Save a reviewed tailoring as a new resume version.
+   *
+   * The server re-validates `result` against the master resume before writing,
+   * so this is not a trust boundary in either direction.
+   */
+  saveTailoredResume(jobId: number, result: TailoringResult, provider?: string): Promise<Resume> {
+    return request<Resume>('/resumes/tailor/save/', {
+      method: 'POST',
+      body: JSON.stringify({ job_id: jobId, result, provider: provider || '' }),
+    })
   },
 }
 

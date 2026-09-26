@@ -3,6 +3,7 @@ import { formatDate, formatScore, scoreTone, sourceHost, statusLabel, statusTone
 import { IconExternal, IconMapPin } from './Icons'
 import { Alert, Pill, ScoreRing } from './primitives'
 import { StepList } from './StepList'
+import { TailorResume } from './TailorResume'
 
 export function JobDetail({ job }: { job: Job }) {
   const tone = statusTone(job.status)
@@ -92,6 +93,12 @@ export function JobDetail({ job }: { job: Job }) {
             <Alert variant="danger">{job.error_message}</Alert>
           </div>
         ) : null}
+
+        <div className="divider" />
+
+        <TailorResume job={job} />
+
+        <div className="divider" />
 
         <StepList steps={job.pipeline_steps} updatedAt={job.updated_at} />
 
