@@ -44,6 +44,10 @@ Master Resume (stored)          Job + JD (stored)
 | `apps/ai/validators.py` | Deterministic factual checks. No model, no NLP. |
 | `apps/ai/tailor.py` | `ResumeTailor`: orchestration only. No HTTP, no model name, no provider type. |
 | `apps/resumes/views.py` | Auth, ownership, error-to-HTTP mapping, persistence. |
+| `apps/resumes/services/document.py` | Resolves profile + approved tailoring into one renderer-agnostic model. |
+| `apps/resumes/services/docx_generator.py` | ATS-friendly DOCX via python-docx. |
+| `apps/resumes/services/pdf_generator.py` | ATS-friendly PDF via reportlab. |
+| `apps/resumes/services/document_service.py` | Single entry point the views call. |
 
 ### Provider independence
 
@@ -175,6 +179,31 @@ so there is no id-guessing path across tenants.
 Only the public `message` is returned. `detail` (base URL, model name, raw
 response) is logged server-side and never sent to the browser.
 
+## Document generation
+
+The model produces *tailoring suggestions* and nothing else. Layout is
+deterministic code:
+
+```
+Stored profile + user-approved tailoring
+        |
+   build_document()          apps/resumes/services/document.py
+        |
+   ResumeDocument            one resolved model
+        |
+        +--> ResumeDocxGenerator (python-docx)
+        +--> ResumePdfGenerator  (reportlab)
+```
+
+`build_document()` is the single point where a suggestion becomes content, which
+is what guarantees the two formats match. It also enforces the no-invention rule
+structurally: education and certifications come only from the stored profile,
+skills are intersected with the source list, and an emptied entry falls back to
+its originals rather than disappearing.
+
+Documents are rendered on demand rather than cached, so a saved file can never
+go stale after an edit.
+
 ## Known limitations
 
 - **No document generation.** There is no DOCX/PDF generator in the codebase, so
@@ -186,6 +215,8 @@ response) is logged server-side and never sent to the browser.
   `_split_projects` recovers blocks with a simple, deterministic rule.
 - **No summary field exists.** `ResumeProfile` has no summary, so summary
   tailoring works from an empty source and is validated against the whole resume.
+- **No document download was verified against a real user's file.** Rendering is
+  covered by unit and API tests against fixtures.
 - **Ollama is not exercised in CI.** `test_ollama_provider.py` runs a local stub
   that speaks Ollama's wire format, which covers the transport but not a real
   model's output quality.

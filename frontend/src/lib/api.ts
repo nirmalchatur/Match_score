@@ -10,6 +10,10 @@ import type {
   TailoringResult,
   TailoringStatus,
   UserProfile,
+  Application,
+  ApplicationStatus,
+  ApplicationSummary,
+  DashboardStats,
 } from './types'
 
 /**
@@ -42,6 +46,13 @@ function getCookie(name: string): string {
 }
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE'])
+/** Read the filename the server chose from Content-Disposition. */
+function filenameFromDisposition(header: string | null, fallback: string): string {
+  const match = header?.match(/filename="?([^"]+)"?/i)
+  return match?.[1] || fallback
+}
+
+
 
 /** Pull a human-readable message out of the various error shapes Django/DRF returns. */
 function extractError(payload: unknown, fallback: string): string {
@@ -232,6 +243,62 @@ export const api = {
     return `${BASE_URL}/${path}`
   },
 
+  /* ---------- Applications ---------- */
+
+  listApplications(params: { status?: string; job?: number } = {}): Promise<Application[]> {
+    const search = new URLSearchParams()
+    if (params.status) search.set('status', params.status)
+    if (params.job) search.set('job', String(params.job))
+
+    const qs = search.toString()
+    return request<Application[]>(`/applications/${qs ? `?${qs}` : ''}`)
+  },
+
+  /** Status counts for the tracker header. Scoped server-side to this account. */
+  applicationSummary(): Promise<ApplicationSummary> {
+    return request<ApplicationSummary>('/applications/?summary=1')
+  },
+
+  createApplication(payload: {
+    job: number
+    tailored_resume?: number | null
+  }): Promise<Application> {
+    return request<Application>('/applications/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  getApplication(id: number): Promise<Application> {
+    return request<Application>(`/applications/${id}/`)
+  },
+
+  updateApplication(
+    id: number,
+    payload: Partial<Pick<Application, 'notes' | 'tailored_resume'>>,
+  ): Promise<Application> {
+    return request<Application>(`/applications/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  setApplicationStatus(id: number, status: ApplicationStatus): Promise<Application> {
+    return request<Application>(`/applications/${id}/status/`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    })
+  },
+
+  deleteApplication(id: number): Promise<{ deleted: boolean }> {
+    return request<{ deleted: boolean }>(`/applications/${id}/`, { method: 'DELETE' })
+  },
+
+  /** Real aggregates for the dashboard. Never hardcoded on the client. */
+  dashboardStats(): Promise<DashboardStats> {
+    return request<DashboardStats>('/applications/dashboard/')
+  },
+
   /* ---------- AI tailoring ---------- */
 
   /** Is tailoring available at all? Used to disable the button up front. */
@@ -263,6 +330,52 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ job_id: jobId, result, provider: provider || '' }),
     })
+  },
+
+  /* ---------- Downloads ---------- */
+
+  /**
+   * Download a generated document and hand it to the browser.
+   *
+   * Returns the filename actually used so the caller can report it. Kept in one
+   * place because the Tailor panel and the Resume Workspace both need it, and
+   * two copies would eventually disagree about error handling.
+   */
+  async downloadResume(id: number, format: 'docx' | 'pdf'): Promise<string> {
+    const response = await fetch(`${BASE_URL}/resumes/${id}/download/${format}/`, {
+      method: 'GET',
+      headers: { Accept: '*/*' },
+      credentials: 'include',
+    })
+
+    if (!response.ok) {
+      let message = `Download failed (${response.status})`
+      try {
+        message = extractError(await response.json(), message)
+      } catch {
+        // Non-JSON error body; the status message is enough.
+      }
+      throw new ApiError(message, response.status)
+    }
+
+    const filename = filenameFromDisposition(
+      response.headers.get('Content-Disposition'),
+      `resume.${format}`,
+    )
+
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    // Revoking immediately can cancel the download in some browsers, so it is
+    // deferred a tick.
+    window.setTimeout(() => URL.revokeObjectURL(url), 4000)
+
+    return filename
   },
 }
 

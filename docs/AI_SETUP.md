@@ -1,149 +1,144 @@
 # AI setup (Ollama)
 
-How to run TailorUp's resume tailoring against a **local Ollama** daemon.
-
-The application never imports Ollama outside `apps/ai/providers/ollama.py`.
-Everything below is configuration, not code.
+> ## Verification status: PENDING
+>
+> **Ollama is now installed on the development machine** (`ollama` 0.34.4, daemon
+> reachable on `:11434`), and `llama3.1` is the intended model.
+>
+> What remains unverified: an actual TailorUp tailoring request executed against
+> the real model. Until that has run and its output is recorded here, this project
+> makes **no claim** that a real model round-trips end to end.
+>
+> What **is** verified today:
+>
+> - The full pipeline against `FakeAIProvider` (the entire test suite).
+> - The Ollama HTTP **transport**: `apps/ai/tests/test_ollama_provider.py` runs a
+>   local stub that speaks Ollama's wire format, covering the request we build,
+>   the envelope we read, and every failure mapping (404 -> "run ollama pull",
+>   5xx -> 503, slow -> 504, empty/garbage -> 502, and that `describe()` never
+>   leaks the base URL).
+>
+> Neither proves a real model's output quality. Close this out by following steps
+> 1-5 below, then the manual check at the end of this file.
 
 ---
 
-## 1. Install Ollama
+# Resume documents (DOCX and PDF)
 
-Download and install from <https://ollama.com/download> (macOS, Windows, Linux).
+## What generates them
 
-Verify:
+Deterministic application code. **The LLM never lays out a document.**
 
-```bash
-ollama --version
+```
+Stored master resume profile
+      +
+User-approved tailoring result
+      |
+      v
+ResumeDocument              apps/resumes/services/document.py
+      |
+      +--> ResumeDocxGenerator   (python-docx)
+      +--> ResumePdfGenerator    (reportlab)
 ```
 
-## 2. Start the daemon
+`build_document()` resolves the stored profile plus the approved tailoring into
+one fully-resolved model. Both renderers consume *that same object*, which is
+what makes the two formats provably equivalent rather than merely similar — a
+regression test asserts it.
 
-Ollama runs as a local background service on install.
+## The no-invention rule
 
-- **macOS / Linux** — it starts automatically. To run it in the foreground:
-  ```bash
-  ollama serve
-  ```
-- **Windows** — open the Ollama app, or run `ollama serve` in a terminal.
+`build_document()` never takes `education`, `certifications` or contact details
+from the AI:
 
-## 3. Verify it is running
+- Education and certifications are copied from the stored profile, always.
+- Skills are intersected with the source skill list, so emphasis reorders but
+  can never add a skill the candidate does not have.
+- Contact links are *extracted* from the resume text, never generated.
+- A rejected suggestion falls back to the original bullet, so rejecting
+  everything reverts a section instead of blanking it.
 
-```bash
-curl http://localhost:11434/api/tags
-```
+## ATS-friendly by construction
 
-A healthy daemon answers with JSON. On Windows PowerShell:
+- Single column, no tables, no text boxes, no columns, no images.
+- Real heading styles and plain paragraphs.
+- PDF bullets use an ASCII hyphen. A U+2022 bullet is emitted from a
+  symbol-encoded font and extracts as `\x7f` in common PDF text extractors,
+  which is exactly what an ATS parser reads. There is a test asserting no
+  garbage glyphs appear in the extracted text.
 
-```powershell
-Invoke-WebRequest http://localhost:11434/api/tags | Select-Object -ExpandProperty Content
-```
+## Endpoints
 
-`{}` means "running, but no models pulled yet" — that is a valid state.
+| Endpoint | Returns |
+|---|---|
+| `GET /api/resumes/<id>/download/docx/` | The resume as a `.docx` attachment |
+| `GET /api/resumes/<id>/download/pdf/` | The resume as a `.pdf` attachment |
 
-You can also ask the application itself:
+Both are authenticated and scoped to the owner: the lookup is
+`Resume.objects.filter(user=request.user, pk=pk)`, so another account's resume
+returns **404**, not 403 — the response never confirms that an id exists. The
+`Content-Disposition` filename is derived from the resume's own name, sanitised,
+and no filesystem path is ever disclosed. Responses are `Cache-Control: private,
+no-store`.
+
+## Review, edit, save, download
+
+1. Open a job and choose **? Tailor My Resume**.
+2. Review each section: **Original** vs **AI suggestion**, with *Why this changed*.
+3. Per bullet: **Accept**, **Edit** (your own wording), or **Reject** (falls back
+   to the original). The summary is freely editable. Nothing is auto-approved.
+4. **Save as a new resume** — the master is never overwritten. The saved row
+   records `source_resume`, `source_job`, `ai_provider`, the validation verdict
+   and the re-derived `source` view, so a version can always explain itself.
+5. **Download DOCX** / **Download PDF** appear immediately, and again in the
+   Resume Workspace.
+
+User edits are re-validated on save. A hand-edited bullet that introduces a
+fabricated figure is rejected with `422` — the backend is not a rubber stamp.
+
+---
+
+# Verifying a real tailoring request
+
+Once Ollama is installed, this exercises the genuine path end to end.
+
+1. Start the daemon and pull a model (steps 1-5 above).
+2. Configure `backend/.env`:
+
+   ```dotenv
+   AI_PROVIDER=ollama
+   OLLAMA_BASE_URL=http://localhost:11434
+   OLLAMA_MODEL=llama3.1
+   ```
+
+3. Confirm the provider is healthy:
+
+   ```bash
+   cd backend
+   python -c "import os,django;os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings');django.setup();from apps.ai import factory;print(factory.get_ai_provider().health())"
+   ```
+
+4. Upload a master resume, analyse a job, then from the job page click
+   **? Tailor My Resume**.
+
+What to look for:
+
+| Outcome | Meaning |
+|---|---|
+| `ai_unavailable` | Daemon not running, or the model is not pulled |
+| `ai_timeout` | Model too slow — raise `OLLAMA_TIMEOUT` or use a smaller model |
+| `ai_invalid_response` | The model did not return readable JSON |
+| `ai_validation_failed` | The model changed a fact. Working as designed. Lower `OLLAMA_TEMPERATURE` or use a larger model. |
+| A review screen with a "needs review" badge | The output was usable but flagged. |
+
+A `422` is the validator doing its job, not a failure of the setup. Re-running
+with a lower temperature is the right response, not bypassing the check.
+
+To see the raw provider round-trip without the HTTP layer:
 
 ```bash
 cd backend
 AI_PROVIDER=ollama OLLAMA_BASE_URL=http://localhost:11434 OLLAMA_MODEL=llama3.1 \
-  python -c "import os,django;os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings');django.setup();from apps.ai import factory;print(factory.get_ai_provider().health())"
+  python -c "import os,django;os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings');django.setup();from apps.ai import factory;from apps.ai.providers.base import TailoringRequest;from apps.ai.tests.fixtures import SOURCE_PROFILE;from apps.ai.tailor import ResumeTailor;print(ResumeTailor.tailor_resume(SOURCE_PROFILE, {'title':'Backend Engineer','company':'Acme','description':'Django and PostgreSQL.'}, {'score':80}).as_dict()['validation'])"
 ```
 
-This prints `(True, 'Ollama is running and ... is installed.')` when ready.
-
-## 4. Pull a model
-
-Tailoring needs a model that reliably emits JSON. One that works well on CPU
-hardware and is small enough to be usable locally:
-
-```bash
-ollama pull llama3.1
-```
-
-Other options that produce usable structured output:
-
-```bash
-ollama pull qwen2.5        # strong instruction-following
-ollama pull mistral        # smaller and faster, less reliable on strict JSON
-ollama pull llama3.1:8b    # explicit tag
-```
-
-Then confirm it is present:
-
-```bash
-ollama list
-```
-
-## 5. Configure the application
-
-Copy the example and edit it:
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-The variables that matter:
-
-| Variable | Purpose | Example |
-|---|---|---|
-| `AI_PROVIDER` | Which provider to use. `ollama` or `fake`. | `ollama` |
-| `OLLAMA_BASE_URL` | Where the daemon listens. | `http://localhost:11434` |
-| `OLLAMA_MODEL` | The model tag to call. **Never hardcoded in code.** | `llama3.1` |
-| `OLLAMA_TIMEOUT` | Seconds to wait. Raise it for large models on CPU. | `180` |
-| `OLLAMA_TEMPERATURE` | Sampling temperature. Keep low. | `0.2` |
-
-### Example `.env`
-
-```dotenv
-# --- AI provider ---------------------------------------------------------
-# Set to "fake" to run without any AI at all (deterministic, used by CI).
-AI_PROVIDER=ollama
-
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.1
-
-# Local models can be slow, especially the first call on CPU.
-OLLAMA_TIMEOUT=180
-
-# Low on purpose: tailoring must stay close to the source text.
-OLLAMA_TEMPERATURE=0.2
-```
-
-If `AI_PROVIDER` is left empty but both `OLLAMA_BASE_URL` and `OLLAMA_MODEL`
-are set, it defaults to `ollama`. If none are set, tailoring is disabled and the
-UI shows why rather than failing silently.
-
-## 6. Run without Ollama
-
-```dotenv
-AI_PROVIDER=fake
-```
-
-The fake provider is deterministic and needs no network. It is what the test
-suite uses, and it never requires Ollama to be installed.
-
-## 7. Secrets
-
-There are none in this integration. `OLLAMA_BASE_URL` points at a local daemon;
-no API key is involved. Never commit a `.env` containing real secrets — the
-example file holds placeholders only, and the provider's base URL is deliberately
-excluded from every API response.
-
----
-
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| `ai_unavailable` (503) | Daemon not running | `ollama serve` |
-| "model is not installed" | 404 from `/api/chat` | `ollama pull <model>` |
-| `ai_timeout` (504) | Model too slow / too large | Raise `OLLAMA_TIMEOUT`, use a smaller model |
-| `ai_not_configured` (500) | `AI_PROVIDER` unset or unknown | Set it to `ollama` or `fake` |
-| `ai_validation_failed` (422) | The model changed facts | Not a setup problem: the validator rejected fabricated content. Re-run, or use a more capable model. |
-
-### Validation is the point, not a bug
-
-`ai_validation_failed` means the model attempted to change something it must
-never change (a metric, a technology, a date, an employer). The result is
-discarded rather than shown. This is working as designed. Lower
-`OLLAMA_TEMPERATURE` or try a larger model if it happens constantly.

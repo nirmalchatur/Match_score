@@ -1,10 +1,19 @@
-import { formatDate } from '../lib/format'
+import { formatDate, formatScore } from '../lib/format'
 import { api } from '../lib/api'
-import type { Resume } from '../lib/types'
+import type { Job, Resume } from '../lib/types'
 import { IconExternal, IconFile, IconRefresh, IconUpload, IconZap } from '../components/Icons'
 import { Alert, EmptyState, Pill, Skeleton } from '../components/primitives'
+import { DownloadButtons } from '../components/DownloadButtons'
 
-function ResumeCard({ resume, isMaster }: { resume: Resume; isMaster: boolean }) {
+function ResumeCard({
+  resume,
+  isMaster,
+  job,
+}: {
+  resume: Resume
+  isMaster: boolean
+  job?: { title: string; company: string; match_score: number | null } | null
+}) {
   return (
     <div className="job-row" style={{ cursor: 'default' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
@@ -16,11 +25,17 @@ function ResumeCard({ resume, isMaster }: { resume: Resume; isMaster: boolean })
             {resume.name}
           </div>
           <div className="job-row-meta">
-            <span>{formatDate(resume.created_at)}</span>
+            <span>
+              {job ? `${job.company} — ${job.title}` : `Created ${formatDate(resume.created_at)}`}
+            </span>
             <Pill tone={isMaster ? 'accent' : 'neutral'}>
               {isMaster ? 'Master' : resume.resume_type}
             </Pill>
+            {resume.tailoring_summary === 'warning' ? <Pill tone="warning">needs review</Pill> : null}
           </div>
+          {job?.match_score != null ? (
+            <div className="stat-hint">Match {formatScore(job.match_score)}</div>
+          ) : null}
         </div>
       </div>
 
@@ -36,6 +51,9 @@ function ResumeCard({ resume, isMaster }: { resume: Resume; isMaster: boolean })
             <IconExternal size={14} />
           </a>
         ) : null}
+        {resume.has_documents !== false ? (
+          <DownloadButtons resumeId={resume.id} label="" size="sm" />
+        ) : null}
       </div>
     </div>
   )
@@ -44,12 +62,18 @@ function ResumeCard({ resume, isMaster }: { resume: Resume; isMaster: boolean })
 type Props = {
   resumes: Resume[]
   master: Resume | null
+  jobs?: Job[]
   loading: boolean
   error: string
   onRefresh: () => void
 }
 
-export function ResumesPage({ resumes, master, loading, error, onRefresh }: Props) {
+export function ResumesPage({ resumes, master, jobs = [], loading, error, onRefresh }: Props) {
+  // Tailored versions are split out of the flat list so the workspace reads as
+  // "master + one version per job" rather than an undifferentiated pile.
+  const isMaster = (resume: Resume) => resume.is_master || master?.id === resume.id
+  const tailored = resumes.filter((resume) => !isMaster(resume))
+  const jobById = new Map(jobs.map((job) => [job.id, job]))
   return (
     <div className="page stack">
       <section className="grid-two">
@@ -102,25 +126,8 @@ export function ResumesPage({ resumes, master, loading, error, onRefresh }: Prop
 
       {error ? <Alert variant="danger">{error}</Alert> : null}
 
-      <section className="card">
-        <div className="card-head">
-          <h3>All resumes</h3>
-          <div className="card-head-actions">
-            <span className="pill">{loading ? '—' : resumes.length}</span>
-            <button
-              type="button"
-              className="btn btn-ghost btn-icon"
-              onClick={onRefresh}
-              disabled={loading}
-              aria-label="Refresh resumes"
-              title="Refresh"
-            >
-              {loading ? <span className="spinner" /> : <IconRefresh size={16} />}
-            </button>
-          </div>
-        </div>
-
-        {loading ? (
+      {loading ? (
+        <section className="card">
           <div className="job-list">
             {Array.from({ length: 3 }).map((_, index) => (
               <div className="sk-row" key={index}>
@@ -132,23 +139,71 @@ export function ResumesPage({ resumes, master, loading, error, onRefresh }: Prop
               </div>
             ))}
           </div>
-        ) : resumes.length === 0 ? (
+        </section>
+      ) : resumes.length === 0 ? (
+        <section className="card">
           <EmptyState
             title="No resumes yet"
-            description="Upload a master resume so MatchScore can start scoring job descriptions."
+            description="Upload a master resume so TailorUp can start scoring job descriptions."
           />
-        ) : (
-          <div className="job-list">
-            {resumes.map((resume) => (
-              <ResumeCard
-                key={resume.id}
-                resume={resume}
-                isMaster={resume.is_master || master?.id === resume.id}
+        </section>
+      ) : (
+        <>
+          <section className="card">
+            <div className="card-head">
+              <h3>Master resume</h3>
+              <div className="card-head-actions">
+                <span className="pill">{master ? 1 : 0}</span>
+              </div>
+            </div>
+            <div className="job-list">
+              {resumes.filter(isMaster).map((resume) => (
+                <ResumeCard key={resume.id} resume={resume} isMaster />
+              ))}
+            </div>
+            <p className="stat-hint" style={{ marginTop: 12 }}>
+              Never overwritten. Tailoring always creates a separate version below.
+            </p>
+          </section>
+
+          <section className="card">
+            <div className="card-head">
+              <h3>Tailored resumes</h3>
+              <div className="card-head-actions">
+                <span className="pill">{tailored.length}</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon"
+                  onClick={onRefresh}
+                  disabled={loading}
+                  aria-label="Refresh resumes"
+                  title="Refresh"
+                >
+                  <IconRefresh size={16} />
+                </button>
+              </div>
+            </div>
+
+            {tailored.length === 0 ? (
+              <EmptyState
+                title="No tailored versions yet"
+                description="Open a job and choose “Tailor My Resume” to create a version for it."
               />
-            ))}
-          </div>
-        )}
-      </section>
+            ) : (
+              <div className="job-list">
+                {tailored.map((resume) => (
+                  <ResumeCard
+                    key={resume.id}
+                    resume={resume}
+                    isMaster={false}
+                    job={resume.source_job ? jobById.get(resume.source_job) ?? null : null}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </div>
   )
 }

@@ -15,8 +15,23 @@ export interface PipelineStep {
   status: StepStatus
 }
 
+/**
+ * Skill gap, projected server-side from the existing MatchEngine output.
+ *
+ * `missing` means "not found in the current resume" -- never "you do not know
+ * this". The server owns that wording; the UI must not soften or invert it.
+ */
+export interface SkillGap {
+  has_analysis: boolean
+  matched: string[]
+  partial: string[]
+  missing: string[]
+  summary: string
+}
+
 export interface Job {
   id: number
+  skill_gap?: SkillGap
   url: string
   company: string
   title: string
@@ -39,6 +54,17 @@ export interface Resume {
   resume_type: string
   is_master: boolean
   created_at: string
+  updated_at?: string
+  /** Which master this version was tailored from. Null for the master itself. */
+  source_resume?: number | null
+  /** Which job this version targets. Null for the master itself. */
+  source_job?: number | null
+  /** Which AI provider produced the original suggestions. */
+  ai_provider?: string
+  /** Validation verdict at save time: "valid" | "warning" | "rejected". */
+  tailoring_summary?: TailoringVerdict | null
+  /** Documents can always be rendered from the structured profile. */
+  has_documents?: boolean
 }
 
 export interface MasterResume {
@@ -185,5 +211,98 @@ export interface TailoringStatus {
   message?: string
   registered?: string[]
   display_name?: string
+  /** The configured model, e.g. "llama3.1". Never a URL or a credential. */
+  model?: string | null
 }
 
+
+
+/* ---------- Application tracker ---------- */
+
+/**
+ * The controlled pipeline. Kept in sync with `Application.STATUS_CHOICES` on
+ * the server, which is the authority: the API rejects anything not in this set.
+ */
+export type ApplicationStatus =
+  | 'SAVED'
+  | 'APPLIED'
+  | 'ASSESSMENT'
+  | 'INTERVIEW'
+  | 'OFFER'
+  | 'REJECTED'
+  | 'WITHDRAWN'
+
+export const APPLICATION_STATUSES: ApplicationStatus[] = [
+  'SAVED',
+  'APPLIED',
+  'ASSESSMENT',
+  'INTERVIEW',
+  'OFFER',
+  'REJECTED',
+  'WITHDRAWN',
+]
+
+export const STATUS_LABELS: Record<ApplicationStatus, string> = {
+  SAVED: 'Saved',
+  APPLIED: 'Applied',
+  ASSESSMENT: 'Assessment',
+  INTERVIEW: 'Interview',
+  OFFER: 'Offer',
+  REJECTED: 'Rejected',
+  WITHDRAWN: 'Withdrawn',
+}
+
+export interface ApplicationJob {
+  id: number
+  title: string
+  company: string
+  location: string
+  match_score: number | null
+  url: string
+}
+
+export interface ApplicationResume {
+  id: number
+  name: string
+  resume_type: string
+  is_master: boolean
+}
+
+export interface Application {
+  id: number
+  job: number
+  tailored_resume: number | null
+  status: ApplicationStatus
+  applied_at: string | null
+  notes: string
+  created_at: string
+  updated_at: string
+  job_detail: ApplicationJob
+  resume_detail: ApplicationResume | null
+}
+
+export interface ApplicationSummary {
+  counts: Record<ApplicationStatus, number>
+  total: number
+}
+
+export interface DashboardStats {
+  jobs: { total: number; scored: number }
+  applications: {
+    total: number
+    by_status: Record<ApplicationStatus, number>
+    active: number
+    interviews: number
+    offers: number
+  }
+  resumes: { total: number; tailored: number; has_master: boolean }
+  match: { average: number | null }
+  recent_applications: Array<{
+    id: number
+    status: ApplicationStatus
+    notes: string
+    updated_at: string
+    tailored_resume_id: number | null
+    job: { id: number; title: string; company: string; location: string; match_score: number | null }
+  }>
+}

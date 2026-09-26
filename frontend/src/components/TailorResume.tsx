@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, api } from '../lib/api'
 import type {
-  EntryChange,
+  TailoringResult,
   Job,
   Resume,
-  SourceEntry,
   TailoringResponse,
   TailoringViolation,
 } from '../lib/types'
 import { Alert, Pill } from './primitives'
+import { DownloadButtons } from './DownloadButtons'
+import { TailoringEditor } from './TailoringEditor'
 
 /**
  * Turn an API failure into something a person can act on.
@@ -75,74 +76,6 @@ function describeFailure(error: unknown): { title: string; message: string } {
 
 /* ---------- Review pieces ---------- */
 
-function Bullets({ items, tone }: { items: string[]; tone: 'before' | 'after' }) {
-  if (!items.length) {
-    return <p className="stat-hint">Nothing in this section.</p>
-  }
-  return (
-    <ul className={`ba-list ba-${tone}`}>
-      {items.map((item, index) => (
-        <li key={`${index}-${item.slice(0, 12)}`}>{item}</li>
-      ))}
-    </ul>
-  )
-}
-
-/** ORIGINAL vs TAILORED, with the model's stated reason underneath. */
-function EntryReview({
-  title,
-  subtitle,
-  change,
-  source,
-}: {
-  title: string
-  subtitle?: string
-  change: EntryChange | undefined
-  source: SourceEntry | undefined
-}) {
-  // Prefer our stored originals. The model echoes them back, but that echo is
-  // untrusted; the server sends the real ones in `source`.
-  const original = source?.bullets ?? change?.original_bullets ?? []
-  const tailored = change?.tailored_bullets ?? []
-
-  if (!change && !source) return null
-
-  const unchanged =
-    tailored.length > 0 && tailored.join(' | ') === original.join(' | ')
-
-  return (
-    <div className="ba-entry">
-      <div className="ba-entry-head">
-        <span className="ba-entry-title">{title}</span>
-        {subtitle ? <span className="ba-entry-sub">{subtitle}</span> : null}
-        {unchanged ? <Pill tone="neutral">unchanged</Pill> : <Pill tone="success">rewritten</Pill>}
-      </div>
-
-      <div className="ba-cols">
-        <div className="ba-col">
-          <div className="ba-col-label">Original</div>
-          <Bullets items={original} tone="before" />
-        </div>
-        <div className="ba-col">
-          <div className="ba-col-label">Tailored</div>
-          <Bullets items={tailored} tone="after" />
-        </div>
-      </div>
-
-      {change?.changes?.length ? (
-        <details className="ba-why">
-          <summary>Why this changed</summary>
-          <ul>
-            {change.changes.map((reason, index) => (
-              <li key={index}>{reason}</li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-    </div>
-  )
-}
-
 function ViolationList({ violations }: { violations: TailoringViolation[] }) {
   if (!violations.length) return null
   return (
@@ -177,6 +110,9 @@ export function TailorResume({ job }: { job: Job }) {
   const [failure, setFailure] = useState<{ title: string; message: string } | null>(null)
   const [violations, setViolations] = useState<TailoringViolation[]>([])
   const [data, setData] = useState<TailoringResponse | null>(null)
+  // The user-approved working copy. Starts as the AI result and is then
+  // edited in place; this is what gets saved and rendered.
+  const [draft, setDraft] = useState<TailoringResult | null>(null)
   const [saved, setSaved] = useState<Resume | null>(null)
   const [available, setAvailable] = useState<boolean | null>(null)
 
@@ -205,6 +141,7 @@ export function TailorResume({ job }: { job: Job }) {
     try {
       const result = await api.tailorResume(job.id)
       setData(result)
+      setDraft(result.result)
       setPhase('review')
     } catch (error) {
       // Always leaves the loading state: the UI must never be stuck.
@@ -216,13 +153,13 @@ export function TailorResume({ job }: { job: Job }) {
   }, [job.id])
 
   const save = useCallback(async () => {
-    if (!data) return
+    if (!data || !draft) return
     setPhase('saving')
     setFailure(null)
     try {
       const created = await api.saveTailoredResume(
         job.id,
-        data.result,
+        draft,
         data.provider?.provider,
       )
       setSaved(created)
@@ -233,12 +170,10 @@ export function TailorResume({ job }: { job: Job }) {
       if (payload) setViolations(payload)
       setPhase('review')
     }
-  }, [data, job.id])
+  }, [data, draft, job.id])
 
   const verdict = data?.validation
-  const unsupported = data?.result?.skills?.unsupported_requirements ?? []
-  const sourceExperience = data?.source?.experience ?? []
-  const sourceProjects = data?.source?.projects ?? []
+  const unsupported = draft?.skills?.unsupported_requirements ?? []
 
   return (
     <div className="card-inner ba">
@@ -288,11 +223,12 @@ export function TailorResume({ job }: { job: Job }) {
       ) : null}
 
       {phase === 'saved' && saved ? (
-        <div style={{ marginTop: 14 }}>
+        <div className="ba-saved">
           <Alert variant="success">
             Saved as a new resume: <strong>{saved.name}</strong>. Your master resume is
             unchanged.
           </Alert>
+          <DownloadButtons resumeId={saved.id} label="Download" size="md" />
         </div>
       ) : null}
 
@@ -318,40 +254,16 @@ export function TailorResume({ job }: { job: Job }) {
 
           <ViolationList violations={violations.length ? violations : verdict?.violations ?? []} />
 
-          {data.result.summary?.tailored ? (
-            <EntryReview
-              title="Summary"
-              change={undefined}
-              source={{ id: 'summary', bullets: data.result.summary.original ? [data.result.summary.original] : [] }}
-            />
+          {draft ? (
+            <TailoringEditor result={draft} source={data.source} onChange={setDraft} />
           ) : null}
 
-          {data.result.experience.map((change) => (
-            <EntryReview
-              key={change.entry_id}
-              title="Experience"
-              subtitle={change.entry_id}
-              change={change}
-              source={sourceExperience.find((entry) => entry.id === change.entry_id)}
-            />
-          ))}
-
-          {data.result.projects.map((change) => (
-            <EntryReview
-              key={change.entry_id}
-              title="Project"
-              subtitle={change.entry_id}
-              change={change}
-              source={sourceProjects.find((entry) => entry.id === change.entry_id)}
-            />
-          ))}
-
           <div className="ba-skills">
-            {data.result.skills.emphasized.length ? (
+            {draft?.skills.emphasized.length ? (
               <div>
                 <div className="ba-col-label">Emphasised</div>
                 <div className="ba-chips">
-                  {data.result.skills.emphasized.map((skill) => (
+                  {draft.skills.emphasized.map((skill) => (
                     <Pill key={skill} tone="success">
                       {skill}
                     </Pill>
@@ -360,11 +272,11 @@ export function TailorResume({ job }: { job: Job }) {
               </div>
             ) : null}
 
-            {data.result.skills.deemphasized.length ? (
+            {draft?.skills.deemphasized.length ? (
               <div>
                 <div className="ba-col-label">De-emphasised</div>
                 <div className="ba-chips">
-                  {data.result.skills.deemphasized.map((skill) => (
+                  {draft.skills.deemphasized.map((skill) => (
                     <Pill key={skill} tone="neutral">
                       {skill}
                     </Pill>
@@ -389,11 +301,11 @@ export function TailorResume({ job }: { job: Job }) {
             </div>
           ) : null}
 
-          {data.result.warnings?.length ? (
+          {draft?.warnings?.length ? (
             <div className="ba-unsupported">
               <div className="ba-col-label">Warnings from the model</div>
               <ul>
-                {data.result.warnings.map((warning, index) => (
+                {draft.warnings.map((warning, index) => (
                   <li key={index}>{warning}</li>
                 ))}
               </ul>
