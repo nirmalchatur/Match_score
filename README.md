@@ -1082,3 +1082,19 @@ MatchScore is being built with one simple goal:
 The final system aims to understand a candidate, understand a job, determine whether the opportunity is worth pursuing, tailor the candidate's application when necessary, and eventually automate the repetitive parts of the application process.
 
 ```
+
+## Documentation
+
+| Area | Doc |
+|---|---|
+| AI setup & Ollama | [docs/AI_SETUP.md](docs/AI_SETUP.md) |
+| AI architecture | [docs/AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md) |
+| Application tracker | [docs/APPLICATIONS.md](docs/APPLICATIONS.md) |
+| Skill gap analysis | [docs/SKILL_GAP.md](docs/SKILL_GAP.md) |
+
+## AI verification status
+
+**Real Ollama verification remains pending.** See the banner at the top of
+[docs/AI_SETUP.md](docs/AI_SETUP.md) for exactly what is and is not verified.
+The test suite never requires Ollama: it runs entirely on `FakeAIProvider`,
+plus a local stub that speaks Ollama's wire format.

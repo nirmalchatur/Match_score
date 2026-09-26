@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api } from '../lib/api'
-import type { Job, Resume } from '../lib/types'
+import type { Application, ApplicationStatus, DashboardStats, Job, Resume } from '../lib/types'
 
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback
@@ -20,7 +20,11 @@ type Resource<T> = {
  * cascading render. A refresh keeps the previous error visible until the new
  * result lands, which avoids the error banner flickering on every poll.
  */
-function useResource<T>(initial: T, fetcher: () => Promise<T>, errorMessage: string): Resource<T> {
+function useResource<T>(
+  initial: T,
+  fetcher: () => Promise<T>,
+  errorMessage: string,
+): Resource<T> & { setData: React.Dispatch<React.SetStateAction<T>> } {
   const [data, setData] = useState<T>(initial)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -72,7 +76,7 @@ function useResource<T>(initial: T, fetcher: () => Promise<T>, errorMessage: str
     void start()
   }, [errorMessage])
 
-  return { data, loading, error, refresh }
+  return { data, loading, error, refresh, setData }
 }
 
 const fetchJobs = () => api.listJobs()
@@ -107,5 +111,104 @@ export function useResumes() {
     loading,
     error,
     refresh,
+  }
+}
+
+
+/**
+ * The application tracker list plus the dashboard's aggregate metrics.
+ *
+ * Both come from one hook so the tracker and the dashboard tiles can never show
+ * numbers captured at different moments. Mutations patch the cache in place so
+ * the UI reacts immediately, then refresh in the background to pick up the new
+ * aggregates (a status change moves the dashboard counters too).
+ */
+export function useApplications() {
+  const { data, loading, error, refresh, setData } = useResource<{
+    applications: Application[]
+    stats: DashboardStats | null
+  }>(
+    { applications: [], stats: null },
+    async () => {
+      const [applications, stats] = await Promise.all([
+        api.listApplications(),
+        api.dashboardStats(),
+      ])
+      return { applications, stats }
+    },
+    'Unable to load applications.',
+  )
+
+  /** Replace one row and recompute the cached aggregates. */
+  const replaceOne = useCallback(
+    (updated: Application) => {
+      setData((current) => ({
+        applications: current.applications.map((item) =>
+          item.id === updated.id ? updated : item,
+        ),
+        stats: current.stats,
+      }))
+    },
+    [setData],
+  )
+
+  const create = useCallback(
+    async (jobId: number, tailoredResumeId?: number | null) => {
+      const created = await api.createApplication({
+        job: jobId,
+        tailored_resume: tailoredResumeId ?? null,
+      })
+      setData((current) => ({
+        applications: [created, ...current.applications],
+        stats: current.stats,
+      }))
+      void refresh()
+      return created
+    },
+    [refresh, setData],
+  )
+
+  const setStatus = useCallback(
+    async (id: number, status: ApplicationStatus) => {
+      const updated = await api.setApplicationStatus(id, status)
+      replaceOne(updated)
+      // A status change moves the dashboard counters, so pull the new totals.
+      void refresh()
+      return updated
+    },
+    [refresh, replaceOne],
+  )
+
+  const updateNotes = useCallback(
+    async (id: number, notes: string) => {
+      const updated = await api.updateApplication(id, { notes })
+      replaceOne(updated)
+      return updated
+    },
+    [replaceOne],
+  )
+
+  const remove = useCallback(
+    async (id: number) => {
+      await api.deleteApplication(id)
+      setData((current) => ({
+        applications: current.applications.filter((item) => item.id !== id),
+        stats: current.stats,
+      }))
+      void refresh()
+    },
+    [refresh, setData],
+  )
+
+  return {
+    applications: data.applications,
+    stats: data.stats,
+    loading,
+    error,
+    refresh,
+    create,
+    setStatus,
+    updateNotes,
+    remove,
   }
 }

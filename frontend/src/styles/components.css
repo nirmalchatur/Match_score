@@ -1756,3 +1756,294 @@
 .ba-actions .stat-hint {
   flex: 1 1 220px;
 }
+
+/* ==========================================================================
+   Tailoring editor + download controls
+
+   Reuses the existing tokens so the review screen stays part of the job card
+   rather than reading as a separate product surface.
+   ========================================================================== */
+
+.ba-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.ba-entry-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ba-editable {
+  padding-left: 0;
+  list-style: none;
+}
+
+.ba-editable > li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ba-editable > li:last-child {
+  border-bottom: 0;
+}
+
+.ba-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ba-suggestion-text {
+  display: block;
+}
+
+.ba-bullet-actions,
+.ba-edit-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ba-edit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ba-textarea {
+  width: 100%;
+  min-height: 58px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--paper, #fff);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 6px);
+  resize: vertical;
+}
+
+.ba-textarea:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.ba-field {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.ba-saved {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+/* ---------- Downloads ---------- */
+
+.dl-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dl-note {
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.dl-ok {
+  color: var(--text-dim);
+}
+
+.dl-err {
+  color: #b3261e;
+}
+
+@media (max-width: 640px) {
+  .dl-wrap {
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
+   Application tracker + skill gap
+
+   Every colour here is an existing token borrowed from the kanban status
+   headers (--blue-12, --warning-bg, --success-bg, --danger-bg and friends).
+   Nothing new was introduced, so the tracker reads as part of the same
+   TailorUp system rather than a bolted-on surface.
+   ========================================================================== */
+
+/* ---------- Status pills and badges ---------- */
+
+.ap-saved {
+  color: var(--text-muted);
+  background: var(--neutral-bg);
+}
+
+.ap-applied {
+  color: var(--blue-soft-text);
+  background: var(--blue-12);
+}
+
+.ap-assessment {
+  color: var(--accent-soft-text);
+  background: var(--accent-15);
+}
+
+.ap-interview {
+  color: var(--warning);
+  background: var(--warning-bg);
+}
+
+.ap-offer {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+.ap-rejected,
+.ap-withdrawn {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* A standalone status chip, used on the job panel rather than in a list. */
+.ap-status {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ap-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.ap-value {
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.ap-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ap-field {
+  display: grid;
+  gap: 4px;
+}
+
+.ap-select {
+  appearance: none;
+  padding: 7px 28px 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--paper)
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%236e6e6e' stroke-width='1.5'/></svg>")
+    no-repeat right 10px center;
+  border: 1px solid var(--border-input);
+  border-radius: var(--r-sm, 6px);
+  cursor: pointer;
+}
+
+.ap-select-sm {
+  padding: 5px 26px 5px 8px;
+  font-size: 12px;
+}
+
+.ap-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------- Clickable stat tiles (tracker filters) ---------- */
+
+.stat-button {
+  appearance: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.stat-button:hover {
+  border-color: var(--border-mid);
+}
+
+.stat-active {
+  border-color: var(--ink);
+  background: var(--surface-2);
+}
+
+/* ---------- Job panel inner block ---------- */
+
+.ba-inner {
+  margin-bottom: 4px;
+}
+
+/* ---------- Skill gap ---------- */
+
+.sg-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.sg-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.sg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sg-chip {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  font-size: 12.5px;
+  text-transform: capitalize;
+}
+
+.sg-chip-ok {
+  color: var(--success);
+  background: var(--success-bg);
+  border-color: transparent;
+}
+
+.sg-chip-partial {
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-color: transparent;
+}
+
+.sg-chip-missing {
+  color: var(--text-muted);
+  background: var(--surface-2);
+  /* Dashed edge reads as "unconfirmed" without implying a deficiency. */
+  border: 1px dashed var(--border-mid);
+}

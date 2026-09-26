@@ -93,6 +93,7 @@ INSTALLED_APPS = [
 
     'corsheaders',
     'rest_framework',
+    'apps.applications',
     'apps.jobs',
     'apps.resumes',
     'apps.users',

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { useAuth } from '../auth/useAuth'
 import { formatDate } from '../lib/format'
-import type { UserProfile } from '../lib/types'
+import type { TailoringStatus, UserProfile } from '../lib/types'
 import { Alert, Pill } from '../components/primitives'
 import { IconCheck, IconFile, IconLayers, IconZap } from '../components/Icons'
 
@@ -25,6 +25,7 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [ai, setAi] = useState<TailoringStatus | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -41,6 +42,26 @@ export function SettingsPage() {
     }
 
     void load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    // Read-only. AI configuration is server-side and is deliberately not
+    // editable from the UI: there are no per-user providers, so there is
+    // nothing a user could meaningfully change here.
+    api
+      .tailoringStatus()
+      .then((status) => {
+        if (!cancelled) setAi(status)
+      })
+      .catch(() => {
+        if (!cancelled) setAi(null)
+      })
+
     return () => {
       cancelled = true
     }
@@ -182,6 +203,49 @@ export function SettingsPage() {
             <IconFile size={15} />
             Manage resumes
           </button>
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="card-head">
+          <h2>AI</h2>
+          <div className="card-head-actions">
+            <Pill tone={ai?.available ? 'success' : 'warning'}>
+              {ai?.available ? 'Ready' : 'Unavailable'}
+            </Pill>
+          </div>
+        </div>
+        <div className="card-body">
+          <p className="stat-hint" style={{ marginTop: 0, lineHeight: 1.65 }}>
+            Resume tailoring runs on the AI provider configured for this deployment.
+            Configuration is set on the server and is shown here for reference only.
+          </p>
+          <div className="grid-detail" style={{ marginTop: 18 }}>
+            <div className="metric">
+              <span className="metric-label">Provider</span>
+              <span className="metric-value">
+                {ai?.available ? (ai.display_name || ai.provider || 'Configured') : 'Not configured'}
+              </span>
+            </div>
+            <div className="metric">
+              <span className="metric-label">Model</span>
+              <span className="metric-value">{ai?.model || '—'}</span>
+            </div>
+            <div className="metric">
+              <span className="metric-label">Master resume</span>
+              <span className="metric-value">
+                {user?.has_master_resume ? 'Ready' : 'Missing'}
+              </span>
+            </div>
+          </div>
+          {!ai?.available ? (
+            <div style={{ marginTop: 16 }}>
+              <Alert variant="warning">
+                Tailoring is unavailable. Ask an administrator to configure an AI provider
+                on the server.
+              </Alert>
+            </div>
+          ) : null}
         </div>
       </section>
 

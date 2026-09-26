@@ -4,7 +4,7 @@ import { ApiError, api } from './lib/api'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
 import { RequireAnonymous, RequireAuth, RequireMasterResume } from './auth/guards'
-import { useJobs, useResumes } from './hooks/useData'
+import { useApplications, useJobs, useResumes } from './hooks/useData'
 import { useToasts } from './hooks/useToasts'
 import type { Job, ViewKey } from './lib/types'
 import { Sidebar } from './components/Sidebar'
@@ -67,7 +67,22 @@ function AppShell() {
     error: resumesError,
     refresh: refreshResumes,
   } = useResumes()
+  const {
+    applications,
+    stats,
+    loading: applicationsLoading,
+    error: applicationsError,
+    refresh: refreshApplications,
+    create: createApplication,
+    setStatus: setApplicationStatus,
+    remove: removeApplication,
+  } = useApplications()
   const { toasts, dismiss, notify } = useToasts()
+
+  const applicationForJob = useCallback(
+    (jobId: number) => applications.find((item) => item.job === jobId) ?? null,
+    [applications],
+  )
 
   const view = (PATH_TO_VIEW[location.pathname] ?? 'dashboard') as ViewKey
   const heading = HEADINGS[view] ?? HEADINGS.dashboard
@@ -159,6 +174,13 @@ function AppShell() {
 
         {view === 'dashboard' ? (
           <DashboardPage
+            applicationForJob={applicationForJob}
+            onCreateApplication={(jobId: number) => createApplication(jobId)}
+            onApplicationStatus={setApplicationStatus}
+            onDeleteApplication={removeApplication}
+            applications={applications}
+            stats={stats}
+            applicationsLoading={applicationsLoading}
             jobs={jobs}
             loading={loading}
             error={error}
@@ -182,13 +204,22 @@ function AppShell() {
         {view === 'jobs' ? <JobsPage /> : null}
 
         {view === 'applications' ? (
-          <ApplicationsPage jobs={jobs} analyzing={analyzing} onAnalyze={(url) => void handleAnalyze(url)} />
+          <ApplicationsPage
+            applications={applications}
+            jobs={jobs}
+            loading={applicationsLoading}
+            error={applicationsError}
+            onRefresh={() => void refreshApplications()}
+            onStatusChange={setApplicationStatus}
+            onDelete={removeApplication}
+          />
         ) : null}
 
         {view === 'resumes' ? (
           <ResumesPage
             resumes={resumes}
             master={master}
+            jobs={jobs}
             loading={resumesLoading}
             error={resumesError}
             onRefresh={() => void refreshResumes()}

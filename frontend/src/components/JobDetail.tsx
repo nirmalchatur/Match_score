@@ -1,11 +1,27 @@
-import type { Job } from '../lib/types'
+import type { Application, ApplicationStatus, Job } from '../lib/types'
 import { formatDate, formatScore, scoreTone, sourceHost, statusLabel, statusTone } from '../lib/format'
 import { IconExternal, IconMapPin } from './Icons'
 import { Alert, Pill, ScoreRing } from './primitives'
 import { StepList } from './StepList'
 import { TailorResume } from './TailorResume'
+import { SkillGapPanel } from './SkillGapPanel'
+import { ApplicationPanel } from './ApplicationPanel'
 
-export function JobDetail({ job }: { job: Job }) {
+type Props = {
+  job: Job
+  application?: Application | null
+  onCreateApplication?: () => Promise<unknown>
+  onApplicationStatus?: (id: number, status: ApplicationStatus) => Promise<unknown>
+  onDeleteApplication?: (id: number) => Promise<unknown>
+}
+
+export function JobDetail({
+  job,
+  application = null,
+  onCreateApplication,
+  onApplicationStatus,
+  onDeleteApplication,
+}: Props) {
   const tone = statusTone(job.status)
   const host = sourceHost(job.url)
 
@@ -55,6 +71,10 @@ export function JobDetail({ job }: { job: Job }) {
           </div>
         </div>
 
+        <div style={{ marginBottom: 20 }}>
+          <SkillGapPanel gap={job.skill_gap} />
+        </div>
+
         {/* Key facts */}
         <div className="grid-detail" style={{ marginBottom: 20 }}>
           <div className="metric">
@@ -99,6 +119,18 @@ export function JobDetail({ job }: { job: Job }) {
         <TailorResume job={job} />
 
         <div className="divider" />
+
+        {onCreateApplication && onApplicationStatus ? (
+          <>
+            <ApplicationPanel
+              application={application}
+              onCreate={onCreateApplication}
+              onStatusChange={onApplicationStatus}
+              onDelete={onDeleteApplication}
+            />
+            <div className="divider" />
+          </>
+        ) : null}
 
         <StepList steps={job.pipeline_steps} updatedAt={job.updated_at} />
 

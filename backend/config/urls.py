@@ -17,6 +17,11 @@ urlpatterns = [
     ),
 
     path(
+        "api/applications/",
+        include("apps.applications.urls"),
+    ),
+
+    path(
         "api/jobs/",
         include("apps.jobs.urls"),
     ),
