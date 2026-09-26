@@ -21,7 +21,7 @@
   width: 44px;
   height: 44px;
   border-radius: var(--r-lg);
-  background: linear-gradient(135deg, var(--accent) 0%, #6d28d9 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-mid) 100%);
   box-shadow: var(--glow-violet), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   color: #fff;
   animation: pulse-glow 1.8s var(--ease) infinite;
@@ -46,7 +46,7 @@
   flex-direction: column;
   justify-content: center;
   padding: 60px 56px;
-  background: linear-gradient(160deg, #0e0e12 0%, #0a0a0b 100%);
+  background: linear-gradient(160deg, #ffffff 0%, var(--sand) 100%);
   border-right: 1px solid var(--border-soft);
 }
 
@@ -56,23 +56,27 @@
   gap: 10px;
   margin-bottom: 56px;
   width: fit-content;
-  font-family: var(--display);
-  font-size: 18px;
-  font-weight: 800;
+  font-family: var(--serif);
+  font-size: 23px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
   color: var(--text);
 }
 
 .auth-pitch {
-  font-family: var(--display);
-  font-size: clamp(28px, 3vw, 38px);
-  font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: -1px;
+  font-family: var(--serif);
+  font-size: clamp(32px, 3.4vw, 46px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
   color: var(--text);
 }
 
+/* Ink-on-paper needs no glow to read as emphasis; a serif italic
+   carries it instead. */
 .auth-pitch .gradient-text {
-  text-shadow: 0 0 40px rgba(167, 139, 250, 0.45);
+  font-style: italic;
+  text-shadow: none;
 }
 
 .auth-sub {
@@ -105,9 +109,9 @@
   height: 20px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: var(--success-bg);
-  border: 1px solid var(--success-border);
-  color: var(--success);
+  background: var(--accent);
+  border: 1px solid var(--accent-line);
+  color: var(--paper);
 }
 
 /* "Last analyzed" recap card on the sign-in panel */
@@ -153,9 +157,9 @@
 
 .auth-recap-score {
   margin-left: auto;
-  font-family: var(--display);
-  font-size: 20px;
-  font-weight: 800;
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 400;
   color: var(--success-strong);
 }
 
@@ -191,7 +195,6 @@
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 8px rgba(124, 58, 237, 0.5);
 }
 
 .auth-main {
@@ -211,16 +214,16 @@
   align-items: center;
   gap: 9px;
   margin-bottom: 26px;
-  font-family: var(--display);
-  font-size: 17px;
-  font-weight: 700;
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 400;
 }
 
 .auth-title {
-  font-family: var(--display);
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-family: var(--serif);
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: -0.015em;
 }
 
 .auth-sub {
@@ -322,7 +325,7 @@
 }
 
 .auth-oauth:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(10, 10, 10, 0.04);
   border-color: var(--border-strong);
 }
 
@@ -381,10 +384,10 @@
 
 .setup-title {
   margin: 10px 0 0;
-  font-family: var(--display);
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-family: var(--serif);
+  font-size: 38px;
+  font-weight: 400;
+  letter-spacing: -0.015em;
 }
 
 .setup-sub {

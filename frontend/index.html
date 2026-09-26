@@ -4,19 +4,47 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#08060d" />
+    <meta name="theme-color" content="#ffffff" />
     <meta
       name="description"
       content="TailorUp — collect real job postings, parse them into structured requirements, and score them against your master resume."
     />
     <title>TailorUp · Job Matching &amp; Resume Analytics</title>
 
+    <!--
+      Typography
+      ---------
+      A deliberately monochrome editorial system, served as woff2 from
+      Google Fonts:
+
+        Instrument Serif  400 + italic  -- display headlines (--serif)
+        Archivo            400-700       -- headings & numerals (--display)
+        Inter Tight        400-600       -- UI and body copy (--sans)
+        JetBrains Mono     400-500       -- labels, scores, data (--mono)
+
+      The earlier "Wavehaus Sans" entries were removed: it is a commercial
+      typeface that was never licensed into this repo, so every page load
+      was firing four guaranteed 404s for /fonts/WavehausSans-*.woff2 before
+      falling through to a fallback anyway.
+
+      The stylesheet is loaded non-render-blocking and swapped in on load.
+      Each stack ends in a real system face, so a blocked or offline CDN
+      degrades cleanly instead of leaving text invisible.
+    -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      />
+    </noscript>
   </head>
   <body>
     <div id="root"></div>

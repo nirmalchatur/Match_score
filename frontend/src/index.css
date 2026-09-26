@@ -1,61 +1,109 @@
 /* ============================================================
-   TailorUp — Design System
-   Flat near-black surfaces, hairline borders, violet accent.
+   TailorUp - Design System
+
+   Palette: strictly monochrome. The product is ink on paper, and
+   hierarchy is carried by value, weight and rule - never by hue.
+
+   Note on the token names: several of them ("accent", "rust",
+   "blue", "green", "pink") are legacy from an earlier teal/rust
+   palette. They are deliberately KEPT and remapped onto the
+   neutral ramp rather than deleted, because ~80 call sites across
+   components.css / layout.css / auth.css / marketing.css still
+   reference them. Renaming is a separate, larger refactor.
    ============================================================ */
 
+/* ------------------------------------------------------------
+   Typefaces are loaded from Google Fonts via index.html:
+   Instrument Serif, Archivo, Inter Tight, JetBrains Mono.
+   Every stack below ends in a real system face, so a blocked or
+   offline CDN degrades cleanly instead of rendering invisible text.
+   ------------------------------------------------------------ */
+
 :root {
+  /* --- Core ink & paper --- */
+  --ink: #0a0a0a;
+  --paper: #ffffff;
+
+  /* --- Legacy brand slots, remapped onto the neutral ramp --- */
+  --sand: #f2f2f2;
+  --mist: #8c8c8c;
+  --deep: #0a0a0a;
+  --rust: #3f3f3f;
+
   /* --- Canvas & surfaces --- */
-  --bg: #0a0a0b;
-  --bg-panel: #0b0b0d;
-  --bg-elevated: #0e0e12;
-  --surface: #111113;
-  --surface-2: #17171a;
-  --surface-3: #1e1e22;
+  --bg: #ffffff;
+  --bg-panel: #fafafa;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f5f5f5;
+  --surface-3: #ebebeb;
 
-  /* --- Borders (deliberately faint) --- */
-  --border-soft: rgba(255, 255, 255, 0.05);
-  --border: rgba(255, 255, 255, 0.07);
-  --border-mid: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.12);
-  --border-input: rgba(255, 255, 255, 0.14);
+  /* --- Borders --- */
+  --border-soft: rgba(10, 10, 10, 0.07);
+  --border: rgba(10, 10, 10, 0.13);
+  --border-mid: rgba(10, 10, 10, 0.22);
+  --border-strong: #9a9a9a;
+  --border-input: rgba(10, 10, 10, 0.28);
 
-  /* --- Text --- */
-  --text: #f1f0f5;
-  --text-muted: #9492a0;
-  --text-dim: #4e4c5e;
+  /* --- Text ---
+     --text-dim is #6e6e6e (4.9:1 on white) so small labels still
+     clear WCAG AA for normal text. */
+  --text: #0a0a0a;
+  --text-muted: #4a4a4a;
+  --text-dim: #6e6e6e;
 
-  /* --- Accent --- */
-  --accent: #7c3aed;
-  --accent-soft-text: #c4b5fd;
-  --accent-mid: #a78bfa;
-  --accent-faint: rgba(124, 58, 237, 0.08);
-  --accent-12: rgba(124, 58, 237, 0.12);
-  --accent-15: rgba(124, 58, 237, 0.15);
-  --accent-20: rgba(124, 58, 237, 0.2);
-  --accent-35: rgba(124, 58, 237, 0.35);
-  --accent-line: rgba(167, 139, 250, 0.25);
+  /* --- Primary (ink) --- */
+  --accent: #0a0a0a;
+  --accent-soft-text: #0a0a0a;
+  --accent-mid: #3d3d3d;
+  --accent-faint: rgba(10, 10, 10, 0.04);
+  --accent-12: rgba(10, 10, 10, 0.12);
+  --accent-15: rgba(10, 10, 10, 0.15);
+  --accent-20: rgba(10, 10, 10, 0.2);
+  --accent-35: rgba(10, 10, 10, 0.35);
+  --accent-line: rgba(10, 10, 10, 0.85);
 
-  --blue: #3b82f6;
-  --blue-soft-text: #93c5fd;
-  --blue-12: rgba(59, 130, 246, 0.12);
-  --blue-20: rgba(59, 130, 246, 0.2);
+  /* --- Secondary (graphite) --- */
+  --rust: #3f3f3f;
+  --rust-soft-text: #2e2e2e;
+  --rust-mid: #5c5c5c;
+  --rust-faint: rgba(10, 10, 10, 0.05);
+  --rust-12: rgba(10, 10, 10, 0.12);
+  --rust-15: rgba(10, 10, 10, 0.15);
+  --rust-20: rgba(10, 10, 10, 0.2);
+  --rust-35: rgba(10, 10, 10, 0.35);
+  --rust-line: rgba(10, 10, 10, 0.3);
 
-  --pink: #f9a8d4;
-  --green: #60a5fa;
+  /* --- Supporting tints --- */
+  --blue: #0a0a0a;
+  --blue-soft-text: #0a0a0a;
+  --blue-12: rgba(10, 10, 10, 0.1);
+  --blue-20: rgba(10, 10, 10, 0.2);
 
-  /* --- Status --- */
-  --success: #34d399;
-  --success-strong: #22c55e;
-  --success-bg: rgba(16, 185, 129, 0.12);
-  --success-border: rgba(16, 185, 129, 0.22);
-  --warning: #fbbf24;
-  --warning-bg: rgba(245, 158, 11, 0.12);
-  --warning-border: rgba(245, 158, 11, 0.22);
-  --danger: #f87171;
-  --danger-bg: rgba(239, 68, 68, 0.12);
-  --danger-border: rgba(239, 68, 68, 0.22);
-  --neutral-bg: rgba(255, 255, 255, 0.06);
-  --neutral-border: rgba(255, 255, 255, 0.08);
+  --pink: #0a0a0a;
+  --green: #0a0a0a;
+
+  /* --- Status ---
+     With no hue available, status is encoded by VALUE WEIGHT and
+     border strength instead of colour, so the states stay separable:
+       success  darkest text + firm border
+       danger   darkest text + heaviest border
+       warning  mid grey + soft border
+       info     light grey fill
+     Every badge also carries a text label, so colour was never the
+     sole carrier of meaning. */
+  --success: #0a0a0a;
+  --success-strong: #0a0a0a;
+  --success-bg: #f0f0f0;
+  --success-border: rgba(10, 10, 10, 0.5);
+  --warning: #3d3d3d;
+  --warning-bg: #f7f7f7;
+  --warning-border: rgba(10, 10, 10, 0.22);
+  --danger: #0a0a0a;
+  --danger-bg: #f0f0f0;
+  --danger-border: rgba(10, 10, 10, 0.75);
+  --neutral-bg: #f2f2f2;
+  --neutral-border: rgba(10, 10, 10, 0.14);
 
   /* --- Radius (compact) --- */
   --r-xs: 6px;
@@ -65,30 +113,39 @@
   --r-xl: 16px;
   --r-pill: 999px;
 
-  /* --- Type --- */
-  --display: 'Manrope', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* --- Type ---
+     --serif   Instrument Serif: high-contrast editorial voice. Used
+               for the wordmark and marketing headlines ONLY, and
+               always at weight 400 - the family has no bold, so any
+               heavier value would trigger ugly synthetic faux-bold.
+     --display Archivo: a slightly condensed grotesque with real 400
+               to 700 weights, so headings and numerals stay sharp.
+     --sans    Inter Tight: dense, neutral UI and body copy.
+     --mono    JetBrains Mono: labels, scores, config values. */
+  --serif: 'Instrument Serif', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  --display: 'Archivo', 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sans: 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
 
-  /* --- Elevation --- */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 8px 24px -12px rgba(0, 0, 0, 0.7);
-  --shadow-lg: 0 24px 60px -24px rgba(0, 0, 0, 0.8);
-  --glow-violet: 0 0 24px rgba(124, 58, 237, 0.35), 0 0 48px rgba(124, 58, 237, 0.12);
-  --glow-violet-sm: 0 0 12px rgba(124, 58, 237, 0.25);
-  --glow-blue-sm: 0 0 12px rgba(59, 130, 246, 0.2);
-  --glow-green-sm: 0 0 16px rgba(16, 185, 129, 0.18);
+  /* --- Elevation (neutral shadows for a light theme) --- */
+  --shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.06);
+  --shadow-md: 0 8px 24px -12px rgba(10, 10, 10, 0.16);
+  --shadow-lg: 0 24px 60px -24px rgba(10, 10, 10, 0.2);
+  --glow-violet: 0 0 24px rgba(10, 10, 10, 0.14), 0 0 48px rgba(10, 10, 10, 0.06);
+  --glow-violet-sm: 0 0 12px rgba(10, 10, 10, 0.12);
+  --glow-blue-sm: 0 0 12px rgba(10, 10, 10, 0.1);
+  --glow-green-sm: 0 0 16px rgba(10, 10, 10, 0.1);
 
   /* --- Layout metrics (mirrors the reference shell) --- */
   --sidebar-w: 232px;
   --topbar-h: 60px;
   --page-max: 1600px;
 
-  /* --- Tech swatch colours for the stack grid --- */
-  --tech-cyan: #22d3ee;
-  --tech-blue: #3b82f6;
-  --tech-green: #22c55e;
-  --tech-violet: #8b5cf6;
+  /* --- Legacy swatch slots (neutralised) --- */
+  --tech-cyan: #0a0a0a;
+  --tech-blue: #3d3d3d;
+  --tech-green: #5c5c5c;
+  --tech-violet: #8c8c8c;
 
   /* --- Motion --- */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -97,7 +154,7 @@
   --t-base: 200ms;
   --t-slow: 450ms;
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 /* ---------- Reset ---------- */
@@ -142,20 +199,20 @@ h4 {
 
 /* ---------- Focus & selection ---------- */
 :focus-visible {
-  outline: 2px solid var(--accent-mid);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--r-xs);
 }
 
 ::selection {
   background: var(--accent-20);
-  color: #fff;
+  color: var(--text);
 }
 
 /* ---------- Scrollbar ---------- */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: rgba(10, 10, 10, 0.22) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -168,12 +225,12 @@ h4 {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(10, 10, 10, 0.18);
   border-radius: var(--r-pill);
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(10, 10, 10, 0.3);
 }
 
 /* ---------- Keyframes ---------- */
@@ -267,8 +324,12 @@ h4 {
   color: var(--text-dim);
 }
 
+/* The palette is monochrome, so these no longer gradient to a second
+   hue. They are kept as classes because AuthLayout.tsx still uses
+   .gradient-text, and they now render as a subtle ink fade that
+   keeps the emphasis without introducing colour. */
 .gradient-text {
-  background: linear-gradient(125deg, #c4b5fd 0%, #93c5fd 45%, #f9a8d4 100%);
+  background: linear-gradient(125deg, var(--accent-mid) 0%, var(--accent) 55%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -276,7 +337,7 @@ h4 {
 }
 
 .gradient-text-subtle {
-  background: linear-gradient(125deg, #a78bfa 0%, #60a5fa 100%);
+  background: linear-gradient(125deg, var(--accent) 0%, var(--rust-mid) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
