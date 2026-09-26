@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="TailorUp API" tests="29" time="0.439">
+  <testsuite name="Auth lifecycle / 01 Register a new account" id="342bf753-45c6-4c1e-b8e7-5e9d8dd19a36" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.128">
+    <testcase name="register returns the new account" time="0.128" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Auth lifecycle / 02 /me accepts the session register just created" id="63ed48a2-e837-4547-89e8-3ce04b4e3928" timestamp="2026-09-26T15:30:30.593Z" tests="2" failures="0" errors="0" time="0.010">
+    <testcase name="csrf token is issued" time="0.010" classname="TailorUpApi"/>
+    <testcase name="/me reports the freshly registered account" time="0.010" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Auth lifecycle / 03 Log in" id="6a10cb68-d178-4e22-b93a-67284a59c29b" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.022">
+    <testcase name="login starts a session" time="0.022" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Auth lifecycle / 04 /me reflects the signed-in account" id="65db3ca6-409d-4059-a7a3-2e5ed2d871c5" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.011">
+    <testcase name="/me returns the authenticated user" time="0.011" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Auth lifecycle / 05 User payload matches the serializer contract" id="3b7cb2a6-9080-4b90-9054-830c625af0d7" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.009">
+    <testcase name="user payload exposes exactly the documented fields" time="0.009" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Profile / 06 Read the workspace profile" id="2656b12b-2af0-4c84-8bdc-399ea8c3ecfe" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.012">
+    <testcase name="profile is readable and auto-created on first access" time="0.012" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Profile / 07 Update the workspace profile" id="c8f20694-9f65-45a2-b9ab-403c21666a10" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.014">
+    <testcase name="profile patch is accepted" time="0.014" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Profile / 08 Profile change reads back" id="45b6f291-5b85-4713-abc0-976f3b8e01e4" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.007">
+    <testcase name="profile persisted what was written" time="0.007" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Jobs and resumes / 09 Job list is empty for a new account" id="3df49351-1a07-45b3-bc78-57291ecded8d" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.013">
+    <testcase name="job list returns an empty array, not an error" time="0.013" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Jobs and resumes / 10 Job list tolerates filters and an unknown sort key" id="f629626e-d1fb-4a1a-bfb5-54d041a8b041" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.010">
+    <testcase name="filtered job list still returns 200" time="0.010" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Jobs and resumes / 11 Resume list is empty for a new account" id="cef98cff-5506-48d2-b29e-23890aa8bc3a" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.007">
+    <testcase name="resume list returns an empty array" time="0.007" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Jobs and resumes / 12 No master resume yet" id="e2564e7c-128f-447e-8a25-e298bbb4b996" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.007">
+    <testcase name="master resume lookup reports none uploaded" time="0.007" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Jobs and resumes / 13 Unknown job id is a 404" id="a8793240-fc2f-4824-8c53-66429d54eed7" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.005">
+    <testcase name="missing job returns 404, not 500" time="0.005" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Jobs and resumes / 14 Unknown resume id is a 404" id="fb7ad2a6-1710-4c33-aba0-c672677c8e42" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.006">
+    <testcase name="missing resume returns 404, not 500" time="0.006" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Validation / 15 Analyze rejects a malformed URL" id="9cdbd021-8a7d-43f5-926d-bd0cc745b395" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.006">
+    <testcase name="analyze rejects a malformed URL at the serializer" time="0.006" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Validation / 16 Analyze rejects a non-http scheme" id="eec77cd5-d55d-4ee2-b50d-a694137d1cdc" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.040">
+    <testcase name="analyze refuses a non-http(s) URL" time="0.040" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Validation / 17 Match without a master resume is a clean 404" id="37bcf950-153d-431e-8115-6a8bba75a9c9" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.006">
+    <testcase name="match reports a missing master resume rather than crashing" time="0.006" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Validation / 18 Duplicate registration is rejected" id="25aaf391-00ab-4cd9-b5b2-0ef0666c6426" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.005">
+    <testcase name="register refuses an email that already exists" time="0.005" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Validation / 19 Weak password is rejected" id="a182a41c-b359-4ff0-bb97-982631ff9b2d" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.006">
+    <testcase name="register enforces the password policy" time="0.006" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Validation / 20 Malformed email is rejected" id="fff4ea5e-fe00-4730-ae5a-3412daca8ac3" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.003">
+    <testcase name="register validates the email format" time="0.003" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Validation / 21 Wrong password is rejected" id="ab8b1eb8-a974-470d-a43f-b0ee530c8e5c" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.004">
+    <testcase name="login refuses an incorrect password" time="0.004" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Tenant isolation / 22 Register a second, unrelated account" id="ccc42b6c-1c6a-4bc4-9ada-f305e8ef4373" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.053">
+    <testcase name="second account registers with its own distinct id" time="0.053" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Tenant isolation / 23 The new session cannot see the first user's jobs" id="2b560765-4e8d-4672-9e0f-dc02d091c0a8" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.011">
+    <testcase name="tenant isolation: the newcomer starts with an empty job list" time="0.011" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Tenant isolation / 24 The new session cannot see the first user's profile" id="a032bc20-c215-43c7-ac13-61cf1cfb236b" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.005">
+    <testcase name="tenant isolation: the profile belongs to the newcomer" time="0.005" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Tenant isolation / 25 /me is the newcomer, not the original user" id="3f8c217b-5ff6-4180-837d-75375e0d8f4f" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.013">
+    <testcase name="the session switched identity cleanly" time="0.013" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Logout / 26 Log out" id="478fc710-a174-4789-b06c-fc43e885ec56" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.015">
+    <testcase name="logout returns 204 No Content" time="0.015" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Logout / 27 /me is anonymous again after logout" id="33b6889c-6885-4c79-a754-d51feaa645d2" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.004">
+    <testcase name="the session is genuinely closed" time="0.004" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Logout / 28 Job list is closed to a logged-out visitor" id="3e352afe-9f96-45da-b3d1-35620bec5582" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.004">
+    <testcase name="job list requires authentication" time="0.004" classname="TailorUpApi"/>
+  </testsuite>
+  <testsuite name="Logout / 29 Profile is closed to a logged-out visitor" id="3adf37e0-7f98-41e2-a516-53c091162884" timestamp="2026-09-26T15:30:30.593Z" tests="1" failures="0" errors="0" time="0.003">
+    <testcase name="profile requires authentication" time="0.003" classname="TailorUpApi"/>
+  </testsuite>
+</testsuites>
