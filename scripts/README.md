@@ -1,15 +1,83 @@
+# Tooling
+
+Two developer tools live here, plus the GitHub Actions workflows that run them.
+
+```
+scripts/ci_console.py               live terminal for CI runs and jobs
+scripts/build_postman_collection.py generates postman/*.json (source of truth)
+scripts/run_api_tests.py            boots Django, runs Newman, reports
+backend/config/settings_test.py     hermetic settings for the API run
+.github/workflows/ci.yml            full test suite on merge to main
+.github/workflows/api-tests.yml     the Newman suite
+```
+
+## `ci_console.py` — the CI terminal
+
+A live view of this repository's workflow runs and the jobs inside them, plus
+commands for the things the GitHub dashboard does not expose well.
+
+It uses **only the standard library**, so there is nothing to install and it
+runs on a fresh runner, in a container, or on a machine that has never seen
+this project.
+
+```bash
+# Interactive
+python scripts/ci_console.py
+
+# One-shot, safe in a pipeline (never prompts)
+python scripts/ci_console.py status
+python scripts/ci_console.py runs main
+```
+
+Authenticate with `GITHUB_TOKEN` (or `GH_TOKEN`). Inside Actions both that and
+`GITHUB_REPOSITORY` are injected automatically, and the repository is read
+from the git `origin` otherwise:
+
+```bash
+export GITHUB_TOKEN=ghp_...        # needs the 'actions' scope
+python scripts/ci_console.py
+```
+
+### Commands
+
+| Command | What it does |
+| --- | --- |
+| `status [run]` | Banner plus every job, with the step currently running |
+| `runs [branch]` | Recent runs, newest first |
+| `jobs [run]` | Full job list for one run |
+| `watch [run]` | Live table, repainted until the run finishes |
+| `log <job-id>` | One job's log (`--tail N` for the last N lines) |
+| `arts [run]` | Artifacts attached to a run |
+| `pending [run]` | Deployments waiting on a reviewer |
+| `retry [run]` | **Re-run only the failed jobs** |
+| `again [run]` | Re-run the whole workflow |
+| `cancel [run]` | Cancel a run in progress |
+| `kill [run]` | Force-cancel, ignoring graceful shutdown |
+| `approve [run]` | Approve a run held for fork-PR review |
+| `deploy [run]` | Approve pending environment deployments |
+| `purge [run]` | Delete a run and free its artifact quota |
+| `nuke [run]` | Delete a run's logs but keep the run |
+| `send <workflow>` | Trigger `workflow_dispatch` |
+
+`retry` is the one worth remembering: the UI buries it under "Re-run jobs",
+and re-running a whole matrix to fix a single test wastes minutes of CI.
+
+### Safety
+
+Every command that changes something prints the exact run it is about to touch
+and asks for confirmation, defaulting to **no**. With no terminal attached it
+refuses to confirm at all, so a stray newline in a pipeline cannot cancel a
+deployment. Read-only commands never prompt.
+
+Colour is disabled automatically when `NO_COLOR` is set or output is piped.
+
+---
+
 # API test suite
 
 Automated API tests for the TailorUp backend, run with **Newman** against a real
 Django server. A GitHub Actions workflow executes them on every pull request and
 again on the merge commit to `main`, then posts the result back on the PR.
-
-```
-scripts/build_postman_collection.py   generates postman/*.json (source of truth)
-scripts/run_api_tests.py              boots Django, runs Newman, reports
-backend/config/settings_test.py       hermetic settings for the run
-.github/workflows/api-tests.yml       the CI workflow
-```
 
 ## Running it locally
 

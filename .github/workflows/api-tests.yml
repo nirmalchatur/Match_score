@@ -1,0 +1,166 @@
+name: API tests
+
+# The collection is fast, hermetic and needs no secrets, so it runs on every
+# change that could plausibly affect it.
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'postman/**'
+      - 'scripts/**'
+      - '.github/workflows/api-tests.yml'
+  # A merged PR lands here as a push to main, which is the "PR was merged"
+  # trigger: re-run against main and publish the report on the merge commit.
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'postman/**'
+      - 'scripts/**'
+      - '.github/workflows/api-tests.yml'
+  workflow_dispatch:
+
+concurrency:
+  # Cancel superseded runs on the same ref, but never cancel a main run.
+  group: api-tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# The run posts its result back onto the PR, which needs write access to
+# pull requests. Without this the comment step fails with a 403
+# ("Resource not accessible by integration") and fails the whole job even
+# though every assertion passed.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  api-tests:
+    name: Postman / Newman
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # Newman is a Node program. The Python `newman` package on PyPI is a thin,
+      # unmaintained wrapper that does `from argument import Argument` while
+      # every published `argument` release exports `Arguments`, so it cannot be
+      # installed at all. The npm distribution is the supported path.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Newman and the HTML reporter
+        # newman-reporter-html ships separately; without it Newman aborts after
+        # printing "could not find html reporter" and writes no report.
+        #
+        # --legacy-peer-deps is required, not optional: newman-reporter-html
+        # declares `peer newman@4`, so installing it against newman@6 makes
+        # npm fail with ERESOLVE before a single test runs. The reporter only
+        # shells out to Newman's CLI, so the declared range is stale rather
+        # than a genuine incompatibility.
+        run: |
+          npm install --no-save --no-package-lock --legacy-peer-deps \
+            newman@6 newman-reporter-html
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Regenerate the collection from its generator
+        working-directory: .
+        # The JSON in postman/ is committed for convenience, but the generator
+        # is the source of truth. Regenerating here means a stale or hand-edited
+        # collection cannot quietly diverge from the tests.
+        run: python scripts/build_postman_collection.py
+
+      - name: Check the committed collection matches the generator
+        run: |
+          if ! git diff --quiet -- postman/; then
+            echo "::error::postman/ is out of date with scripts/build_postman_collection.py"
+            git --no-pager diff -- postman/
+            exit 1
+          fi
+
+      - name: Run the API test suite
+        run: python scripts/run_api_tests.py
+
+      - name: Upload the HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-report
+          path: reports/newman-report.html
+          if-no-files-found: warn
+
+      - name: Upload the JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-junit
+          path: reports/newman-junit.xml
+          if-no-files-found: warn
+
+      - name: Comment the result on the PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'reports/newman-report.json';
+            if (!fs.existsSync(path)) {
+              core.info('No newman JSON report found; skipping comment.');
+              return;
+            }
+            const report = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const stats = report.run.stats;
+            const total = stats.assertions.total;
+            const failed = stats.assertions.failed;
+            const passed = total - failed;
+            const ok = failed === 0 && total > 0;
+
+            const failures = [];
+            for (const ex of report.run.executions) {
+              for (const a of ex.assertions || []) {
+                if (a.error) {
+                  failures.push(`- **${ex.item.name}** — _${a.assertion}_\n  \`${a.error.message}\``);
+                }
+              }
+            }
+
+            const body = [
+              `### API tests: ${ok ? '✅ passed' : '❌ failed'}`,
+              '',
+              `**${passed}/${total}** assertions passed across ` +
+                `${stats.requests.total} requests.`,
+              '',
+              failures.length
+                ? '<details><summary>Failures</summary>\n\n' + failures.join('\n') + '\n\n</details>'
+                : 'No failures.',
+              '',
+              'Download the `newman-report` artifact from this run for the full ' +
+                'request/response breakdown.',
+            ].join('\n');
+
+            const marker = '<!-- newman-api-tests -->';
+            const full = marker + '\n' + body;
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(
+              github.rest.issues.listComments, { owner, repo, issue_number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: full });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: full });
+            }
