@@ -8,8 +8,13 @@ the :class:`AIProvider` interface.
 
 Configuration
 -------------
-    AI_PROVIDER=ollama     # production default: local Ollama
+    AI_PROVIDER=ollama     # local development: a local Ollama daemon
+    AI_PROVIDER=gemini     # hosted deployment: Google AI Studio
     AI_PROVIDER=fake        # tests / CI: deterministic, no network
+
+Ollama is the local default because it needs no key. Render and similar hosts
+cannot run a daemon, so a hosted deployment sets ``gemini`` and either a
+server-wide ``GEMINI_API_KEY`` or lets each user bring their own.
 """
 
 from __future__ import annotations
@@ -20,6 +25,7 @@ from typing import Callable
 from .exceptions import AIConfigurationError
 from .providers.base import AIProvider
 from .providers.fake import FakeAIProvider
+from .providers.gemini import GeminiProvider
 from .providers.ollama import OllamaProvider
 
 logger = logging.getLogger(__name__)
@@ -28,6 +34,7 @@ logger = logging.getLogger(__name__)
 #: classes so a provider can be constructed lazily with its own overrides.
 _BUILTIN: dict[str, Callable[[], AIProvider]] = {
     "ollama": OllamaProvider,
+    "gemini": GeminiProvider,
     "fake": FakeAIProvider,
 }
 
