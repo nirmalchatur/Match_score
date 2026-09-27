@@ -18,11 +18,29 @@ import type {
 
 /**
  * API base URL.
- * Defaults to a relative `/api` prefix so the Vite dev proxy (and any
- * reverse proxy in production) can forward to Django without CORS.
- * Override with VITE_API_URL for a cross-origin backend.
+ * Defaults to a relative `/api` prefix so the Vite dev proxy can forward to
+ * Django without CORS. Override with VITE_API_URL for a cross-origin backend.
  */
-const BASE_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '')
+const RAW_BASE_URL = (import.meta.env.VITE_API_URL || '').trim()
+const BASE_URL = (RAW_BASE_URL || '/api').replace(/\/+$/, '')
+
+/**
+ * True when a production bundle is still calling its own origin.
+ *
+ * That means `VITE_API_URL` was not set at build time, so the request never
+ * leaves the browser's host. On Vercel that host is a CDN, and it answers
+ * with its own 404/405 -- an error that looks like a broken API but is
+ * really a misconfigured build. Catching it here turns a baffling network
+ * tab into a message that names the actual fix.
+ */
+const API_URL_MISSING = import.meta.env.PROD && !RAW_BASE_URL
+
+const API_URL_MISSING_MESSAGE =
+  'This deployment is not connected to the API. ' +
+  'VITE_API_URL was not set when the site was built, so requests are going ' +
+  'to the static site instead of Django. ' +
+  'Set VITE_API_URL on the Vercel project (including the trailing /api) ' +
+  'and redeploy.'
 
 export class ApiError extends Error {
   status: number
@@ -105,6 +123,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   let response: Response
 
+  // Fail before touching the network. A relative BASE_URL in production can
+  // only ever reach the CDN, so the round trip could only ever return a
+  // 404/405 that misattributes the problem to the API.
+  if (API_URL_MISSING) {
+    throw new ApiError(API_URL_MISSING_MESSAGE, 0)
+  }
+
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       ...init,
@@ -113,7 +138,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       credentials: 'include',
     })
   } catch {
-    throw new ApiError('Cannot reach the API server. Is the backend running on port 8000?', 0)
+    throw new ApiError(
+      `Cannot reach the API at ${BASE_URL}. ` +
+        'Check that the backend is running and that VITE_API_URL points at it.',
+      0,
+    )
   }
 
   if (response.status === 204) {
@@ -342,6 +371,12 @@ export const api = {
    * two copies would eventually disagree about error handling.
    */
   async downloadResume(id: number, format: 'docx' | 'pdf'): Promise<string> {
+    // This path does its own fetch rather than going through request(), so it
+    // needs the same guard.
+    if (API_URL_MISSING) {
+      throw new ApiError(API_URL_MISSING_MESSAGE, 0)
+    }
+
     const response = await fetch(`${BASE_URL}/resumes/${id}/download/${format}/`, {
       method: 'GET',
       headers: { Accept: '*/*' },
