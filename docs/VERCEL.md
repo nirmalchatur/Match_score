@@ -27,6 +27,30 @@ removed because they were the only reason that misdetection could happen.
 The real entry points are `backend/manage.py` and
 `backend/requirements.txt`.
 
+## Signed-out on every request after signup
+
+If signup succeeds and the very next call returns
+
+```
+403 Forbidden — Authentication credentials were not provided.
+```
+
+the session cookie is not being sent. The SPA is on Vercel and the API on
+Render, so every request is **cross-site**, and a `SameSite=Lax` cookie is
+never attached to a cross-site `fetch` — even one that sets
+`credentials: 'include'`. The browser stores the cookie and then refuses to
+send it, which looks precisely like a backend auth bug.
+
+`config.settings` sets `SESSION_COOKIE_SAMESITE` and `CSRF_COOKIE_SAMESITE`
+to `None` when `DEBUG` is off, paired with `SESSION_COOKIE_SECURE` and
+`CSRF_COOKIE_SECURE` (browsers reject `SameSite=None` without `Secure`).
+Override with the same-named environment variables if a deployment needs
+something else.
+
+`apps/users/tests/test_cookie_policy.py` pins that posture, because the
+pairing is the part that breaks silently: separate the two flags and you get
+a cookie that is set but never sent, which is the same symptom.
+
 ## The "Request failed (405)" trap
 
 If signup, login or any other API call reports **405 Method Not Allowed**,
