@@ -63,6 +63,17 @@ CORS_ALLOWED_ORIGINS = env_list(
     ),
 )
 
+# Vercel preview deployments are served from a per-commit subdomain --
+# match-score-<hash>-<team>.vercel.app -- so the origin of a branch preview
+# cannot be hardcoded in CORS_ALLOWED_ORIGINS and it changes on every push.
+# django-cors-headers matches this list as regular expressions, which is the
+# only way to let previews talk to the API without disabling CORS for
+# everything. Leave empty in production unless previews actually need it.
+CORS_ALLOWED_ORIGINS_REGEX = env_list(
+    "CORS_ALLOWED_ORIGINS_REGEX",
+    default="",
+)
+
 CSRF_TRUSTED_ORIGINS = env_list(
     "CSRF_TRUSTED_ORIGINS",
     default="http://localhost:5173,http://127.0.0.1:5173",

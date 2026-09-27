@@ -105,6 +105,13 @@ def main() -> int:
         print()
         print("The value must match character for character: https:// included,")
         print("no trailing slash, no www.")
+        print()
+        print("NOTE: if you are on a Vercel *preview* URL the origin looks like")
+        print("  match-score-<hash>-<team>.vercel.app")
+        print("and changes on every push, so it cannot be hardcoded. Test on the")
+        print("production URL, or set CORS_ALLOWED_ORIGINS_REGEX on the server:")
+        print()
+        print(r"  CORS_ALLOWED_ORIGINS_REGEX=https://match-score.*\.vercel\.app")
 
     if allow and allow_credentials:
         print(f"credentials            Access-Control-Allow-Credentials: {allow_credentials}")
