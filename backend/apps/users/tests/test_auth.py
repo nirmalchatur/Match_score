@@ -38,6 +38,95 @@ class RegistrationTests(TestCase):
         self.assertNotEqual(user.password, "sup3r-secret-pw")
         self.assertTrue(user.check_password("sup3r-secret-pw"))
 
+
+class CsrfTokenTests(TestCase):
+    """The SPA must be able to obtain a CSRF token it can actually read.
+
+    The SPA is on a different origin from the API, so `document.cookie`
+    cannot see the `csrftoken` cookie. The token therefore has to be
+    delivered in the response body as well as the cookie, or every
+    mutating request fails with "CSRF token missing".
+
+    Two things make these tests easy to write wrong:
+
+    * The default test client sets ``enforce_csrf_checks=False``, so CSRF is
+      silently skipped and a token is never actually exercised. These use an
+      explicitly enforcing client.
+    * ``register`` and ``login`` declare ``authentication_classes = []``,
+      which bypasses ``SessionAuthentication`` and therefore CSRF entirely. A
+      token test pointed at ``register`` passes whether or not the token is
+      real, so these are written against ``logout``, which uses the default
+      classes and does enforce it.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # This project reuses django.contrib.auth.models.User, whose USERNAME_FIELD
+        # is still "username" even though the API is email-based, so create_user
+        # takes the email positionally as the username.
+        self.user = User.objects.create_user(
+            "csrf@example.com", "csrf@example.com", "sup3r-secret-pw"
+        )
+
+    def _enforcing_client(self):
+        from django.test import Client
+
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.user)
+        return client
+
+    def test_token_is_returned_in_the_body(self):
+        response = self.client.get("/api/auth/csrf/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("csrf_token", response.data)
+        self.assertTrue(response.data["csrf_token"])
+
+    def test_token_is_also_set_as_a_cookie(self):
+        # DRF's SessionAuthentication compares the header against the cookie,
+        # so the cookie is not optional even when the body carries the token.
+        response = self.client.get("/api/auth/csrf/")
+        self.assertIn("csrftoken", response.cookies)
+
+    def test_endpoint_needs_no_session(self):
+        """It is called before signing in, so it must not require auth."""
+        response = self.client.get("/api/auth/csrf/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_token_is_accepted_on_a_mutating_request(self):
+        """End-to-end proof: the token from this endpoint passes CSRF."""
+        client = self._enforcing_client()
+        token = client.get("/api/auth/csrf/").data["csrf_token"]
+
+        response = client.post(
+            "/api/auth/logout/", HTTP_X_CSRFTOKEN=token
+        )
+
+        self.assertEqual(
+            response.status_code,
+            204,
+            "the token from /api/auth/csrf/ was rejected by CSRF middleware",
+        )
+
+    def test_mutating_request_without_token_is_rejected(self):
+        """The counterpart, so the test above cannot pass vacuously.
+
+        This is the assertion that failed when the token was read from
+        `document.cookie`: on a real deployment the header went out unset and
+        every write failed exactly like this.
+        """
+        client = self._enforcing_client()
+        client.get("/api/auth/csrf/")  # set the cookie...
+
+        response = client.post("/api/auth/logout/")  # ...but send no header
+
+        self.assertEqual(
+            response.status_code,
+            403,
+            "a request with no X-CSRFToken was accepted; the positive test "
+            "above would then prove nothing",
+        )
+
     def test_register_creates_profile(self):
         self.client.post(
             "/api/auth/register/",

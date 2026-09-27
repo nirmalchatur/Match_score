@@ -57,13 +57,45 @@ export function isAuthError(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 401 || error.status === 403)
 }
 
-/** Read Django's CSRF cookie so unsafe requests can be authenticated. */
-function getCookie(name: string): string {
-  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`))
-  return match ? decodeURIComponent(match[1]) : ''
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE'])
+
+/**
+ * The CSRF token, held in memory.
+ *
+ * It used to be read from `document.cookie`, which works when the SPA and
+ * the API share an origin. They do not: the page is on Vercel and the
+ * `csrftoken` cookie is set on the Render host, and a page can only read
+ * cookies belonging to its own domain. `credentials: 'include'` makes the
+ * browser *send* those cookies, but it does nothing to make them readable
+ * by script, so the header silently went out unset and every mutating
+ * request died with "CSRF token missing".
+ *
+ * The token is therefore fetched from the API and kept here. A CSRF token
+ * is not a secret -- it is echoed back in the header, which is the whole
+ * point of the double-submit pattern -- so memory is an appropriate place
+ * for it. It is refetched whenever a request is rejected for a stale token.
+ */
+let csrfToken: string | null = null
+
+async function fetchCsrfToken(): Promise<string> {
+  const response = await fetch(`${BASE_URL}/auth/csrf/`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) {
+    throw new ApiError(
+      `Could not obtain a CSRF token (HTTP ${response.status}).`,
+      response.status,
+    )
+  }
+  const payload = await response.json()
+  csrfToken = payload.csrf_token || null
+  if (!csrfToken) {
+    throw new ApiError('The API did not return a CSRF token.', 0)
+  }
+  return csrfToken
 }
 
-const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE'])
 /** Read the filename the server chose from Content-Disposition. */
 function filenameFromDisposition(header: string | null, fallback: string): string {
   const match = header?.match(/filename="?([^"]+)"?/i)
@@ -103,6 +135,14 @@ function extractError(payload: unknown, fallback: string): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  return attempt<T>(path, init, true)
+}
+
+async function attempt<T>(
+  path: string,
+  init: RequestInit | undefined,
+  allowTokenRetry: boolean,
+): Promise<T> {
   const method = (init?.method || 'GET').toUpperCase()
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -116,9 +156,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   // Django requires the CSRF header on unsafe session-authenticated requests.
+  // It is fetched rather than read from document.cookie, which is empty for a
+  // page on a different origin from the API.
   if (!SAFE_METHODS.has(method)) {
-    const token = getCookie('csrftoken')
-    if (token) headers['X-CSRFToken'] = token
+    if (!csrfToken) {
+      await fetchCsrfToken()
+    }
+    if (csrfToken) headers['X-CSRFToken'] = csrfToken
   }
 
   let response: Response
@@ -175,6 +219,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
+    // Django rotates the CSRF token on login, so a token cached before
+    // signing in is stale afterwards. Refetch once and replay; a second
+    // failure is a real error and is reported as one.
+    if (
+      response.status === 403 &&
+      allowTokenRetry &&
+      !SAFE_METHODS.has(method)
+    ) {
+      csrfToken = null
+      await fetchCsrfToken()
+      return attempt<T>(path, init, false)
+    }
+
     throw new ApiError(extractError(payload, `Request failed (${response.status})`), response.status)
   }
 

@@ -5,9 +5,23 @@ We use Django's built-in session auth rather than tokens so the browser
 holds an HttpOnly session cookie and no secret is ever exposed to
 JavaScript. `ensure_csrf_cookie` on the "me" endpoint guarantees the SPA
 can always obtain a CSRF token for mutating requests.
+
+Cross-origin note
+-----------------
+The SPA (Vercel) and this API (Render) are different origins, so the
+classic "read the csrftoken cookie with document.cookie" trick cannot work:
+a page can only read cookies belonging to its own host, and this API's
+cookies are set on the Render domain. `document.cookie` in the browser
+therefore returns nothing, and the SPA has no way to discover the token from
+the cookie it is *sent*.
+
+`CsrfTokenView` exists for that. It returns the token in the response body so
+the client can hold it in memory and echo it in the `X-CSRFToken` header,
+which is the arrangement DRF's SessionAuthentication expects.
 """
 
 from django.contrib.auth import authenticate, login, logout
+from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
@@ -22,6 +36,23 @@ from .serializers import (
     UserProfileSerializer,
     UserSerializer,
 )
+
+
+class CsrfTokenView(APIView):
+    """GET /api/auth/csrf/ — hand the SPA a CSRF token it can actually read.
+
+    The `ensure_csrf_cookie` decorator is not optional: DRF's
+    SessionAuthentication performs the double-submit comparison, so the token
+    has to be in the cookie *as well* as the header. Returning it in the body
+    is what makes it reachable from a page on another origin.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @method_decorator(ensure_csrf_cookie)
+    def get(self, request):
+        return Response({"csrf_token": get_token(request)})
 
 
 class RegisterView(APIView):
