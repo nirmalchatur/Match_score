@@ -290,6 +290,34 @@ ALLOWED_RESUME_EXTENSIONS = {'.pdf'}
 
 
 # ---------------------------------------------------------------------------
+# Session and CSRF cookies
+#
+# The SPA (Vercel) and the API (Render) are different registrable domains, so
+# every request the browser makes is *cross-site*. That changes what the
+# cookie attributes have to be:
+#
+#   SameSite=Lax  the browser refuses to attach the cookie to a cross-site
+#                 fetch, even when the request sets `credentials: 'include'`.
+#                 Signup succeeds, then every later call arrives anonymous --
+#                 which looks exactly like a backend auth bug.
+#   SameSite=None the cookie is sent cross-site, but browsers only accept it
+#                 alongside `Secure`.
+#
+# So in production both flags are set together, and the test suite below
+# pins that pairing so they cannot be separated later.
+# ---------------------------------------------------------------------------
+
+SESSION_COOKIE_SAMESITE = os.environ.get(
+    "SESSION_COOKIE_SAMESITE",
+    "Lax" if DEBUG else "None",
+)
+CSRF_COOKIE_SAMESITE = os.environ.get(
+    "CSRF_COOKIE_SAMESITE",
+    "Lax" if DEBUG else "None",
+)
+
+
+# ---------------------------------------------------------------------------
 # Production hardening (applied only when DEBUG is off)
 # ---------------------------------------------------------------------------
 
