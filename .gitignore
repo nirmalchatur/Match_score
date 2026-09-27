@@ -38,8 +38,15 @@ backend/staticfiles/
 
 storage/
 backend/storage/
-resumes/
+
+# Anchored with a leading slash on purpose. A bare "resumes/" matches a
+# directory named "resumes" at ANY depth, which silently untracked
+# backend/apps/resumes/ -- an installed Django app that config/urls.py
+# imports. Anchor to the repo root and name the backend upload dir
+# explicitly so the app stays tracked.
+/resumes/
 backend/resumes/
+
 
 *.pdf
 *.doc
