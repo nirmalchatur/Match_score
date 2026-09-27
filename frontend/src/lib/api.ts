@@ -138,9 +138,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       credentials: 'include',
     })
   } catch {
+    // A failed fetch is genuinely ambiguous: the browser reports a CORS
+    // rejection exactly like a dead network, because it refuses to hand the
+    // response to the page at all. Saying only "cannot reach the API" sends
+    // people to restart a backend that is in fact serving requests perfectly
+    // well -- the real cause is almost always CORS.
     throw new ApiError(
-      `Cannot reach the API at ${BASE_URL}. ` +
-        'Check that the backend is running and that VITE_API_URL points at it.',
+      `Cannot reach the API at ${BASE_URL}.\n` +
+        'Either the backend is down, or the browser blocked the response ' +
+        'because the API did not return an Access-Control-Allow-Origin ' +
+        'header for this origin.\n\n' +
+        'To tell them apart, run this in the browser console:\n' +
+        `  fetch('${BASE_URL}/auth/me/').then(r =>\n` +
+        '    console.log(r.status)).catch(() =>\n' +
+        "    console.log('blocked or offline'))\n\n" +
+        'If the console shows a status, the backend is fine and the issue is ' +
+        'CORS_ALLOWED_ORIGINS on the server. If it logs "blocked or offline", ' +
+        'the request never completed.',
       0,
     )
   }
