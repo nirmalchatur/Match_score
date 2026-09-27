@@ -10,7 +10,12 @@ charset-normalizer==3.5.1
 # Fernet, for encrypting user-supplied third-party API keys at rest
 # (apps.users.crypto). Wheels bundle the native OpenSSL binding, so this
 # needs no system library on Render.
-cryptography==44.0.2
+#
+# Pinned to >=50: 44.x carries ten known advisories (PYSEC-2026-2141,
+# PYSEC-2026-35, PYSEC-2026-3552/3553/3554, GHSA-537c-gmf6-5ccf). The
+# dependency audit in CI fails the build on them, and rightly so -- this
+# package guards every stored credential.
+cryptography==50.0.1
 Django==6.1
 djangorestframework==3.18.0
 idna==3.19
