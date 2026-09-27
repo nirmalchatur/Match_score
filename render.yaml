@@ -28,8 +28,12 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_HOSTS
-        # Replaced with your own API hostname after the first deploy.
-        value: "onrender.com"
+        # Must be the exact hostname, not the bare domain. Django matches
+        # ALLOWED_HOSTS literally, so "onrender.com" rejects
+        # "tailorup-api.onrender.com" with DisallowedHost -> HTTP 400. That
+        # made every request fail and left the health check unable to pass,
+        # so Render reported the deploy as timed out.
+        value: "tailorup-api.onrender.com"
       # The three origin variables must agree. They used to be mixed: this one
       # was prompted while the two below were hardcoded to a domain that never
       # existed, so a deploy could silently produce a CORS/CSRF pair that
