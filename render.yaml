@@ -30,13 +30,17 @@ services:
       - key: ALLOWED_HOSTS
         # Replaced with your own API hostname after the first deploy.
         value: "onrender.com"
+      # The three origin variables must agree. They used to be mixed: this one
+      # was prompted while the two below were hardcoded to a domain that never
+      # existed, so a deploy could silently produce a CORS/CSRF pair that
+      # rejected the real frontend. All three are now prompted at deploy time.
       - key: FRONTEND_ORIGIN
-        # Set to your Vercel URL, e.g. https://tailorup.vercel.app
+        # Your deployed Vercel origin, e.g. https://match-score.vercel.app
         sync: false
       - key: CSRF_TRUSTED_ORIGINS
-        value: "https://tailorup.vercel.app"
+        sync: false
       - key: CORS_ALLOWED_ORIGINS
-        value: "https://tailorup.vercel.app"
+        sync: false
     # Uncomment once on a paid plan to keep uploaded resumes across deploys.
     # disk:
     #   name: media
