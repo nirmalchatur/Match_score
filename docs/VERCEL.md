@@ -43,10 +43,22 @@ Django. On Vercel the same relative URL points at the **static site**, which
 answers a POST with a bare 405 and never contacts Django. Nothing in the
 browser points at the real cause.
 
-`frontend/vite.config.ts` now refuses to build a production bundle without an
-absolute `VITE_API_URL`, so the deploy fails at build time with the variable
-named instead of shipping a broken bundle. Set `ALLOW_RELATIVE_API=1` to
-override that when `/api` really is proxied to Django on the same host.
+`frontend/vite.config.ts` now surfaces this at build time, so a deploy
+cannot ship a bundle that can only 405:
+
+| Build | Missing `VITE_API_URL` |
+| --- | --- |
+| Vercel **production** | hard **error** — the real site is blocked |
+| Vercel **preview** (pull requests) | **warning** — branches stay deployable and reviewable |
+| Local `vite build` | hard **error** — `dist/` is a deploy artefact |
+
+Previews only warn on purpose: Vite builds them in `production` mode too, so
+erroring there would turn every pull request into a red deployment and block
+the very reviews the check exists to protect. Production stays gated, because
+that is the site real users hit.
+
+Set `ALLOW_RELATIVE_API=1` to skip the check entirely when `/api` really is
+proxied to Django on the same host.
 
 The SPA rewrite also excludes `api/`, so a stray API call returns a plain 404
 rather than masquerading as a method error.
