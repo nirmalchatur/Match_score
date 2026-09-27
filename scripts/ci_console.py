@@ -194,7 +194,15 @@ class Console:
         return getattr(self.style, colour)(text if text is not None else label)
 
     def print(self, message: str = "") -> None:
-        print(message, flush=True)
+        # CI output, and error bodies from Azure, carry bytes that a cp1252
+        # console cannot encode (BOMs, box characters). Without this, printing
+        # an error raises UnicodeEncodeError and hides the error itself.
+        try:
+            print(message, flush=True)
+        except UnicodeEncodeError:
+            encoding = (sys.stdout.encoding or "ascii")
+            print(message.encode(encoding, "replace").decode(encoding),
+                  flush=True)
 
     def rule(self, title: str = "") -> None:
         if title:
@@ -273,6 +281,28 @@ class Console:
 # ---------------------------------------------------------------------------
 
 
+class _StripAuthOnRedirect(urllib.request.HTTPRedirectHandler):
+    """Drop the API token when following a redirect off api.github.com.
+
+    GitHub's log endpoints answer with a 302 to a pre-signed blob URL.
+    urllib replays the original request headers on the redirect, which
+    sends the personal access token to Azure storage -- where it is
+    meaningless and the request is rejected with a 401 that looks like a
+    bad token rather than a redirect problem. Removing Authorization on
+    any cross-host redirect is the fix, and is the safe default generally.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and _host(newurl) != _host(req.full_url):
+            new.remove_header("Authorization")
+        return new
+
+
+def _host(url: str) -> str:
+    return urllib.parse.urlparse(url).netloc.lower()
+
+
 class GitHubError(RuntimeError):
     """A REST call failed. Carries the status code for better messages."""
 
@@ -312,14 +342,20 @@ class GitHub:
         if data is not None:
             request.add_header("Content-Type", "application/json")
 
+        # The log endpoints 302 to a signed blob URL. urllib replays the
+        # original headers onto that redirect, so the API token would be
+        # sent to a storage host that has no use for it -- and rejects it
+        # with 401. A redirect handler that drops Authorization fixes it.
+        opener = urllib.request.build_opener(_StripAuthOnRedirect)
+
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with opener.open(request, timeout=30) as response:
                 body = response.read()
                 if raw:
                     return body
                 return json.loads(body) if body else {}
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", "replace")
+            detail = exc.read().decode("utf-8-sig", "replace")
             try:
                 message = json.loads(detail).get("message", detail)
             except ValueError:

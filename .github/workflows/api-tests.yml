@@ -25,6 +25,14 @@ concurrency:
   group: api-tests-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# The run posts its result back onto the PR, which needs write access to
+# pull requests. Without this the comment step fails with a 403
+# ("Resource not accessible by integration") and fails the whole job even
+# though every assertion passed.
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   api-tests:
     name: Postman / Newman
@@ -51,7 +59,15 @@ jobs:
       - name: Install Newman and the HTML reporter
         # newman-reporter-html ships separately; without it Newman aborts after
         # printing "could not find html reporter" and writes no report.
-        run: npm install --no-save --no-package-lock newman@6 newman-reporter-html
+        #
+        # --legacy-peer-deps is required, not optional: newman-reporter-html
+        # declares `peer newman@4`, so installing it against newman@6 makes
+        # npm fail with ERESOLVE before a single test runs. The reporter only
+        # shells out to Newman's CLI, so the declared range is stale rather
+        # than a genuine incompatibility.
+        run: |
+          npm install --no-save --no-package-lock --legacy-peer-deps \
+            newman@6 newman-reporter-html
 
       - name: Install backend dependencies
         working-directory: backend
