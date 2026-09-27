@@ -232,6 +232,7 @@ class ResumeTailor:
         *,
         jd_profile: dict | None = None,
         provider=None,
+        api_key: str = "",
     ) -> TailoringOutcome:
         """
         Produce a validated tailoring of ``resume`` for ``job``.
@@ -245,6 +246,10 @@ class ResumeTailor:
             tailoring agrees with the match score the user already sees.
         :param provider: inject a provider (tests). Defaults to the configured
             one from :func:`apps.ai.factory.get_ai_provider`.
+        :param api_key: the calling user's own provider key, decrypted by the
+            view. Absent for keyless providers like Ollama. It is placed on the
+            request for the provider to read and is kept out of the prompt
+            payload by ``TailoringRequest.to_payload``.
         :raises AIConfigurationError: no usable provider is configured.
         :raises AIProviderUnavailableError: the provider could not be reached.
         :raises AIProviderTimeoutError: the provider did not answer in time.
@@ -262,6 +267,7 @@ class ResumeTailor:
             resume=source,
             job=job_context,
             match=dict(match_analysis or {}),
+            api_key=api_key,
         )
 
         logger.info(

@@ -1,4 +1,74 @@
-# AI setup (Ollama)
+# AI setup
+
+## Two ways to run the model
+
+| | Local | Hosted |
+| --- | --- | --- |
+| Provider | Ollama | Google Gemini |
+| Setting | `AI_PROVIDER=ollama` | `AI_PROVIDER=gemini` |
+| Key | None needed | **The user's own**, via Settings |
+
+A web host cannot run an Ollama daemon, so a deployed instance uses Gemini. Both
+paths go through the same `AIProvider` interface, so the rest of the app does not
+know which is in use.
+
+---
+
+## Bring your own Gemini key
+
+There is deliberately **no `GEMINI_API_KEY` server variable**. Every user pastes
+their own free key into **Settings → AI**, and it is stored encrypted. That means:
+
+- the owner's quota is never spent on someone else's tailoring, and
+- there is no shared secret on the server to leak.
+
+```bash
+AI_PROVIDER=gemini
+GEMINI_MODEL=gemini-2.0-flash   # optional, this is the default
+GEMINI_TIMEOUT=120              # optional
+```
+
+### Where a stored key lives
+
+`apps/users/models.py` → `ProviderCredential`, one row per (user, provider).
+
+- `encrypted_key` — a Fernet token. **Never** the plaintext. The encryption key
+  is derived from `SECRET_KEY` via SHA-256 (`apps/users/crypto.py`), so there is
+  no second secret to provision.
+- `key_hint` — a 4+4 mask like `AIza...4f2b`, so a user with two keys can tell
+  them apart. Eight characters cannot reconstruct a 39-character key.
+
+### The rules the code enforces
+
+1. **No endpoint returns a key.** `GET /api/auth/ai-key/` reports
+   `configured: true/false` and the hint. There is no reveal route — it would
+   put the value in a browser cache and every proxy log on the path.
+2. **A key never enters a prompt.** `TailoringRequest.to_payload()` omits
+   `api_key`, and the payload is what gets serialised into the prompt.
+3. **A key is decrypted only at call time**, inside the tailoring view, and the
+   decrypted string is not logged.
+4. **Signing out deletes it.** `POST /api/auth/logout/` removes the caller's rows
+   — scoped to that account, so nobody else's key is touched.
+
+### Rotating `SECRET_KEY` invalidates stored keys
+
+Because the encryption key is derived from `SECRET_KEY`, rotating it makes every
+stored key undecryptable. This fails **loudly and safely**: the unreadable row
+is deleted and the user is told to re-paste. There is no silent fallback to
+plaintext. Render's `generateValue: true` generates the secret once and keeps it,
+so redeploys are unaffected — but treat it as effectively permanent once users
+have saved keys.
+
+### What this does not protect against
+
+Encryption at rest defends a stolen database dump or backup. It does **not**
+defend against code execution on the web host, where the running process can
+decrypt any user's key. That is inherent to persisting a credential server-side.
+Users can remove their key at any time, and it is removed on sign-out.
+
+---
+
+# Local: Ollama
 
 > ## Verification status: PENDING
 >
@@ -20,6 +90,21 @@
 >
 > Neither proves a real model's output quality. Close this out by following steps
 > 1-5 below, then the manual check at the end of this file.
+
+Ollama needs no API key, so the Settings key form does not appear when
+`AI_PROVIDER=ollama` — there would be nothing for the user to paste.
+
+```bash
+# Install once: https://ollama.com/download
+ollama serve
+ollama pull llama3.1
+```
+
+```env
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1
+```
 
 ---
 

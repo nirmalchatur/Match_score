@@ -104,3 +104,61 @@ class RegisterSerializer(serializers.Serializer):
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+
+
+class ProviderCredentialSerializer(serializers.Serializer):
+    """Accepts a user's own API key. The key is write-only, by construction.
+
+    Declaring ``api_key`` write-only means it can never be echoed back by the
+    default ``to_representation``, so it is impossible to leak a key through
+    this serializer even if someone serialises the object by mistake later.
+    The read side is built by hand in :meth:`ProviderCredential.public_dict`,
+    which has no key field at all.
+    """
+
+    #: Restricted to a known set so this endpoint cannot be used to stash
+    #: arbitrary blobs against a user.
+    provider = serializers.ChoiceField(
+        choices=["gemini"],
+        default="gemini",
+    )
+
+    api_key = serializers.CharField(
+        write_only=True,
+        # Deliberately NOT trim_whitespace=True: that would strip a trailing
+        # newline before validate_api_key ever sees it, hiding a truncated
+        # paste. The raw value is inspected instead.
+        trim_whitespace=False,
+        min_length=8,
+        max_length=200,
+        error_messages={
+            "min_length": "That key looks too short to be a real API key.",
+            "max_length": "That key is longer than any known provider key.",
+        },
+    )
+
+    def validate_api_key(self, value):
+        # The whitespace check runs on the raw value, before trim_whitespace
+        # has silently stripped a trailing newline. A pasted key often arrives
+        # with one, and quietly trimming it hides a truncated paste -- better to
+        # say so and let the user re-copy.
+        if any(ch.isspace() for ch in value):
+            raise serializers.ValidationError(
+                "An API key cannot contain spaces. Check for a stray newline "
+                "or a missing character."
+            )
+
+        key = value.strip()
+        if not key:
+            raise serializers.ValidationError("Enter your API key.")
+        # A shape check, not a validity check. The goal is to catch a pasted
+        # URL or a truncated string early and give a clear message; whether
+        # the key actually works is only knowable by calling the provider, and
+        # that happens on first use.
+        if key.lower().startswith(("http://", "https://")):
+            raise serializers.ValidationError(
+                "That is a URL, not an API key. Copy the key itself from "
+                "Google AI Studio."
+            )
+        return key
+

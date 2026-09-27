@@ -26,6 +26,15 @@ services:
       - key: DEBUG
         value: "False"
       - key: SECRET_KEY
+        # Render generates this ONCE and stores it, so it survives redeploys.
+        #
+        # It is load-bearing beyond sessions: user AI keys are encrypted with a
+        # key derived from it (apps.users.crypto). Rotating it therefore makes
+        # every stored API key undecryptable, and affected users must re-paste
+        # theirs. That fails loudly and safely -- a key that cannot be decrypted
+        # is deleted and reported as "not configured", never silently downgraded
+        # to plaintext -- but it is still user-visible, so treat this as
+        # effectively permanent once users have saved keys.
         generateValue: true
       - key: ALLOWED_HOSTS
         # Must be the exact hostname, not the bare domain. Django matches
@@ -52,6 +61,25 @@ services:
       # Anchored to this project's own subdomain, so it is not a blanket allow.
       - key: CORS_ALLOWED_ORIGINS_REGEX
         value: 'https://match-score.*\.vercel\.app'
+      # --- AI provider ---------------------------------------------------
+      # Gemini, the hosted provider. A web host cannot run an Ollama daemon,
+      # so this is what makes resume tailoring work in production.
+      #
+      # There is deliberately **no** GEMINI_API_KEY. Each user pastes their own
+      # Google AI Studio key into Settings, and it is stored encrypted against
+      # SECRET_KEY. That keeps the owner's quota off the owner's bill and means
+      # a single leaked deployment cannot be used by anyone.
+      - key: AI_PROVIDER
+        value: "gemini"
+      # Optional. gemini-2.0-flash is the provider's default; set this only to
+      # pin a different model.
+      - key: GEMINI_MODEL
+        value: "gemini-2.0-flash"
+      # Generation timeout in seconds. Matches gunicorn's --timeout above, so a
+      # slow tailoring call is answered with a real error rather than a worker
+      # kill.
+      - key: GEMINI_TIMEOUT
+        value: "120"
     # Uncomment once on a paid plan to keep uploaded resumes across deploys.
     # disk:
     #   name: media

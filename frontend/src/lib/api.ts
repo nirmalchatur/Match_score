@@ -1,4 +1,5 @@
 import type {
+  AiKeyStatus,
   AnalyzeResponse,
   AuthResponse,
   Job,
@@ -271,6 +272,34 @@ export const api = {
     return request<UserProfile>('/auth/profile/', {
       method: 'PATCH',
       body: JSON.stringify(patch),
+    })
+  },
+
+  /* ---------- AI provider key (bring your own) ---------- */
+
+  /** Whether this account has a key saved. Never returns the key itself. */
+  getAiKey(provider = 'gemini'): Promise<AiKeyStatus> {
+    return request<AiKeyStatus>(`/auth/ai-key/?provider=${encodeURIComponent(provider)}`)
+  },
+
+  /**
+   * Store the user's own provider key.
+   *
+   * The key is sent once and then forgotten by the client: nothing here
+   * retains it, and there is no getter that could read it back. Callers
+   * should clear their input state as soon as this resolves.
+   */
+  saveAiKey(apiKey: string, provider = 'gemini'): Promise<AiKeyStatus> {
+    return request<AiKeyStatus>('/auth/ai-key/', {
+      method: 'POST',
+      body: JSON.stringify({ provider, api_key: apiKey }),
+    })
+  },
+
+  /** Forget the stored key. Idempotent. */
+  deleteAiKey(provider = 'gemini'): Promise<AiKeyStatus> {
+    return request<AiKeyStatus>(`/auth/ai-key/?provider=${encodeURIComponent(provider)}`, {
+      method: 'DELETE',
     })
   },
 

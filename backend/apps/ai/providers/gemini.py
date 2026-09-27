@@ -12,11 +12,15 @@ work there. Local development still uses ``AI_PROVIDER=ollama``.
 Configuration (environment only; nothing is hardcoded):
 
     AI_PROVIDER=gemini
-    GEMINI_API_KEY=...            # server-wide key
     GEMINI_MODEL=gemini-2.0-flash # optional, this is the default
+    GEMINI_TIMEOUT=120            # optional
 
-A user who brings their own key has it attached to the request by
-``apps.ai.credentials``; it is never logged and never leaves this module.
+There is deliberately **no** ``GEMINI_API_KEY``. This provider is
+bring-your-own-key only: the user's key is stored encrypted in
+``apps.users.models.ProviderCredential``, decrypted by the tailoring view, and
+attached to the request for the duration of one call. A deployment therefore
+never spends the owner's quota on anyone else's behalf, and a leaked server
+secret cannot be used to call Gemini.
 """
 
 from __future__ import annotations
@@ -62,12 +66,15 @@ class GeminiProvider(AIProvider):
 
     def __init__(
         self,
-        api_key: str | None = None,
         model: str | None = None,
         timeout: int | None = None,
         temperature: float | None = None,
     ):
-        self.api_key = (api_key or getattr(settings, "GEMINI_API_KEY", "") or "").strip()
+        # No api_key parameter and no server-wide key. This provider is
+        # bring-your-own-key only: the credential arrives on the request, from
+        # the user who typed it into the UI. There is deliberately no fallback
+        # to an environment variable, so a deployment can never end up quietly
+        # spending the owner's quota on someone else's behalf.
         self.model = (
             model or getattr(settings, "GEMINI_MODEL", "") or DEFAULT_MODEL
         ).strip()
@@ -79,14 +86,13 @@ class GeminiProvider(AIProvider):
         )
 
     def _key_for(self, request) -> str:
-        """A per-user key wins over the deployment-wide one.
+        """The user's own key, carried on the request.
 
-        This is the whole bring-your-own-key mechanism: the credential rides
-        on the request, is used for that one call, and is never written to a
-        log or included in an error detail.
+        This is the whole bring-your-own-key mechanism: the credential rides on
+        the request, is used for that one call, and is never written to a log
+        or included in an error detail.
         """
-        user_key = (getattr(request, "api_key", "") or "").strip()
-        return user_key or self.api_key
+        return (getattr(request, "api_key", "") or "").strip()
 
     @staticmethod
     def _extract_content(response) -> str:
@@ -131,9 +137,9 @@ class GeminiProvider(AIProvider):
         key = self._key_for(request)
         if not key:
             raise AIProviderUnavailableError(
-                "No Gemini API key is configured. Add one in Settings, or set "
-                "GEMINI_API_KEY on the server.",
-                detail="neither a per-user key nor GEMINI_API_KEY is set",
+                "No Google AI Studio API key. Add one in Settings to use "
+                "tailoring.",
+                detail="the request carried no user api_key",
             )
 
         body = {
@@ -203,26 +209,26 @@ class GeminiProvider(AIProvider):
         return self._extract_content(response)
 
     def health(self) -> tuple[bool, str]:
-        """Report whether a key is present.
+        """Report whether a deployment-level key is configured.
 
-        A live API call is deliberately not made: this runs on page load from
-        ``/tailor/status/``, and the free tier bills per request. It answers
-        "is this configured", not "is the provider's uptime good".
+        With bring-your-own-key there is no server key, so this is normally
+        ``False`` and the message points at the user's own Settings entry
+        rather than at a server variable. ``/tailor/status/`` reports
+        availability per signed-in user, not globally, so the wording matters
+        more than the boolean.
         """
-        if not self.api_key:
-            return False, (
-                "No server-wide Gemini key. Users can still add their own key "
-                "in Settings."
-            )
-        return True, f"Gemini ready (model {self.model})"
+        return False, (
+            "Add your own Google AI Studio API key in Settings to enable "
+            "tailoring."
+        )
 
     def describe(self) -> dict:
-        """Non-secret metadata. Never includes the key, or any part of it."""
+        """Non-secret metadata. Never includes a key, or any part of one."""
         return {
             "provider": self.name,
             "display_name": self.display_name,
             "model": self.model,
-            # Reported so the client knows a per-user key is the intended path
-            # when the server has none.
-            "server_key_configured": bool(self.api_key),
+            # Always False: this provider has no server-side key by design.
+            "server_key_configured": False,
+            "requires_user_key": True,
         }

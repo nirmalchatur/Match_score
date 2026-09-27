@@ -33,7 +33,10 @@ Django's `AUTH_PASSWORD_VALIDATORS`. `full_name` is optional.
 
 ### `POST /api/auth/logout/` — public
 
-`204` · ends the session.
+`204` · ends the session **and deletes the caller's stored AI API key**. Signing
+out on a shared machine leaves nothing behind. Scoped to the signed-in account
+only; other users' keys are untouched. Still `204` — the deletion is a side
+effect, not a response body.
 
 ### `GET /api/auth/me/` — public
 

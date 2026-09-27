@@ -213,6 +213,32 @@ export interface TailoringStatus {
   display_name?: string
   /** The configured model, e.g. "llama3.1". Never a URL or a credential. */
   model?: string | null
+  /**
+   * True when the provider is only usable once this account supplies a key.
+   * Set by the server, not the client.
+   */
+  requires_user_key?: boolean
+  /**
+   * Whether *this* account has a key saved. Never the key itself -- the
+   * backend has no route that can return it.
+   */
+  user_key_configured?: boolean
+  server_key_configured?: boolean
+}
+
+/**
+ * The status of the signed-in user's own provider key.
+ *
+ * Note what is absent: there is no `api_key` field. The backend deliberately
+ * has no endpoint that returns a stored key, so the value cannot be read back
+ * even by a caller that would like to.
+ */
+export interface AiKeyStatus {
+  provider: string
+  configured: boolean
+  /** A 4+4 mask such as "AIza...4f2b", for telling two keys apart. */
+  key_hint?: string
+  updated_at?: string
 }
 
 

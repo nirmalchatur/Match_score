@@ -13,8 +13,9 @@ Configuration
     AI_PROVIDER=fake        # tests / CI: deterministic, no network
 
 Ollama is the local default because it needs no key. Render and similar hosts
-cannot run a daemon, so a hosted deployment sets ``gemini`` and either a
-server-wide ``GEMINI_API_KEY`` or lets each user bring their own.
+cannot run a daemon, so a hosted deployment sets ``gemini``, and each user
+brings their own key through the UI (stored encrypted in
+``apps.users.models.ProviderCredential``).
 """
 
 from __future__ import annotations

@@ -189,13 +189,11 @@ OLLAMA_TEMPERATURE = float(os.environ.get("OLLAMA_TEMPERATURE", "0.2"))
 # --- Google Gemini -------------------------------------------------------
 #
 # The hosted provider. A hosted service cannot run an Ollama daemon, so this is
-# what makes tailoring work on Render. The key is optional at the settings
-# level: a user may bring their own, which takes precedence per request.
+# what makes tailoring work on Render.
 #
-# GEMINI_API_KEY is a fallback for a single-tenant deployment. On a multi-user
-# one, prefer leaving it empty and letting each user store their own key.
-
-GEMINI_API_KEY = (os.environ.get("GEMINI_API_KEY") or "").strip()
+# There is deliberately **no** GEMINI_API_KEY. Users bring their own key from
+# the UI and it is stored encrypted (see apps.users.crypto), so a deployment
+# can never spend the owner's quota on someone else's behalf.
 
 #: Defaults to gemini-2.0-flash in the provider. Overridable for anyone who
 #: wants a different model or a newer one when it lands.

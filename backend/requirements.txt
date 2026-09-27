@@ -7,6 +7,10 @@ asgiref==3.12.1
 beautifulsoup4==4.15.0
 certifi==2026.7.22
 charset-normalizer==3.5.1
+# Fernet, for encrypting user-supplied third-party API keys at rest
+# (apps.users.crypto). Wheels bundle the native OpenSSL binding, so this
+# needs no system library on Render.
+cryptography==44.0.2
 Django==6.1
 djangorestframework==3.18.0
 idna==3.19

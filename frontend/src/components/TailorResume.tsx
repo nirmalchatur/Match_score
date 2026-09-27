@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import type {
   TailoringResult,
@@ -115,15 +116,28 @@ export function TailorResume({ job }: { job: Job }) {
   const [draft, setDraft] = useState<TailoringResult | null>(null)
   const [saved, setSaved] = useState<Resume | null>(null)
   const [available, setAvailable] = useState<boolean | null>(null)
+  /** True when the provider is fine but this account has not added a key. */
+  const [missingKey, setMissingKey] = useState(false)
 
-  // Ask once whether tailoring is configured, so the button can be disabled
-  // with an explanation instead of failing on click.
+  // Ask once whether tailoring is actually usable *for this account*, so the
+  // button can be disabled with an explanation instead of failing on click.
+  //
+  // "Configured" and "usable" are different: with a bring-your-own-key
+  // provider the deployment can be correctly configured while this account has
+  // no key, and then the right message is "add your key", not "tailoring is
+  // unavailable".
   useEffect(() => {
     let cancelled = false
     api
       .tailoringStatus()
       .then((status) => {
-        if (!cancelled) setAvailable(status.available)
+        if (cancelled) return
+        if (status.requires_user_key && !status.user_key_configured) {
+          setMissingKey(true)
+          setAvailable(false)
+          return
+        }
+        setAvailable(status.available)
       })
       .catch(() => {
         if (!cancelled) setAvailable(null)
@@ -191,7 +205,7 @@ export function TailorResume({ job }: { job: Job }) {
             className="btn btn-primary"
             onClick={run}
             disabled={available === false}
-            title={available === false ? 'No AI provider is configured.' : undefined}
+            title={available === false ? 'Tailoring is not available for your account.' : undefined}
           >
             ✨ Tailor My Resume
           </button>
@@ -201,7 +215,14 @@ export function TailorResume({ job }: { job: Job }) {
       {available === false ? (
         <div style={{ marginTop: 14 }}>
           <Alert variant="info">
-            Tailoring is unavailable on this deployment: no AI provider is configured.
+            {missingKey ? (
+              <>
+                Tailoring needs your own Google AI Studio API key. Add one in{' '}
+                <Link to="/settings">Settings</Link> to switch this on.
+              </>
+            ) : (
+              'Tailoring is unavailable on this deployment: no AI provider is configured.'
+            )}
           </Alert>
         </div>
       ) : null}
