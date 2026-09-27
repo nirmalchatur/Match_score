@@ -184,6 +184,14 @@ jobs:
       - name: Type-check and build
         # tsc runs as part of the build, so a type error fails the job
         # rather than shipping a broken bundle.
+        #
+        # VITE_API_URL is a placeholder. The build refuses to run without it
+        # (see vite.config.ts), because a bundle with no API URL is a
+        # production bug that only shows up as "Request failed (405)" in the
+        # browser. CI is not a deployment, so any absolute URL will do; the
+        # real value is injected by Vercel at deploy time.
+        env:
+          VITE_API_URL: https://api.example.invalid/api
         run: npm run build
 
       - name: Upload build output

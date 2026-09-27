@@ -6,7 +6,7 @@
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
-      "source": "/((?!assets/|favicon.svg|icons.svg).*)",
+      "source": "/((?!assets/|api/|favicon.svg|icons.svg).*)",
       "destination": "/index.html"
     }
   ]
