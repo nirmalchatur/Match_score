@@ -60,6 +60,15 @@ that is the site real users hit.
 Set `ALLOW_RELATIVE_API=1` to skip the check entirely when `/api` really is
 proxied to Django on the same host.
 
+If a build slips through anyway, the app says so instead of failing opaquely:
+`src/lib/api.ts` detects a production bundle with no `VITE_API_URL` and
+returns
+
+> This deployment is not connected to the API. VITE_API_URL was not set when
+> the site was built...
+
+instead of letting the CDN return a 404 that looks like a broken endpoint.
+
 The SPA rewrite also excludes `api/`, so a stray API call returns a plain 404
 rather than masquerading as a method error.
 
