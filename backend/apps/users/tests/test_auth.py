@@ -38,6 +38,68 @@ class RegistrationTests(TestCase):
         self.assertNotEqual(user.password, "sup3r-secret-pw")
         self.assertTrue(user.check_password("sup3r-secret-pw"))
 
+
+class CsrfTokenTests(TestCase):
+    """The SPA must be able to obtain a CSRF token it can actually read.
+
+    The SPA is on a different origin from the API, so `document.cookie`
+    cannot see the `csrftoken` cookie. The token therefore has to be
+    delivered in the response body as well as the cookie, or every
+    mutating request fails with "CSRF token missing".
+    """
+
+    def test_token_is_returned_in_the_body(self):
+        response = self.client.get("/api/auth/csrf/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("csrf_token", response.data)
+        self.assertTrue(response.data["csrf_token"])
+
+    def test_token_is_also_set_as_a_cookie(self):
+        # DRF's SessionAuthentication compares the header against the cookie,
+        # so the cookie is not optional even when the body carries the token.
+        response = self.client.get("/api/auth/csrf/")
+        self.assertIn("csrftoken", response.cookies)
+
+    def test_endpoint_needs_no_session(self):
+        """It is called before signing in, so it must not require auth."""
+        response = self.client.get("/api/auth/csrf/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_token_is_accepted_on_a_mutating_request(self):
+        """End-to-end proof: the token from this endpoint passes CSRF."""
+        token = self.client.get("/api/auth/csrf/").data["csrf_token"]
+
+        response = self.client.post(
+            "/api/auth/register/",
+            {
+                "email": "csrf-ok@example.com",
+                "password": "sup3r-secret-pw",
+            },
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+
+        self.assertEqual(
+            response.status_code, 201, "the token from /api/auth/csrf/ was rejected"
+        )
+
+    def test_mutating_request_without_token_is_rejected(self):
+        """The counterpart, so the test above cannot pass vacuously."""
+        self.client.get("/api/auth/csrf/")
+        self.client.cookies.clear()
+
+        response = self.client.post(
+            "/api/auth/register/",
+            {
+                "email": "csrf-missing@example.com",
+                "password": "sup3r-secret-pw",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
     def test_register_creates_profile(self):
         self.client.post(
             "/api/auth/register/",
