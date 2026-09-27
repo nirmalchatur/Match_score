@@ -24,18 +24,28 @@ import urllib.request
 DEFAULT_API = os.environ.get("VITE_API_URL", "").rstrip("/")
 
 
-def request(url: str, origin: str | None, timeout: int = 60) -> tuple[int | None, dict, str]:
+def request(url: str, origin: str | None, timeout: int = 60) -> tuple[int | None, object, str]:
+    """Return (status, headers, body).
+
+    The header object is returned as-is rather than as a dict: HTTP header
+    names are case-insensitive, and ``dict(headers)`` preserves whatever case
+    the server sent (``access-control-allow-origin`` from a WSGI server, say).
+    Looking those up as ``Access-Control-Allow-Origin`` then silently misses,
+    and the checker reports a perfectly good CORS setup as blocked.
+    """
     req = urllib.request.Request(url, method="GET")
     req.add_header("Accept", "application/json")
     if origin:
         req.add_header("Origin", origin)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as response:
-            return response.status, dict(response.headers), response.read().decode(
-                "utf-8", "replace"
+            return (
+                response.status,
+                response.headers,
+                response.read().decode("utf-8", "replace"),
             )
     except urllib.error.HTTPError as exc:
-        return exc.code, dict(exc.headers), exc.read().decode("utf-8", "replace")
+        return exc.code, exc.headers, exc.read().decode("utf-8", "replace")
     except Exception as exc:  # DNS, TLS, timeout, free-tier wake-up
         return None, {}, f"{type(exc).__name__}: {exc}"
 
@@ -105,6 +115,13 @@ def main() -> int:
         print()
         print("The value must match character for character: https:// included,")
         print("no trailing slash, no www.")
+        print()
+        print("NOTE: if you are on a Vercel *preview* URL the origin looks like")
+        print("  match-score-<hash>-<team>.vercel.app")
+        print("and changes on every push, so it cannot be hardcoded. Test on the")
+        print("production URL, or set CORS_ALLOWED_ORIGINS_REGEX on the server:")
+        print()
+        print(r"  CORS_ALLOWED_ORIGINS_REGEX=https://match-score.*\.vercel\.app")
 
     if allow and allow_credentials:
         print(f"credentials            Access-Control-Allow-Credentials: {allow_credentials}")

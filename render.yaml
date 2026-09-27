@@ -45,6 +45,13 @@ services:
         sync: false
       - key: CORS_ALLOWED_ORIGINS
         sync: false
+      # Vercel previews live on a per-commit subdomain
+      # (match-score-<hash>-<team>.vercel.app), so their origin cannot be
+      # listed above and it changes on every push. This regex lets branch
+      # previews reach the API; keep CORS_ALLOWED_ORIGINS for production.
+      # Anchored to this project's own subdomain, so it is not a blanket allow.
+      - key: CORS_ALLOWED_ORIGINS_REGEX
+        value: 'https://match-score.*\.vercel\.app'
     # Uncomment once on a paid plan to keep uploaded resumes across deploys.
     # disk:
     #   name: media
