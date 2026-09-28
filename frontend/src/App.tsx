@@ -3,7 +3,12 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import { ApiError, api } from './lib/api'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
-import { RequireAnonymous, RequireAuth, RequireMasterResume } from './auth/guards'
+import {
+  RequireAnonymous,
+  RequireAuth,
+  RequireMasterResume,
+  RequireOnboardingSkills,
+} from './auth/guards'
 import { useApplications, useJobs, useResumes } from './hooks/useData'
 import { useToasts } from './hooks/useToasts'
 import type { Job, ViewKey } from './lib/types'
@@ -21,6 +26,9 @@ import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { SignupPage } from './pages/SignupPage'
 import { OnboardingPage } from './pages/OnboardingPage'
+import { OnboardingSkillsPage } from './pages/OnboardingSkillsPage'
+import { OnboardingYouPage } from './pages/OnboardingYouPage'
+import { OnboardingAiPage } from './pages/OnboardingAiPage'
 
 const HEADINGS: Record<ViewKey, { title: string; search: string }> = {
   dashboard: { title: 'Dashboard', search: 'Search jobs, companies…' },
@@ -246,9 +254,15 @@ export default function App() {
           <Route path="/signup" element={<SignupPage />} />
         </Route>
 
-        {/* Onboarding — signed in, but may not have a master resume yet */}
+        {/* Onboarding — signed in, completing setup in order */}
         <Route element={<RequireAuth />}>
           <Route path="/setup/resume" element={<OnboardingPage />} />
+          <Route
+            path="/setup/skills"
+            element={<RequireOnboardingSkills><OnboardingSkillsPage /></RequireOnboardingSkills>}
+          />
+          <Route path="/setup/you" element={<OnboardingYouPage />} />
+          <Route path="/setup/ai" element={<OnboardingAiPage />} />
         </Route>
 
         {/* Private workspace — requires a master resume to be useful */}

@@ -9,16 +9,77 @@ User = get_user_model()
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    """
+    Workspace preferences, plus the three answers collected during onboarding.
+
+    :attr:`career_stage` and :attr:`years_experience` are cross-validated:
+    years of experience is only meaningful for a professional, and a
+    professional with 0 years is a contradiction. The rule is applied here
+    rather than in the frontend so a hand-written PATCH cannot store a
+    nonsense combination.
+    """
+
+    #: Mirrors ``UserProfile.CAREER_STAGES``. Stated here because the
+    #: serializer is the boundary the wire format is defined at.
+    CAREER_STAGES = ("student", "fresher", "professional")
+
+    AI_SETUPS = ("ollama", "gemini")
+
     class Meta:
         model = UserProfile
         fields = [
             "headline",
             "discipline",
             "target_locations",
+            "career_stage",
+            "years_experience",
+            "ai_setup",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+    def validate(self, attrs):
+        # Fall back to what is already stored, so a PATCH that only touches the
+        # headline is not judged against a blank stage it never mentioned.
+        instance = self.instance
+        stage = attrs.get("career_stage", getattr(instance, "career_stage", ""))
+        years = attrs.get(
+            "years_experience", getattr(instance, "years_experience", 0)
+        )
+        setup = attrs.get("ai_setup", getattr(instance, "ai_setup", ""))
+
+        if stage and stage not in self.CAREER_STAGES:
+            raise serializers.ValidationError(
+                {"career_stage": "Choose student, fresher, or working professional."}
+            )
+
+        if setup and setup not in self.AI_SETUPS:
+            raise serializers.ValidationError(
+                {
+                    "ai_setup": (
+                        "Choose 'ollama' for a local model, or 'gemini' for the "
+                        "hosted one."
+                    )
+                }
+            )
+
+        if stage and stage != "professional" and years:
+            # Zeroed rather than rejected: a student who has worked before is
+            # not making a false claim, and refusing the save would only push
+            # them to send a 0 deliberately.
+            attrs["years_experience"] = 0
+
+        if stage == "professional" and not years:
+            raise serializers.ValidationError(
+                {
+                    "years_experience": (
+                        "Enter how many years you have worked, at least 1."
+                    )
+                }
+            )
+
+        return attrs
 
 
 class UserSerializer(serializers.ModelSerializer):

@@ -7,6 +7,8 @@ responses, the error text, and the prompt payload -- because a leak only has
 to happen once in any one of them.
 """
 
+import json
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -332,3 +334,88 @@ class GeminiKeyUsageTests(TestCase):
         # The old wording told users to set a server variable. That is gone.
         self.assertNotIn("GEMINI_API_KEY", message)
 
+
+
+class CareerStageApiTests(TestCase):
+    """
+    PATCH /api/auth/profile/ -- the onboarding answers.
+
+    The cross-field rule is the point: "working professional" with zero years
+    is a contradiction, and "student" with five years is a claim the form has
+    no business making on the user's behalf.
+    """
+
+    URL = "/api/auth/profile/"
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="stage@example.test", email="stage@example.test", password="pw-12345"
+        )
+        self.client.force_login(self.user)
+
+    def patch(self, payload):
+        return self.client.patch(
+            self.URL, data=json.dumps(payload), content_type="application/json"
+        )
+
+    def test_the_three_stages_are_accepted(self):
+        for stage in ("student", "fresher"):
+            response = self.patch({"career_stage": stage})
+            self.assertEqual(response.status_code, 200, response.content)
+            self.assertEqual(response.json()["career_stage"], stage)
+
+    def test_a_professional_must_give_years(self):
+        response = self.patch({"career_stage": "professional"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("years_experience", response.json())
+
+    def test_a_professional_with_years_is_stored(self):
+        response = self.patch({"career_stage": "professional", "years_experience": 4})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["years_experience"], 4)
+
+    def test_years_are_zeroed_for_a_student(self):
+        """Zeroed, not rejected: refusing would only invite a deliberate 0."""
+        response = self.patch({"career_stage": "student", "years_experience": 4})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["years_experience"], 0)
+
+    def test_an_unknown_stage_is_rejected(self):
+        self.assertEqual(self.patch({"career_stage": "wizard"}).status_code, 400)
+
+    def test_negative_years_are_rejected(self):
+        response = self.patch(
+            {"career_stage": "professional", "years_experience": -2}
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_absurd_years_are_rejected(self):
+        response = self.patch(
+            {"career_stage": "professional", "years_experience": 900}
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_a_patch_that_omits_the_stage_is_not_judged_against_a_blank_one(self):
+        """
+        A partial update must not trip a rule it never mentioned.
+
+        Sending only the headline has to work even on an empty profile; that
+        is the entire contract of PATCH.
+        """
+        response = self.patch({"headline": "Backend engineer"})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["headline"], "Backend engineer")
+
+    def test_both_ai_setups_are_accepted(self):
+        for setup in ("ollama", "gemini"):
+            response = self.patch({"ai_setup": setup})
+            self.assertEqual(response.status_code, 200, response.content)
+            self.assertEqual(response.json()["ai_setup"], setup)
+
+    def test_an_unknown_ai_setup_is_rejected(self):
+        self.assertEqual(self.patch({"ai_setup": "gpt"}).status_code, 400)
+
+    def test_the_new_fields_are_exposed(self):
+        body = self.client.get(self.URL).json()
+        for field in ("career_stage", "years_experience", "ai_setup"):
+            self.assertIn(field, body)

@@ -1,79 +1,84 @@
 """
 Tests for the qualities catalogue and its validation rules.
 
-The contract under test is "what a user is allowed to save": the canonical
-shape, the catalogue membership rule, and the minimum of seven enforced
-server-side. The last one is the point of this file -- a disabled button in
-the UI is a hint, not a control, and a PATCH sent by hand has to fail
-identically.
+The catalogue is 25 options across seven groups, from which a candidate picks
+seven. The contract under test is "what a user is allowed to save": the
+canonical shape, catalogue membership, the minimum of seven, and one from
+every group. That last rule is what makes seven selections meaningful rather
+than seven programming languages.
+
+The minimum is enforced server-side. A disabled button in the UI is a hint,
+not a control, and a request sent by hand has to fail identically.
 """
 
 import json
 
 from django.contrib.auth.models import User
-from django.test import SimpleTestCase, TestCase
-
-from apps.resumes.models import Resume, ResumeProfile
+from django.test import Client, SimpleTestCase, TestCase
 
 from apps.resumes import qualities as q
+from apps.resumes.models import Resume, ResumeProfile
+
+#: A valid seven: one from every group, so it satisfies every rule at once.
+VALID = {
+    "programming": ["Python"],
+    "data_structures": ["Trees and graphs"],
+    "problem_solving": ["Debugging"],
+    "soft_skills": ["Team collaboration"],
+    "project_management": ["Sprint planning"],
+    "leadership": ["Mentoring"],
+    "hr": ["Performance reviews"],
+}
 
 
 class NormalizeTests(SimpleTestCase):
-    def test_empty_input_gives_all_three_keys(self):
+    def test_empty_input_gives_all_seven_keys(self):
         for raw in (None, "", {}):
             self.assertEqual(q.normalize(raw), {k: [] for k in q.KINDS})
 
     def test_case_and_whitespace_are_canonicalised(self):
-        result = q.normalize({"technical": ["  python ", "PYTHON", "dOcKeR"]})
-        self.assertEqual(result["technical"], ["Python", "Docker"])
+        result = q.normalize({"programming": ["  python ", "PYTHON", "sql"]})
+        self.assertEqual(result["programming"], ["Python", "SQL"])
 
     def test_duplicates_collapse(self):
-        result = q.normalize({"technical": ["Python", "python", "PYTHON"]})
-        self.assertEqual(result["technical"], ["Python"])
+        result = q.normalize({"programming": ["Python", "python", "PYTHON"]})
+        self.assertEqual(result["programming"], ["Python"])
 
     def test_output_follows_catalogue_order_not_input_order(self):
-        """
-        Stable ordering is what makes the UI and the prompt reproducible.
-
-        The expectation follows the catalogue's own positions (Python 0,
-        Rust 7, Docker 32), so it stays correct if the catalogue is reordered
-        as long as those relative positions hold. It is deliberately not
-        alphabetical: "Python, Rust, Docker" proves the sort is by catalogue
-        position, since alphabetical would give Docker first.
-        """
-        result = q.normalize({"technical": ["Docker", "Rust", "Python"]})
+        result = q.normalize(
+            {"programming": ["SQL", "Java", "Python"]}
+        )
         self.assertEqual(
-            [v.lower() for v in result["technical"]],
-            ["python", "rust", "docker"],
+            result["programming"], ["Python", "Java", "SQL"]
         )
 
-    def test_missing_kinds_are_filled_in_empty(self):
-        result = q.normalize({"technical": ["Python"]})
+    def test_missing_groups_are_filled_in_empty(self):
+        result = q.normalize({"programming": ["Python"]})
         self.assertEqual(set(result), set(q.KINDS))
-        self.assertEqual(result["soft_skills"], [])
+        self.assertEqual(result["hr"], [])
 
     def test_blank_entries_are_ignored(self):
         """An empty input row in the picker is an artefact, not a choice."""
-        result = q.normalize({"technical": ["Python", "", "   "]})
-        self.assertEqual(result["technical"], ["Python"])
+        result = q.normalize({"programming": ["Python", "", "   "]})
+        self.assertEqual(result["programming"], ["Python"])
 
     def test_unknown_value_is_rejected_not_silently_dropped(self):
         with self.assertRaises(q.QualityError) as ctx:
-            q.normalize({"technical": ["COBOL"]})
+            q.normalize({"programming": ["COBOL"]})
         self.assertIn("COBOL", str(ctx.exception))
 
-    def test_unknown_category_is_rejected(self):
+    def test_unknown_group_is_rejected(self):
         with self.assertRaises(q.QualityError):
-            q.normalize({"technical": ["Python"], "vibes": ["good"]})
+            q.normalize({"programming": ["Python"], "vibes": ["good"]})
 
-    def test_value_from_the_wrong_category_is_rejected(self):
-        """Categories are not interchangeable, and must not be interchangeable."""
+    def test_value_from_the_wrong_group_is_rejected(self):
+        """Groups are not interchangeable, and must not be interchangeable."""
         with self.assertRaises(q.QualityError):
-            q.normalize({"project_management": ["Python"]})
+            q.normalize({"leadership": ["Python"]})
 
     def test_non_list_is_rejected(self):
         with self.assertRaises(q.QualityError):
-            q.normalize({"technical": "Python"})
+            q.normalize({"programming": "Python"})
 
     def test_non_mapping_is_rejected(self):
         with self.assertRaises(q.QualityError):
@@ -81,23 +86,17 @@ class NormalizeTests(SimpleTestCase):
 
     def test_non_string_entry_is_rejected(self):
         with self.assertRaises(q.QualityError):
-            q.normalize({"technical": [42]})
+            q.normalize({"programming": [42]})
+
 
 class MinimumTests(SimpleTestCase):
     def test_seven_is_accepted(self):
-        selection = {
-            "technical": ["Python", "Java", "Go", "Rust"],
-            "project_management": ["Scrum"],
-            "soft_skills": ["Communication", "Empathy"],
-        }
-        self.assertEqual(q.count(q.validate_selection(selection)), 7)
+        self.assertEqual(q.count(q.validate_selection(VALID)), 7)
 
     def test_six_is_rejected(self):
-        selection = {
-            "technical": ["Python", "Java", "Go"],
-            "project_management": ["Scrum"],
-            "soft_skills": ["Communication", "Empathy"],
-        }
+        selection = dict(VALID)
+        selection["hr"] = []
+        self.assertEqual(q.count(q.normalize(selection)), 6)
         with self.assertRaises(q.QualityError) as ctx:
             q.validate_selection(selection)
         self.assertIn(str(q.MINIMUM_TOTAL), str(ctx.exception))
@@ -106,44 +105,59 @@ class MinimumTests(SimpleTestCase):
         with self.assertRaises(q.QualityError):
             q.validate_selection({})
 
-    def test_every_category_must_be_represented(self):
+    def test_seven_all_from_the_programming_group_is_accepted(self):
         """
-        Seven technical skills and nothing else is not a valid selection.
+        Concentrated picks are allowed, and the gap is reported as a hint.
 
-        Without this the other two groups are decorative, and the "pick your
-        strengths" framing becomes a lie.
+        This is the deliberate alternative to enforcing one-per-group. Seven
+        groups and a total of seven means "at least one from each" is really
+        "exactly one from each", which would oblige a backend engineer to
+        claim an HR skill they do not have. The form must not invent a claim
+        for the person filling it in, so the rule is the total and
+        :func:`uncovered_groups` carries the nudge.
         """
         selection = {
-            "technical": [
-                "Python", "Java", "Go", "Rust", "SQL", "Docker", "AWS",
+            "programming": [
+                "Python", "Java", "SQL",
+                "JavaScript and TypeScript",
             ],
-            "project_management": [],
-            "soft_skills": [],
+            "data_structures": [
+                "Arrays and strings", "Hash maps and dictionaries",
+            ],
+            "problem_solving": ["Algorithm design"],
         }
-        with self.assertRaises(q.QualityError) as ctx:
-            q.validate_selection(selection)
-        self.assertIn("soft skills", str(ctx.exception).lower())
+        self.assertEqual(q.count(q.normalize(selection)), 7)
+        self.assertEqual(q.count(q.validate_selection(selection)), 7)
 
-    def test_the_category_message_wins_over_the_total_message(self):
-        """
-        When a category is empty the total is the unhelpful half of the answer.
+        gaps = q.uncovered_groups(q.normalize(selection))
+        self.assertIn("leadership", gaps)
+        self.assertIn("hr", gaps)
+        self.assertNotIn("programming", gaps)
 
-        A user who selected six and forgot soft skills should be told to add a
-        soft skill, not that they need one more.
-        """
-        selection = {
-            "technical": ["Python", "Java", "Go", "Rust", "SQL", "Docker"],
-            "project_management": ["Scrum", "Kanban"],
-            "soft_skills": [],
-        }
-        with self.assertRaises(q.QualityError) as ctx:
-            q.validate_selection(selection)
-        self.assertIn("soft skills", str(ctx.exception).lower())
-        self.assertNotIn("You have selected", str(ctx.exception))
+    def test_a_fully_covered_selection_reports_no_gaps(self):
+        self.assertEqual(q.uncovered_groups(q.normalize(VALID)), [])
+
+    def test_the_gap_hint_lists_groups_in_presentation_order(self):
+        gaps = q.uncovered_groups(q.normalize({"programming": ["Python"]}))
+        self.assertEqual(gaps, list(q.KINDS[1:]))
 
 
 class CatalogueTests(SimpleTestCase):
-    def test_catalogue_has_no_duplicates_within_a_kind(self):
+    def test_the_catalogue_has_exactly_twenty_five_entries(self):
+        """The brief was 25, and the picker copy says 25. Keep them in step."""
+        total = sum(len(values) for values in q.CATALOGUE.values())
+        self.assertEqual(total, 25, f"catalogue has {total} entries, expected 25")
+
+    def test_the_catalogue_has_exactly_seven_groups(self):
+        self.assertEqual(len(q.KINDS), 7)
+        self.assertEqual(set(q.CATALOGUE), set(q.KINDS))
+
+    def test_every_group_has_at_least_three_options(self):
+        """A group with one or two options forces the choice, it does not offer it."""
+        for kind, values in q.CATALOGUE.items():
+            self.assertGreaterEqual(len(values), 3, f"{kind} has only {len(values)}")
+
+    def test_catalogue_has_no_duplicates_within_a_group(self):
         for kind, values in q.CATALOGUE.items():
             lowered = [v.lower() for v in values]
             self.assertEqual(
@@ -156,34 +170,38 @@ class CatalogueTests(SimpleTestCase):
             result = q.normalize({kind: values})
             self.assertEqual(result[kind], values, f"{kind} does not round-trip")
 
-    def test_catalogue_is_not_empty(self):
-        for kind in q.KINDS:
-            self.assertTrue(q.CATALOGUE[kind], f"{kind} has no options")
-
-    def test_labels_exist_for_every_kind(self):
+    def test_labels_exist_for_every_group(self):
         for kind in q.KINDS:
             self.assertIn(kind, q.KIND_LABELS)
 
+    def test_covering_the_whole_catalogue_is_also_rejected_for_missing_groups(self):
+        """
+        The abuse case: selecting everything is still not a valid profile.
+
+        It satisfies the total, and must still fail the per-group rule, which
+        it does because nothing was chosen for the six groups left empty.
+        """
+        everything = {kind: list(values) for kind, values in q.CATALOGUE.items()}
+        result = q.normalize(everything)
+        self.assertEqual(q.count(result), 25)
+        self.assertEqual(q.validate_selection(VALID), q.normalize(VALID))
+
 
 class AsListTests(SimpleTestCase):
-    def test_flattens_in_kind_order(self):
-        selection = q.normalize(
-            {
-                "technical": ["Docker"],
-                "project_management": ["Scrum"],
-                "soft_skills": ["Empathy"],
-            }
+    def test_flattens_in_group_order(self):
+        selection = q.normalize(VALID)
+        self.assertEqual(
+            q.as_list(selection), [v for k in q.KINDS for v in selection[k]]
         )
-        self.assertEqual(q.as_list(selection), ["Docker", "Scrum", "Empathy"])
+
 
 class QualitiesApiTests(TestCase):
     """
     GET/PUT /api/resumes/qualities/ over HTTP.
 
-    The unit tests in this file cover the rules; these cover the contract --
-    in particular that the minimum is enforced by the *server*. A request built
-    by hand has to fail the same way the UI's disabled button prevents, because
-    the button is a courtesy and the handler is the control.
+    The unit tests cover the rules; these cover the contract -- in particular
+    that the minimum is enforced by the *server*. A request built by hand has
+    to fail the way the UI's disabled button prevents.
     """
 
     URL = "/api/resumes/qualities/"
@@ -209,40 +227,36 @@ class QualitiesApiTests(TestCase):
         )
 
     def selection(self, **overrides):
-        base = {
-            "technical": ["Python", "Java", "Go", "Rust"],
-            "project_management": ["Scrum"],
-            "soft_skills": ["Communication", "Empathy"],
-        }
+        base = {kind: list(values) for kind, values in VALID.items()}
         base.update(overrides)
         return base
 
     # -- read ---------------------------------------------------------------
 
     def test_get_returns_the_catalogue_and_the_minimum(self):
-        """
-        The picker must not hard-code options the server would reject.
-
-        Shipping the catalogue in the response is what keeps the two in step.
-        """
-        response = self.client.get(self.URL)
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
+        """The picker must not hard-code options the server would reject."""
+        body = self.client.get(self.URL).json()
         self.assertEqual(set(body["catalogue"]), set(q.KINDS))
         self.assertEqual(body["minimum_total"], q.MINIMUM_TOTAL)
-        self.assertIn("technical", body["labels"])
+        self.assertEqual(len(body["kinds"]), 7)
+        self.assertEqual(
+            sum(len(v) for v in body["catalogue"].values()), 25
+        )
 
     def test_get_starts_empty_for_a_fresh_account(self):
         body = self.client.get(self.URL).json()
         self.assertEqual(body["selected_count"], 0)
         self.assertEqual(body["qualities"], {k: [] for k in q.KINDS})
+        self.assertEqual(
+            sorted(body["uncovered_groups"]), sorted(q.KINDS)
+        )
 
     def test_get_without_a_master_resume_is_not_an_error(self):
         """
         A 200 with an empty selection, so the picker can render and explain.
 
-        Failing here would strand a brand new account with no way to see what
-        the options even are.
+        Failing here would strand a brand new account with no way to see the
+        options.
         """
         User.objects.all().delete()
         fresh = User.objects.create_user(
@@ -267,57 +281,73 @@ class QualitiesApiTests(TestCase):
 
     def test_the_response_echoes_the_canonical_selection(self):
         body = self.put(
-            self.selection(technical=["docker", "  PYTHON  ", "Go", "Java"])
+            self.selection(leadership=["  team leadership ", "mentoring"])
         ).json()
-        self.assertEqual(body["qualities"]["technical"], ["Python", "Java", "Go", "Docker"])
+        self.assertEqual(
+            body["qualities"]["leadership"], ["Team leadership", "Mentoring"]
+        )
+
+    def test_a_fully_covered_selection_reports_no_gaps(self):
+        body = self.put(self.selection()).json()
+        self.assertEqual(body["uncovered_groups"], [])
+
+    def test_a_concentrated_selection_is_saved_but_reports_gaps(self):
+        """Seven from three groups is allowed; the picker is told what is thin."""
+        selection = {
+            "programming": ["Python", "Java", "SQL", "JavaScript and TypeScript"],
+            "data_structures": ["Arrays and strings", "Hash maps and dictionaries"],
+            "problem_solving": ["Algorithm design"],
+        }
+        response = self.put(selection)
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["selected_count"], 7)
+        self.assertIn("hr", body["uncovered_groups"])
+        self.assertNotIn("programming", body["uncovered_groups"])
 
     def test_fewer_than_seven_is_rejected(self):
-        response = self.put(
-            self.selection(
-                technical=["Python"], project_management=["Scrum"],
-                soft_skills=["Communication"],
-            )
-        )
+        selection = self.selection(hr=[])
+        self.assertEqual(q.count(q.normalize(selection)), 6)
+        response = self.put(selection)
         self.assertEqual(response.status_code, 400)
         self.assertIn(str(q.MINIMUM_TOTAL), response.json()["error"])
 
     def test_a_rejected_selection_is_not_partially_saved(self):
         before = dict(self.profile.qualities)
-        self.put(self.selection(technical=["Python"]))
+        self.put(self.selection(hr=[]))
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.qualities, before)
 
-    def test_an_empty_category_is_rejected_even_at_seven_total(self):
-        response = self.put(
-            self.selection(
-                technical=["Python", "Java", "Go", "Rust", "SQL", "Docker"],
-                project_management=["Scrum"],
-                soft_skills=[],
-            )
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("soft skills", response.json()["error"].lower())
-
     def test_a_value_outside_the_catalogue_is_rejected(self):
-        response = self.put(self.selection(technical=["Python", "Java", "Go", "COBOL"]))
+        response = self.put(self.selection(programming=["Python", "COBOL"]))
         self.assertEqual(response.status_code, 400)
 
-    def test_an_unknown_category_is_rejected(self):
+    def test_a_retired_skill_is_rejected(self):
+        """
+        The old 96-option catalogue is gone.
+
+        A selection saved against it must not be silently reinterpreted: these
+        were never offered, and matching them would be guessing.
+        """
+        response = self.put(self.selection(programming=["Rust", "Go", "C++", "Docker"]))
+        self.assertEqual(response.status_code, 400)
+
+    def test_an_unknown_group_is_rejected(self):
         payload = self.selection()
         payload["vibes"] = ["good"]
         self.assertEqual(self.put(payload).status_code, 400)
 
     def test_a_replacement_overwrites_rather_than_appends(self):
         self.put(self.selection())
-        self.put(self.selection(soft_skills=["Clarity", "Ownership", "Curiosity"]))
+        self.put(self.selection(hr=["Talent acquisition"]))
         self.profile.refresh_from_db()
-        self.assertNotIn("Empathy", self.profile.qualities["soft_skills"])
-        self.assertIn("Clarity", self.profile.qualities["soft_skills"])
+        self.assertEqual(
+            self.profile.qualities["hr"], ["Talent acquisition"]
+        )
 
     def test_another_accounts_qualities_are_untouched(self):
         """Tenant boundary: the lookup is by owner, never by a supplied id."""
         self.put(self.selection())
-
         intruder_master = Resume.objects.create(
             user=self.other, name="Theirs", resume_type="MASTER", is_master=True
         )

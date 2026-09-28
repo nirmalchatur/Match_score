@@ -203,17 +203,20 @@ class QualityMatchTests(TestCase):
     The score is the product's central claim about a candidate, so the
     guarantee that a self-assessment cannot inflate it is worth pinning
     explicitly rather than trusting to the weights staying untouched.
+
+    Values are drawn from the 25-skill catalogue; a retired value would be
+    rejected by normalisation and silently test the empty path instead.
     """
 
     RESUME = {
-        "skills": ["Python", "Django"],
+        "skills": ["Python", "SQL"],
         "experience": {"total_years": 5.0},
         "education": "B.Tech Computer Science",
     }
 
     JD = {
-        "skills": ["Python", "Docker"],
-        "requirements": ["Docker experience", "Scrum"],
+        "skills": ["Python", "SQL"],
+        "requirements": ["Sprint planning experience", "Mentoring"],
         "responsibilities": ["Lead delivery"],
         "title": "Backend Engineer",
         "education": [],
@@ -228,9 +231,13 @@ class QualityMatchTests(TestCase):
         without = self.calculate(None)
         with_seven = self.calculate(
             {
-                "technical": ["Python", "Docker", "Go", "Rust"],
-                "project_management": ["Scrum"],
-                "soft_skills": ["Communication", "Empathy"],
+                "programming": ["Python"],
+                "data_structures": ["Trees and graphs"],
+                "problem_solving": ["Debugging"],
+                "soft_skills": ["Team collaboration"],
+                "project_management": ["Sprint planning"],
+                "leadership": ["Mentoring"],
+                "hr": ["Performance reviews"],
             }
         )
         self.assertEqual(without["score"], with_seven["score"])
@@ -253,21 +260,22 @@ class QualityMatchTests(TestCase):
     def test_a_quality_the_job_mentions_is_reported_as_matched(self):
         result = self.calculate(
             {
-                "technical": ["Python", "Docker"],
-                "project_management": ["Scrum"],
-                "soft_skills": ["Communication"],
+                "programming": ["Python"],
+                "project_management": ["Sprint planning"],
+                "leadership": ["Mentoring"],
             }
         )
         matched = result["qualities"]["matched"]
-        self.assertIn("Docker", matched)
-        self.assertIn("Scrum", matched)
+        self.assertIn("Python", matched)
+        self.assertIn("Sprint planning", matched)
+        self.assertIn("Mentoring", matched)
 
     def test_a_quality_the_job_never_mentions_is_not_matched(self):
         result = self.calculate(
             {
-                "technical": ["Rust"],
-                "project_management": ["Kanban"],
-                "soft_skills": ["Diplomacy"],
+                "programming": ["Java"],
+                "project_management": ["Agile delivery"],
+                "hr": ["Talent acquisition"],
             }
         )
         self.assertEqual(result["qualities"]["matched"], [])
@@ -282,9 +290,9 @@ class QualityMatchTests(TestCase):
         empty = self.calculate(None)["qualities"]
         chosen_but_unmatched = self.calculate(
             {
-                "technical": ["Rust"],
-                "project_management": ["Kanban"],
-                "soft_skills": ["Diplomacy"],
+                "programming": ["Java"],
+                "project_management": ["Agile delivery"],
+                "hr": ["Talent acquisition"],
             }
         )["qualities"]
 
@@ -295,18 +303,30 @@ class QualityMatchTests(TestCase):
 
     def test_malformed_qualities_do_not_break_the_engine(self):
         """A bad row must not take the whole analysis down with it."""
-        for bad in ("not-a-mapping", {"technical": "Python"}, {"nope": []}):
+        for bad in ("not-a-mapping", {"programming": "Python"}, {"nope": []}):
             result = self.calculate(bad)
             self.assertEqual(result["qualities"]["matched"], [])
             self.assertIn("score", result)
+
+    def test_a_retired_skill_is_treated_as_no_selection(self):
+        """
+        The 96-option catalogue was replaced by 25 curated options.
+
+        An old row holding "Docker" or "Scrum" must normalise to nothing
+        rather than raise, so a profile saved before the change still scores.
+        """
+        result = self.calculate(
+            {"programming": ["Docker", "Rust"], "project_management": ["Scrum"]}
+        )
+        self.assertEqual(result["qualities"]["selected"], [])
+        self.assertEqual(result["qualities"]["matched"], [])
 
     def test_the_qualities_block_does_not_disturb_the_other_blocks(self):
         """Existing consumers see exactly the keys they saw before."""
         result = self.calculate(
             {
-                "technical": ["Python"],
-                "project_management": ["Scrum"],
-                "soft_skills": ["Communication"],
+                "programming": ["Python"],
+                "project_management": ["Sprint planning"],
             }
         )
         for key in ("skills", "experience", "requirements", "education", "decision"):

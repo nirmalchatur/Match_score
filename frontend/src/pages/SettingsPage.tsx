@@ -141,6 +141,12 @@ export function SettingsPage() {
         headline: profile.headline,
         discipline: profile.discipline,
         target_locations: profile.target_locations,
+        // The onboarding answers are editable here too, so the "change this
+        // later" promise on the setup step actually holds.
+        career_stage: profile.career_stage,
+        years_experience:
+          profile.career_stage === 'professional' ? profile.years_experience ?? 1 : 0,
+        ai_setup: profile.ai_setup,
       })
       setProfile(updated)
       setSaved(true)
@@ -179,6 +185,84 @@ export function SettingsPage() {
               <span className="metric-value">{formatDate(user?.date_joined)}</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="card-head">
+          <h2>About you</h2>
+        </div>
+        <div className="card-body">
+          <label className="form-label" htmlFor="career_stage">
+            Career stage
+          </label>
+          <select
+            id="career_stage"
+            value={profile?.career_stage ?? ''}
+            onChange={(e) => patch('career_stage', e.target.value)}
+          >
+            <option value="">Not set</option>
+            <option value="student">Student</option>
+            <option value="fresher">Fresher</option>
+            <option value="professional">Working professional</option>
+          </select>
+
+          {profile?.career_stage === 'professional' ? (
+            <>
+              <label
+                className="form-label"
+                htmlFor="years"
+                style={{ marginTop: 14 }}
+              >
+                Years of work experience
+              </label>
+              <input
+                id="years"
+                type="number"
+                min={1}
+                max={60}
+                value={profile?.years_experience ?? 1}
+                onChange={(e) =>
+                  setProfile((c) =>
+                    c ? { ...c, years_experience: Number(e.target.value) || 0 } : c,
+                  )
+                }
+              />
+            </>
+          ) : null}
+          <button
+            type="button"
+            className="btn"
+            style={{ marginTop: 16 }}
+            onClick={async () => {
+              if (!profile || saving) return
+              setSaving(true)
+              setError('')
+              try {
+                const updated = await api.updateProfile({
+                  career_stage: profile.career_stage,
+                  years_experience:
+                    profile.career_stage === 'professional'
+                      ? profile.years_experience ?? 1
+                      : 0,
+                })
+                setProfile(updated)
+                setSaved(true)
+                window.setTimeout(() => setSaved(false), 2500)
+              } catch (err) {
+                setError(
+                  err instanceof ApiError
+                    ? err.message
+                    : 'Could not save your answers.',
+                )
+              } finally {
+                setSaving(false)
+              }
+            }}
+            disabled={saving}
+          >
+            {saving ? 'Saving\u2026' : 'Save'}
+          </button>
         </div>
       </section>
 

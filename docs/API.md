@@ -68,6 +68,20 @@ or, when signed in:
 
 Returns the workspace preferences.
 
+### `PATCH /api/auth/profile/` fields added during onboarding
+
+| Field | Values | Rule |
+|---|---|---|
+| `career_stage` | `student`, `fresher`, `professional` | Closed list; blank until answered |
+| `years_experience` | integer 0-60 | Required (>= 1) when the stage is `professional`; zeroed for the other two |
+| `ai_setup` | `ollama`, `gemini` | Records the onboarding choice; does not change the server's `AI_PROVIDER` |
+
+The cross-field rule is enforced on the server, so a hand-written `PATCH`
+behaves exactly like the onboarding form. A professional with zero years is a
+contradiction and is refused; years sent with a student or fresher are zeroed
+rather than stored, because a student who has worked before is not making a
+false claim and refusing the save would only invite a deliberate zero.
+
 ### `PATCH /api/auth/profile/` — **requires auth**
 
 ```json
@@ -179,15 +193,23 @@ The candidate's chosen qualities, plus everything the picker needs to render.
 {
   "qualities": { "technical": ["Python"], "project_management": [], "soft_skills": [] },
   "selected_count": 1,
-  "catalogue": { "technical": ["Python", "Java"], "project_management": ["Scrum"], "soft_skills": ["Empathy"] },
-  "labels":    { "technical": "Technical skills", "project_management": "Project management", "soft_skills": "Soft skills" },
+  "catalogue": { "programming": ["Python", "Java"], "hr": ["Talent acquisition"] },
+  "labels":    { "programming": "Programming", "hr": "HR and people operations" },
   "minimum_total": 7,
-  "kinds": ["technical", "project_management", "soft_skills"]
+  "kinds": ["programming", "data_structures", "problem_solving", "soft_skills",
+            "project_management", "leadership", "hr"],
+  "uncovered_groups": ["leadership"]
 }
 ```
 
-The catalogue and the minimum are sent on every read so the client never
-hard-codes options the server would reject. With no master resume this still
+The catalogue is 25 options across seven areas: programming, data structures,
+problem solving, soft skills, project management, leadership, and HR. Seven is
+the server-enforced minimum. `uncovered_groups` lists areas with nothing
+chosen; it is a hint the picker shows, **not** a rule. With seven areas and a
+minimum of seven, "at least one from each" is arithmetically identical to
+"exactly one from each", which would oblige a backend engineer to claim an
+HR skill they do not have. The catalogue and the minimum are sent on every
+read so the client never hard-codes options the server would reject. With no master resume this still
 returns `200` with an empty selection, so a new account can see the options;
 `PUT` returns `404` in that state, since there is nothing to attach them to.
 

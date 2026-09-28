@@ -309,6 +309,91 @@ me_shape = request(
     ),
 )
 
+# ---------------------------------------------------------------------------
+# Onboarding answers
+#
+# The career-stage rule is the interesting one: "working professional" with
+# zero years is a contradiction the server refuses, and years sent alongside a
+# student or fresher are zeroed rather than stored. Both are asserted here
+# because a hand-written PATCH has to behave exactly like the onboarding form.
+# ---------------------------------------------------------------------------
+
+profile_stage_student = request(
+    "45 A student is stored with no years",
+    "PATCH",
+    "/api/auth/profile/",
+    body={"career_stage": "student", "years_experience": 4},
+    tests=pm(
+        "years are zeroed rather than stored for a student",
+        "pm.response.to.have.status(200);",
+        "const body = pm.response.json();",
+        "pm.expect(body.career_stage).to.eql('student');",
+        "pm.expect(body.years_experience).to.eql(0);",
+    ),
+)
+
+profile_stage_professional_no_years = request(
+    "46 A professional with no years is rejected",
+    "PATCH",
+    "/api/auth/profile/",
+    body={"career_stage": "professional"},
+    tests=pm(
+        "the contradiction is refused, not silently stored",
+        "pm.response.to.have.status(400);",
+        "pm.expect(pm.response.text()).to.include('years_experience');",
+    ),
+)
+
+profile_stage_professional = request(
+    "47 A professional with years is stored",
+    "PATCH",
+    "/api/auth/profile/",
+    body={"career_stage": "professional", "years_experience": 4},
+    tests=pm(
+        "the answer is kept as sent",
+        "pm.response.to.have.status(200);",
+        "const body = pm.response.json();",
+        "pm.expect(body.career_stage).to.eql('professional');",
+        "pm.expect(body.years_experience).to.eql(4);",
+    ),
+)
+
+profile_stage_unknown = request(
+    "48 An unknown career stage is rejected",
+    "PATCH",
+    "/api/auth/profile/",
+    body={"career_stage": "wizard"},
+    tests=pm(
+        "the stage list is closed",
+        "pm.response.to.have.status(400);",
+    ),
+)
+
+profile_ai_setup = request(
+    "49 Both AI setups are accepted",
+    "PATCH",
+    "/api/auth/profile/",
+    body={"ai_setup": "gemini"},
+    tests=pm(
+        "the hosted choice is recorded",
+        "pm.response.to.have.status(200);",
+        "pm.expect(pm.response.json().ai_setup).to.eql('gemini');",
+    ),
+)
+
+profile_ai_setup_unknown = request(
+    "50 An unknown AI setup is rejected",
+    "PATCH",
+    "/api/auth/profile/",
+    body={"ai_setup": "gpt"},
+    tests=pm(
+        "only the two documented setups are accepted",
+        "pm.response.to.have.status(400);",
+    ),
+)
+
+
+
 profile_read = request(
     "06 Read the workspace profile",
     "GET",
@@ -318,7 +403,8 @@ profile_read = request(
         "pm.response.to.have.status(200);",
         "const body = pm.response.json();",
         "pm.expect(body).to.have.all.keys('headline', 'discipline', "
-        + "'target_locations', 'created_at', 'updated_at');",
+        + "'target_locations', 'career_stage', 'years_experience', "
+        + "'ai_setup', 'created_at', 'updated_at');",
     ),
 )
 
@@ -709,9 +795,10 @@ qualities_get_without_resume = request(
         "pm.expect(body.selected_count).to.eql(0);",
         "pm.expect(body.minimum_total).to.eql(7);",
         "pm.expect(body.kinds).to.eql("
-        "['technical', 'project_management', 'soft_skills']);",
-        "pm.expect(body.catalogue.technical.length).to.be.above(0);",
-        "pm.expect(body.catalogue.soft_skills.length).to.be.above(0);",
+        "['programming', 'data_structures', 'problem_solving', "
+        + "'soft_skills', 'project_management', 'leadership', 'hr']);",
+        "const total = Object.values(body.catalogue).flat().length;",
+        "pm.expect(total).to.eql(25);",
     ),
 )
 
@@ -978,6 +1065,25 @@ FOLDERS = [
         "name": "Auth lifecycle",
         "description": "Register, log in, inspect the session, then tear it down.",
         "item": [register, me_anonymous, login, me_authenticated, me_shape],
+    },
+    {
+        "name": "Onboarding answers",
+        "description": (
+            "Career stage, years of experience and the AI setup choice, "
+            "asserted over HTTP. The professional-without-years combination "
+            "is a contradiction the server refuses, and years sent with a "
+            "student or fresher are zeroed rather than stored -- both rules "
+            "enforced server-side so a hand-written PATCH behaves exactly "
+            "like the onboarding form."
+        ),
+        "item": [
+            profile_stage_student,
+            profile_stage_professional_no_years,
+            profile_stage_professional,
+            profile_stage_unknown,
+            profile_ai_setup,
+            profile_ai_setup_unknown,
+        ],
     },
     {
         "name": "Profile",
