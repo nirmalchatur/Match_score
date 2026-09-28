@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { ViewKey } from '../lib/types'
+import type { Job, ViewKey } from '../lib/types'
 import { initials } from '../lib/format'
+import { DevTerminal } from './DevTerminal'
 import {
   IconBriefcase,
   IconDashboard,
@@ -40,6 +41,7 @@ export function Sidebar({
   email,
   displayName,
   onLogout,
+  jobs,
 }: {
   view: ViewKey
   onNavigate: (view: ViewKey) => void
@@ -47,6 +49,7 @@ export function Sidebar({
   email: string
   displayName: string
   onLogout: () => void
+  jobs?: Job[]
 }) {
   /**
    * Signing out is destructive enough to confirm, but not so much that a
@@ -106,6 +109,7 @@ export function Sidebar({
           <IconHelp size={17} />
           <span>Help</span>
         </a>
+        <DevTerminal jobs={jobs} />
       </nav>
 
       <div className="sidebar-footer">

@@ -17,6 +17,9 @@ class JobRefSerializer(serializers.Serializer):
     location = serializers.CharField(allow_blank=True)
     match_score = serializers.FloatField(allow_null=True)
     url = serializers.URLField()
+    #: Which ATS this was read from, so the tracker can badge it without
+    #: a second request per row.
+    source = serializers.CharField(allow_blank=True, required=False)
 
 
 class ResumeRefSerializer(serializers.Serializer):

@@ -355,6 +355,8 @@ export interface ApplicationJob {
   company: string
   location: string
   match_score: number | null
+  /** Which ATS this posting was read from, e.g. "greenhouse". */
+  source?: string
   url: string
 }
 

@@ -798,7 +798,7 @@ qualities_get_without_resume = request(
         "['programming', 'data_structures', 'problem_solving', "
         + "'soft_skills', 'project_management', 'leadership', 'hr']);",
         "const total = Object.values(body.catalogue).flat().length;",
-        "pm.expect(total).to.eql(25);",
+        "pm.expect(total).to.eql(50);",
     ),
 )
 

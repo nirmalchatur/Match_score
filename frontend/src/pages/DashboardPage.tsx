@@ -9,6 +9,7 @@ import {
   IconZap,
 } from '../components/Icons'
 import { JobRow } from '../components/JobRow'
+import { ApplicationTracker } from '../components/ApplicationTracker'
 import { JobDetail } from '../components/JobDetail'
 import { STATUS_LABELS } from '../lib/types'
 import { UrlForm } from '../components/UrlForm'
@@ -170,6 +171,10 @@ export function DashboardPage({
           </div>
         )}
       </section>
+
+      {/* The tracker owns its own data: it reads and PATCHes applications
+          directly, so it does not need (or wait on) the dashboard payload. */}
+      <ApplicationTracker />
 
       <section className="grid-dashboard">
         <div className="card sticky-col">

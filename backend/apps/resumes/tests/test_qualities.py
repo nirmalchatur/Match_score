@@ -1,7 +1,7 @@
 """
 Tests for the qualities catalogue and its validation rules.
 
-The catalogue is 25 options across seven groups, from which a candidate picks
+The catalogue is 50 options across seven groups, from which a candidate picks
 seven. The contract under test is "what a user is allowed to save": the
 canonical shape, catalogue membership, the minimum of seven, and one from
 every group. That last rule is what makes seven selections meaningful rather
@@ -143,10 +143,10 @@ class MinimumTests(SimpleTestCase):
 
 
 class CatalogueTests(SimpleTestCase):
-    def test_the_catalogue_has_exactly_twenty_five_entries(self):
-        """The brief was 25, and the picker copy says 25. Keep them in step."""
+    def test_the_catalogue_has_exactly_fifty_entries(self):
+        """The brief was 50, and the picker copy says 50. Keep them in step."""
         total = sum(len(values) for values in q.CATALOGUE.values())
-        self.assertEqual(total, 25, f"catalogue has {total} entries, expected 25")
+        self.assertEqual(total, 50, f"catalogue has {total} entries, expected 50")
 
     def test_the_catalogue_has_exactly_seven_groups(self):
         self.assertEqual(len(q.KINDS), 7)
@@ -183,7 +183,7 @@ class CatalogueTests(SimpleTestCase):
         """
         everything = {kind: list(values) for kind, values in q.CATALOGUE.items()}
         result = q.normalize(everything)
-        self.assertEqual(q.count(result), 25)
+        self.assertEqual(q.count(result), sum(len(v) for v in q.CATALOGUE.values()))
         self.assertEqual(q.validate_selection(VALID), q.normalize(VALID))
 
 
@@ -239,8 +239,11 @@ class QualitiesApiTests(TestCase):
         self.assertEqual(set(body["catalogue"]), set(q.KINDS))
         self.assertEqual(body["minimum_total"], q.MINIMUM_TOTAL)
         self.assertEqual(len(body["kinds"]), 7)
+        # Counted from the response, not a literal: this asserts the API
+        # ships the whole catalogue, and stays right if the size changes.
         self.assertEqual(
-            sum(len(v) for v in body["catalogue"].values()), 25
+            sum(len(v) for v in body["catalogue"].values()),
+            sum(len(v) for v in q.CATALOGUE.values()),
         )
 
     def test_get_starts_empty_for_a_fresh_account(self):

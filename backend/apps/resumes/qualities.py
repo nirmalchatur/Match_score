@@ -9,16 +9,16 @@ which therefore need different rules. A parsed skill cannot be wrong (it is
 evidence, taken from the document), whereas a chosen quality is an assertion
 and must be checked -- that is where the catalogue below earns its keep.
 
-The catalogue: 25 options, pick 7
+The catalogue: 50 options, pick 7
 ----------------------------------
-:data:`CATALOGUE` is a deliberately short, curated list -- 25 entries across
-seven groups -- from which a candidate picks exactly seven.
+:data:`CATALOGUE` is a curated list -- 50 entries across seven groups -- from
+which a candidate picks seven.
 
-Short on purpose. An earlier revision carried 96 options in three groups,
-which was more precise against a real job description but far heavier to look
-at: asking someone to find seven relevant items inside a 96-item wall is a
-different task from asking them to choose seven from 25, and the larger list
-was measurably worse at being answered.
+Deliberately bounded. An earlier revision carried 96 options in three groups.
+Splitting those same areas across seven groups and rounding back to 50 keeps
+the technical/people-management balance the brief asked for while staying
+small enough to scan: choosing seven from 50 is a different task from finding
+them inside 96, and the larger list was worse at being answered.
 
 Seven is the floor enforced by :func:`validate_selection`, and the picker
 requires at least one from every group, so the selection cannot be seven
@@ -81,6 +81,14 @@ CATALOGUE: dict[str, list[str]] = {
         "Python",
         "JavaScript and TypeScript",
         "Java",
+        "C and C++",
+        "C# and .NET",
+        "Go",
+        "Rust",
+        "Ruby on Rails",
+        "PHP",
+        "Swift",
+        "Kotlin",
         "SQL",
     ],
     "data_structures": [
@@ -88,33 +96,50 @@ CATALOGUE: dict[str, list[str]] = {
         "Hash maps and dictionaries",
         "Trees and graphs",
         "Sorting and searching",
+        "Dynamic programming",
+        "Database indexing",
     ],
     "problem_solving": [
         "Algorithm design",
-        "Dynamic programming",
+        "Complexity analysis",
         "Debugging",
         "Performance optimisation",
+        "Unit and integration testing",
+        "Technical documentation",
     ],
     "soft_skills": [
         "Written communication",
         "Team collaboration",
         "Time management",
         "Attention to detail",
+        "Verbal communication",
+        "Critical thinking",
+        "Adaptability",
     ],
     "project_management": [
         "Agile delivery",
         "Sprint planning",
         "Stakeholder management",
+        "Roadmap planning",
+        "Requirements gathering",
+        "Risk management",
+        "Release management",
+        "Status reporting",
     ],
     "leadership": [
         "Team leadership",
         "Mentoring",
         "Conflict resolution",
+        "Delegation",
+        "Technical decision making",
+        "Onboarding new engineers",
     ],
     "hr": [
         "Talent acquisition",
         "Performance reviews",
         "Onboarding and retention",
+        "Policy and compliance",
+        "Employee relations",
     ],
 }
 

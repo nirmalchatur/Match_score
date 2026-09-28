@@ -43,7 +43,7 @@ function ResumeCard({
         {resume.file ? (
           <a
             className="btn btn-ghost btn-sm"
-            href={api.fileUrl(resume.file)}
+            href={api.resumeFileUrl(resume.id)}
             target="_blank"
             rel="noreferrer noopener"
           >
