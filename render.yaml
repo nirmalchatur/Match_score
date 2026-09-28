@@ -48,7 +48,11 @@ services:
       # existed, so a deploy could silently produce a CORS/CSRF pair that
       # rejected the real frontend. All three are now prompted at deploy time.
       - key: FRONTEND_ORIGIN
-        # Your deployed Vercel origin, e.g. https://match-score.vercel.app
+        # Your deployed Vercel origin, e.g. https://match-score-delta.vercel.app
+        # (the live TailorUp frontend). Do not use a bare
+        # https://match-score.vercel.app here -- that hostname serves a
+        # different, unrelated project, and setting it produces a CORS pair
+        # that rejects the real frontend.
         sync: false
       - key: CSRF_TRUSTED_ORIGINS
         sync: false
