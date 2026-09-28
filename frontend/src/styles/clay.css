@@ -1,0 +1,400 @@
+/* ============================================================
+   Claymorphism
+
+   The art direction for TailorUp, replacing the monochrome editorial
+   system this file used to follow. The old header described "ink on
+   paper... sharp corners, a hard offset shadow"; that is now the
+   thing being replaced, and leaving the description would make the
+   stylesheet lie about itself.
+
+   What clay actually is
+   ---------------------
+   Soft, rounded, extruded surfaces. Depth comes from stacked diffuse
+   shadows plus an inset highlight along the top edge -- the same trick
+   a physical clay object uses, where a matte top edge catches light and
+   the body occludes downwards. There are no 1px borders, because a hairline
+   reads as a drawn outline rather than a volume.
+
+   The palette
+   -----------
+   Still the brand. Claymorphism is usually sold in pastels, but a
+   pastel TailorUp would be a different product. So: warm paper and
+   muted neutral for the clay body, #245F73 as the single accent, and
+   #733E24 for the warm secondary used sparingly. The neutrals do the
+   structural work, exactly as the earlier system intended -- only the
+   treatment changed.
+
+   Two rules
+   ---------
+   1. Shadows are diffuse. No hard offset shadow, and no single 1px
+      hairline standing in for depth.
+   2. Every pressable thing has a pressed state that looks pressed. A
+      button that only changes colour on :active does not feel physical.
+
+   Loaded last, after components.css and marketing.css, so it wins
+   without needing !important on every rule.
+   ============================================================ */
+
+:root {
+  /* --- Radii: generous and consistent, replacing sharp corners --- */
+  --clay-r-xs: 10px;
+  --clay-r-sm: 14px;
+  --clay-r-md: 20px;
+  --clay-r-lg: 28px;
+  --clay-r-xl: 36px;
+  --clay-r-pill: 999px;
+
+  /* --- The clay shadow stack: contact, ambient, then cast --- */
+  --clay-shadow-sm:
+    0 1px 2px rgba(15, 23, 26, 0.06),
+    0 3px 8px rgba(15, 23, 26, 0.07);
+  --clay-shadow-md:
+    0 2px 4px rgba(15, 23, 26, 0.06),
+    0 8px 18px rgba(15, 23, 26, 0.08);
+  --clay-shadow-lg:
+    0 4px 8px rgba(15, 23, 26, 0.06),
+    0 14px 32px rgba(15, 23, 26, 0.10);
+  --clay-shadow-xl:
+    0 8px 16px rgba(15, 23, 26, 0.08),
+    0 24px 56px rgba(15, 23, 26, 0.14);
+
+  /* The inset highlight. This is the part that reads as clay rather than
+     as a blurred rectangle: a bright top edge and a soft occlusion at the
+     bottom, so light is implied as coming from above. */
+  --clay-inset: inset 0 2px 2px rgba(255, 255, 255, 0.60), inset 0 -2px 4px rgba(15, 23, 26, 0.05);
+  --clay-inset-soft: inset 0 1px 1px rgba(255, 255, 255, 0.45);
+
+  /* Pressed: the shadow collapses and the inset deepens, so the surface
+     looks pushed into the page rather than tinted. */
+  --clay-pressed: 0 1px 2px rgba(15, 23, 26, 0.10), inset 0 3px 7px rgba(15, 23, 26, 0.12);
+
+  /* --- Clay surface colours, derived from the brand neutrals --- */
+  --clay-body: #f2f0ef;
+  --clay-body-raised: #faf9f8;
+  --clay-sunken: #e8e6e4;
+  --clay-accent: #245f73;
+  --clay-accent-raised: #2f7189;
+  --clay-warm: #733e24;
+}
+
+[data-theme='dark'] {
+  /* A light-top-edge highlight is wrong on a dark surface: there is no
+     light source above. Dark clay gets a *dimmer* top edge instead, which
+     is what keeps the volume readable rather than looking like a smudge. */
+  --clay-body: #1a1a1c;
+  --clay-body-raised: #232326;
+  --clay-sunken: #111113;
+  --clay-inset: inset 0 2px 2px rgba(255, 255, 255, 0.045), inset 0 -2px 5px rgba(0, 0, 0, 0.35);
+  --clay-inset-soft: inset 0 1px 1px rgba(255, 255, 255, 0.035);
+  --clay-shadow-sm:
+    0 1px 2px rgba(0, 0, 0, 0.40),
+    0 3px 8px rgba(0, 0, 0, 0.34);
+  --clay-shadow-md:
+    0 2px 4px rgba(0, 0, 0, 0.42),
+    0 8px 18px rgba(0, 0, 0, 0.38);
+  --clay-shadow-lg:
+    0 4px 8px rgba(0, 0, 0, 0.44),
+    0 14px 32px rgba(0, 0, 0, 0.42);
+  --clay-shadow-xl:
+    0 8px 16px rgba(0, 0, 0, 0.48),
+    0 24px 56px rgba(0, 0, 0, 0.50);
+  --clay-pressed: 0 1px 2px rgba(0, 0, 0, 0.40), inset 0 3px 8px rgba(0, 0, 0, 0.45);
+  --clay-accent: #7fb6c9;
+  --clay-accent-raised: #96c6d6;
+}
+
+/* ---------- Buttons: clay tablets with a real pressed state ---------- */
+
+/* Buttons are the surface claymorphism is built around, so they carry the
+   full stack: diffuse shadow for lift, inset highlight for the lit top edge,
+   and a pressed state that actually looks pressed. */
+.btn {
+  border-radius: var(--clay-r-pill) !important;
+  border: 0 !important;
+  box-shadow: var(--clay-shadow-sm), var(--clay-inset) !important;
+  transition:
+    transform 140ms var(--ease),
+    box-shadow 140ms var(--ease),
+    background-color 160ms var(--ease) !important;
+  /* A hair of downward travel on press. Under 2px reads as a click
+     acknowledgement; more looks like the button is falling off. */
+  will-change: transform;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--clay-shadow-md), var(--clay-inset) !important;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: var(--clay-pressed) !important;
+  transition-duration: 70ms;
+}
+
+.btn:disabled {
+  box-shadow: none !important;
+  transform: none;
+}
+
+.btn-primary {
+  background: var(--clay-accent) !important;
+  color: #fff !important;
+  box-shadow:
+    var(--clay-shadow-md),
+    inset 0 2px 2px rgba(255, 255, 255, 0.22),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.16) !important;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--clay-accent-raised) !important;
+  box-shadow: var(--clay-shadow-lg) !important;
+}
+
+.btn-primary:active:not(:disabled) {
+  box-shadow: var(--clay-pressed) !important;
+}
+
+.btn-ghost {
+  background: var(--clay-body-raised) !important;
+  color: var(--text) !important;
+}
+
+/* ---------- Cards and panels: extruded volumes ---------- */
+
+.card,
+.panel,
+.stat-card,
+.mk-card,
+.mk-step,
+.mk-config,
+.mk-report,
+.help-panel,
+.confirm-card,
+.job-card,
+.resume-card,
+.app-card {
+  border: 0 !important;
+  border-radius: var(--clay-r-lg) !important;
+  background: var(--clay-body-raised) !important;
+  box-shadow: var(--clay-shadow-md), var(--clay-inset) !important;
+  transition: transform 180ms var(--ease), box-shadow 180ms var(--ease) !important;
+}
+
+@media (hover: hover) {
+  .card:hover,
+  .mk-card:hover,
+  .mk-step:hover,
+  .mk-config:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--clay-shadow-lg), var(--clay-inset) !important;
+  }
+}
+
+/* The old editorial system used a hard 4px offset shadow on the report
+   card. That is the single most "sharp UI" gesture in the app, so it is
+   replaced rather than merely supplemented. */
+.mk-report {
+  box-shadow: var(--clay-shadow-xl), var(--clay-inset) !important;
+}
+
+/* ---------- Surfaces: sunken, not outlined ---------- */
+
+.sunken,
+.well {
+  border: 0 !important;
+  border-radius: var(--clay-r-md) !important;
+  background: var(--clay-sunken) !important;
+  box-shadow: inset 0 2px 5px rgba(15, 23, 26, 0.07) !important;
+}
+
+[data-theme='dark'] .sunken,
+[data-theme='dark'] .well {
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* ---------- Inputs: soft inset wells ---------- */
+
+.input,
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='url'],
+input[type='search'],
+select,
+textarea {
+  border: 0 !important;
+  border-radius: var(--clay-r-sm) !important;
+  background: var(--clay-sunken) !important;
+  box-shadow: inset 0 2px 4px rgba(15, 23, 26, 0.07) !important;
+  transition: box-shadow 160ms var(--ease) !important;
+}
+
+.input:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none !important;
+  /* A ring, not a border change. The inset deepens and the ring appears,
+     which is how a focused clay surface should read. */
+  box-shadow:
+    inset 0 2px 5px rgba(15, 23, 26, 0.09),
+    0 0 0 3px color-mix(in srgb, var(--clay-accent) 34%, transparent) !important;
+}
+
+[data-theme='dark'] input,
+[data-theme='dark'] select,
+[data-theme='dark'] textarea,
+[data-theme='dark'] .input {
+  background: var(--clay-sunken) !important;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* ---------- Remove glassmorphism ---------- */
+
+/* Frosted-glass panels are the other half of the same generic look clay is
+   being chosen against: a blur reads as a screenshot of a design system, and
+   it costs a compositing layer on every scroll frame. Replaced with a solid
+   raised surface, which is also faster and legible over any background. */
+.mk-nav,
+.sidebar,
+.devterm,
+.devterm-scrim,
+.key-pop,
+.help-scrim,
+.confirm-scrim {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.mk-nav {
+  border-bottom: 0 !important;
+  background: var(--clay-body) !important;
+  box-shadow: var(--clay-shadow-sm) !important;
+}
+
+.sidebar {
+  background: var(--clay-body) !important;
+  box-shadow: var(--clay-shadow-md) !important;
+}
+
+.devterm,
+.key-pop {
+  border: 0 !important;
+  border-radius: var(--clay-r-lg) !important;
+  box-shadow: var(--clay-shadow-xl), var(--clay-inset) !important;
+}
+
+.help-scrim,
+.confirm-scrim,
+.devterm-scrim {
+  background: rgba(15, 23, 26, 0.34) !important;
+}
+
+/* ---------- Nav items: clay pills ---------- */
+
+.nav-item {
+  border-radius: var(--clay-r-sm) !important;
+  transition:
+    background-color 150ms var(--ease),
+    color 150ms var(--ease),
+    transform 140ms var(--ease) !important;
+}
+
+.nav-item:hover {
+  transform: translateX(1px);
+}
+
+.nav-item.active {
+  background: var(--clay-body-raised) !important;
+  box-shadow: var(--clay-shadow-sm), var(--clay-inset) !important;
+  color: var(--ink) !important;
+}
+
+.nav-divider {
+  background: var(--border-soft) !important;
+  opacity: 1 !important;
+}
+
+/* ---------- Badges: small clay chips ---------- */
+
+.badge,
+.badge-amber {
+  border: 0 !important;
+  border-radius: var(--clay-r-pill) !important;
+  box-shadow: var(--clay-shadow-sm) !important;
+}
+
+.badge-amber {
+  background: color-mix(in srgb, var(--clay-warm) 16%, var(--clay-body-raised)) !important;
+  color: var(--clay-warm) !important;
+}
+
+/* ---------- The mark: clay tile ---------- */
+
+.brand-mark,
+.brand-emblem {
+  border-radius: var(--clay-r-sm) !important;
+  box-shadow: var(--clay-shadow-sm) !important;
+}
+
+/* ---------- Spacing rhythm ---------- */
+
+/* "Inconsistent spacing" is a real criticism and it is cheapest to fix at the
+   token level: one scale, used everywhere, instead of ad-hoc values that
+   happen to be near each other. */
+:root {
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+}
+
+.card,
+.panel,
+.stat-card,
+.help-content,
+.legal {
+  padding: var(--sp-5) !important;
+}
+
+/* ---------- Modal panels get real corner radius ---------- */
+
+.help-panel,
+.confirm-card {
+  border-radius: var(--clay-r-xl) !important;
+  box-shadow: var(--clay-shadow-xl), var(--clay-inset) !important;
+}
+
+.toast {
+  border-radius: var(--clay-r-md) !important;
+  box-shadow: var(--clay-shadow-lg) !important;
+}
+
+/* ---------- Reduced motion ---------- */
+
+/* Clay makes press states feel physical, which makes them more important to
+   disable rather than less. Without this, :active transforms still fire. */
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .card,
+  .nav-item,
+  .mk-card,
+  .mk-step,
+  .mk-config {
+    transition: none !important;
+  }
+
+  .btn:hover:not(:disabled),
+  .btn:active:not(:disabled),
+  .nav-item:hover,
+  .mk-card:hover,
+  .mk-step:hover,
+  .mk-config:hover {
+    transform: none !important;
+  }
+}
