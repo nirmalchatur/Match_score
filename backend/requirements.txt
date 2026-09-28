@@ -21,7 +21,7 @@ djangorestframework==3.18.0
 idna==3.19
 psycopg==3.3.4
 psycopg-binary==3.3.4
-pypdf==6.16.2
+pypdf==6.19.0
 python-dotenv==1.2.3
 requests==2.34.2
 soupsieve==2.9.2
