@@ -1,0 +1,17 @@
+# TailorUp robots.txt
+#
+# The authenticated workspace is useless to a crawler and should not be
+# crawled: /app/* and /setup/* are behind a session, so there is nothing
+# there to index, and spending crawl budget on redirect-to-login URLs is
+# wasteful. The Disallow below costs nothing and keeps the budget on the
+# pages that can actually rank.
+
+User-agent: *
+Allow: /
+
+# Private, session-gated. No content to index; disallow rather than waste
+# crawl budget on the redirect to /login.
+Disallow: /app/
+Disallow: /setup/
+
+Sitemap: https://match-score-delta.vercel.app/sitemap.xml

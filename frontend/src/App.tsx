@@ -30,6 +30,10 @@ import { OnboardingPage } from './pages/OnboardingPage'
 import { OnboardingSkillsPage } from './pages/OnboardingSkillsPage'
 import { OnboardingYouPage } from './pages/OnboardingYouPage'
 import { OnboardingAiPage } from './pages/OnboardingAiPage'
+import { NotFoundPage } from './pages/NotFoundPage'
+import { ThanksPage } from './pages/ThanksPage'
+import { PrivacyPage, TermsPage } from './pages/LegalPages'
+import { Analytics, CookieBanner } from './components/Analytics'
 
 const HEADINGS: Record<ViewKey, { title: string; search: string }> = {
   dashboard: { title: 'Dashboard', search: 'Search jobs, companies…' },
@@ -257,6 +261,13 @@ export default function App() {
           <Route path="/signup" element={<SignupPage />} />
         </Route>
 
+        {/* Public legal. Inside RequireAnonymous because they are read before
+            signing up; a signed-in user reaches them from Settings, which
+            navigates with a full page load for these two. */}
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/thanks" element={<ThanksPage />} />
+
         {/* Onboarding — signed in, completing setup in order */}
         <Route element={<RequireAuth />}>
           <Route path="/setup/resume" element={<OnboardingPage />} />
@@ -281,8 +292,17 @@ export default function App() {
           </Route>
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/*
+          Was <Navigate to="/" replace />, which silently redirected every
+          unknown URL home. A crawler following a bad link saw a 200 with the
+          homepage and indexed the wrong URL -- the soft-404 pattern -- and a
+          mistyped path looked like the app had decided to send you somewhere
+          rather than telling you it does not exist.
+        */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <Analytics />
+      <CookieBanner />
     </AuthProvider>
   )
 }
