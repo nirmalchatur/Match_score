@@ -1,0 +1,151 @@
+name: Security
+
+# The one property TailorUp cannot compromise: a user's own API key is
+# entered in their browser, encrypted at rest, and must never be returned by
+# the API, written to a log, or shipped inside the built JavaScript bundle.
+#
+# That last one is the interesting risk and the reason this workflow exists.
+# A backend secret that leaks into `VITE_*` is a real incident: Vite inlines
+# every `VITE_` variable into the bundle at build time, in plaintext, visible
+# in devtools. The scan below builds the actual bundle and reads it, rather
+# than trusting a grep of the source, because the bundle is what ships.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# Read-only. This workflow never writes to the repository.
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.12'
+  PYTHONDONTWRITEBYTECODE: '1'
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Nothing that looks like a credential may reach the browser bundle.
+  # ---------------------------------------------------------------------
+  no-secrets-in-bundle:
+    name: No secrets in the frontend bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      # A placeholder, not a real key. If the build is wired to read a secret
+      # from the environment, this is the string that would end up inlined.
+      - name: Build with a canary secret in the environment
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://api.example.com
+          # Deliberately shaped like a Google AI Studio key.
+          VITE_GEMINI_API_KEY: AIzaSyCANARYCANARYCANARYCANARYCANARYCAN
+        run: npm run build
+
+      - name: Scan the built bundle for credential material
+        run: python3 .github/scripts/scan_bundle_secrets.py dist
+
+  # ---------------------------------------------------------------------
+  # Secrets in source: catches a key committed to a file, which lives in the
+  # git history forever even after it is removed.
+  # ---------------------------------------------------------------------
+  no-secrets-in-source:
+    name: No secrets in source
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: History-aware secret scan
+        run: python3 .github/scripts/scan_source_secrets.py
+
+  # ---------------------------------------------------------------------
+  # Django refuses to serve with DEBUG on or with permissive host headers.
+  # `manage.py check --deploy` is the built-in assertion for exactly that.
+  # ---------------------------------------------------------------------
+  django-deploy-check:
+    name: Django deploy check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: check --deploy
+        working-directory: backend
+        env:
+          DJANGO_SECRET_KEY: ci-only-not-a-real-secret-0000000000000000
+          DJANGO_DEBUG: 'False'
+          DJANGO_ALLOWED_HOSTS: 'ci.invalid'
+        run: python manage.py check --deploy
+
+  # ---------------------------------------------------------------------
+  # Known-vulnerable dependencies.
+  # ---------------------------------------------------------------------
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: pip-audit (backend)
+        working-directory: backend
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt --strict || AUDIT_RC=$?
+          # --strict exits non-zero on a warning as well as a vulnerability.
+          # A warning still deserves to be seen, so it is surfaced as a
+          # failure rather than quietly passed.
+          exit ${AUDIT_RC:-0}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: npm audit (frontend)
+        working-directory: frontend
+        # `npm audit` reports dev-only advisories too, which are not shipped.
+        # --omit=dev narrows it to what actually reaches a browser.
+        run: npm audit --omit=dev --audit-level=high

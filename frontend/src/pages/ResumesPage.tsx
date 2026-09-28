@@ -1,5 +1,6 @@
+import { useRef, useState } from 'react'
 import { formatDate, formatScore } from '../lib/format'
-import { api } from '../lib/api'
+import { ApiError, api } from '../lib/api'
 import type { Job, Resume } from '../lib/types'
 import { IconExternal, IconFile, IconRefresh, IconUpload, IconZap } from '../components/Icons'
 import { Alert, EmptyState, Pill, Skeleton } from '../components/primitives'
@@ -69,6 +70,48 @@ type Props = {
 }
 
 export function ResumesPage({ resumes, master, jobs = [], loading, error, onRefresh }: Props) {
+  // This page previously had no upload control at all: the "Library" card
+  // described `POST /api/resumes/` in prose while `api.uploadResume` sat
+  // unused, so "Manage resumes" could not actually add a resume. The only
+  // working route to an upload was a browser tab running curl.
+  const [file, setFile] = useState<File | null>(null)
+  const [asMaster, setAsMaster] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const submitUpload = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!file || uploading) return
+
+    setUploading(true)
+    setUploadError('')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('name', file.name.replace(/\.pdf$/i, '') || 'Resume')
+      form.append('resume_type', 'MASTER')
+      // A first resume is always the master: there is nothing else to score
+      // against, and the API rejects a request with no master set.
+      form.append('is_master', asMaster || !master ? 'true' : 'false')
+
+      await api.uploadResume(form)
+      setFile(null)
+      setAsMaster(false)
+      // Reset the native control too. Clearing React state does not clear the
+      // input, so the same filename would silently re-upload on the next pick.
+      if (fileRef.current) fileRef.current.value = ''
+      onRefresh()
+    } catch (err) {
+      setUploadError(
+        err instanceof ApiError
+          ? err.message
+          : 'The upload did not finish. Check the file is a readable PDF and try again.',
+      )
+    } finally {
+      setUploading(false)
+    }
+  }
   // Tailored versions are split out of the flat list so the workspace reads as
   // "master + one version per job" rather than an undifferentiated pile.
   const isMaster = (resume: Resume) => resume.is_master || master?.id === resume.id
@@ -110,16 +153,59 @@ export function ResumesPage({ resumes, master, jobs = [], loading, error, onRefr
           <div className="card-body">
             <div className="section-title">
               <IconUpload size={13} />
-              Library
+              Upload
             </div>
-            <p className="stat-hint" style={{ marginTop: 0, lineHeight: 1.65 }}>
-              Upload resumes with{' '}
-              <code className="mono" style={{ fontSize: 12 }}>
-                POST /api/resumes/
-              </code>{' '}
-              — send the PDF as multipart form data with <code className="mono">name</code>,{' '}
-              <code className="mono">resume_type</code>, and <code className="mono">is_master</code>.
-            </p>
+
+            <form className="upload-form" onSubmit={submitUpload}>
+              <label className="form-label" htmlFor="resume-file">
+                PDF
+              </label>
+              <div className="upload-drop">
+                <input
+                  id="resume-file"
+                  ref={fileRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                />
+                {file ? (
+                  <div className="upload-picked">
+                    <IconFile size={16} />
+                    <span className="upload-name" title={file.name}>
+                      {file.name}
+                    </span>
+                    <span className="stat-hint">{Math.round(file.size / 1024)} KB</span>
+                  </div>
+                ) : (
+                  <span className="stat-hint">Choose a PDF, or drop one here.</span>
+                )}
+              </div>
+
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={asMaster}
+                  onChange={(event) => setAsMaster(event.target.checked)}
+                />
+                <span>Make this the master resume</span>
+              </label>
+
+              {uploadError ? <Alert variant="danger">{uploadError}</Alert> : null}
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={!file || uploading}
+              >
+                {uploading ? <span className="spinner" /> : <IconUpload size={15} />}
+                {uploading ? 'Uploading…' : 'Upload resume'}
+              </button>
+
+              <p className="stat-hint" style={{ lineHeight: 1.6 }}>
+                Every job is scored against your master resume. Tailoring never overwrites it —
+                each tailored version is stored separately.
+              </p>
+            </form>
           </div>
         </div>
       </section>
@@ -144,7 +230,7 @@ export function ResumesPage({ resumes, master, jobs = [], loading, error, onRefr
         <section className="card">
           <EmptyState
             title="No resumes yet"
-            description="Upload a master resume so TailorUp can start scoring job descriptions."
+            description="Use the upload panel to add your first resume."
           />
         </section>
       ) : (
