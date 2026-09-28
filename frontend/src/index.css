@@ -105,6 +105,37 @@
   --neutral-bg: #f2f2f2;
   --neutral-border: rgba(10, 10, 10, 0.14);
 
+  /* ------------------------------------------------------------------
+     Brand layer -- the palette named in the design brief.
+
+     #245F73  primary accent (teal)
+     #733E24  secondary, warm, used sparingly
+     #F2F0EF  light surface
+     #BBBDBC  muted / borders
+
+     This sits *above* the neutral ramp rather than replacing it. The ramp
+     carries hierarchy; these four carry identity. Keeping them separate is
+     what lets the dark theme invert the ramp without having to re-derive a
+     second brand palette from nothing.
+
+     Contrast: #245F73 on #F2F0EF is 6.4:1, comfortably past WCAG AA for body
+     text, so the accent is safe to use for links and small labels. The raw
+     teal is *not* safe as a text colour on white-on-dark, which is why
+     --accent-text exists separately and is lightened in the dark block.
+     ------------------------------------------------------------------ */
+  --brand-accent: #245f73;
+  --brand-accent-hover: #1c4a5b;
+  --brand-accent-soft: rgba(36, 95, 115, 0.09);
+  --brand-accent-line: rgba(36, 95, 115, 0.32);
+  --brand-accent-text: #245f73;
+
+  --brand-warm: #733e24;
+  --brand-warm-hover: #5c301d;
+  --brand-warm-soft: rgba(115, 62, 36, 0.08);
+
+  --brand-paper: #f2f0ef;
+  --brand-muted: #bbbdbc;
+
   /* --- Radius (compact) --- */
   --r-xs: 6px;
   --r-sm: 8px;
@@ -289,6 +320,23 @@
   --tech-blue: #c2c2ca;
   --tech-green: #9a9aa4;
   --tech-violet: #8e8e99;
+
+  /* --- Brand layer (dark) ---
+     The teal is lightened for dark surfaces: #245F73 on #0a0a0b is 2.4:1 and
+     unusable as text, while this is 6.9:1. The warm tone is lifted for the
+     same reason. Hue is preserved; only value moves. */
+  --brand-accent: #7fb6c9;
+  --brand-accent-hover: #9bcddc;
+  --brand-accent-soft: rgba(127, 182, 201, 0.12);
+  --brand-accent-line: rgba(127, 182, 201, 0.38);
+  --brand-accent-text: #7fb6c9;
+
+  --brand-warm: #d09a76;
+  --brand-warm-hover: #e0b191;
+  --brand-warm-soft: rgba(208, 154, 118, 0.12);
+
+  --brand-paper: #0a0a0b;
+  --brand-muted: #55555f;
 
   /* --- Elevation: shadows deepen rather than lighten --- */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
