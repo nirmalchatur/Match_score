@@ -1,5 +1,7 @@
+import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
+import { useReveal } from '../hooks/useReveal'
 import {
   IconArrowRight,
   IconBriefcase,
@@ -117,13 +119,26 @@ function SectionHead({ eyebrow, title, lede }: { eyebrow: string; title: string;
   )
 }
 
+/**
+ * Stagger helper for scroll reveals.
+ *
+ * `transition-delay` cannot be set from a plain object without a cast,
+ * because React's `CSSProperties` only knows about real CSS properties,
+ * not custom ones. Doing the cast once here keeps the call sites readable.
+ */
+const delay = (ms: number) => ({ '--reveal-delay': `${ms}ms` }) as CSSProperties
+
 export function LandingPage() {
   const { status } = useAuth()
   const signedIn = status === 'authenticated'
   const primaryTo = signedIn ? '/app/dashboard' : '/signup'
 
+  // Scroll reveals. Renders nothing and adds no markup, so the page still
+  // reads correctly if the observer never runs.
+  useReveal()
+
   return (
-    <div className="landing">
+    <div className="landing mk-animate">
       <div className="mk-bg" aria-hidden="true" />
 
       <header className="mk-nav">
@@ -252,8 +267,8 @@ export function LandingPage() {
           />
 
           <ol className="mk-steps">
-            {STEPS.map((step) => (
-              <li className="mk-step" key={step.n}>
+            {STEPS.map((step, i) => (
+              <li className="mk-step" key={step.n} data-reveal style={delay(i * 90)}>
                 <span className="mk-step-n">{step.n}</span>
                 <div className="mk-step-body">
                   <h3 className="mk-step-title">
@@ -276,8 +291,13 @@ export function LandingPage() {
           />
 
           <div className="mk-grid">
-            {FEATURES.map(({ Icon, title, body, soon }) => (
-              <article className="mk-card" key={title}>
+            {FEATURES.map(({ Icon, title, body, soon }, i) => (
+              <article
+                className="mk-card"
+                key={title}
+                data-reveal
+                style={delay(Math.min(i, 5) * 70)}
+              >
                 <span className="mk-card-icon">
                   <Icon size={17} />
                 </span>
@@ -300,7 +320,7 @@ export function LandingPage() {
               lede="The analysis provider is pluggable, and the default one runs on your own hardware. Your resume is not shipped to a third-party API just to be scored."
             />
 
-            <div className="mk-config">
+            <div className="mk-config" data-reveal>
               <p className="mk-config-label">Environment</p>
               {LOCAL_CONFIG.map((row) => (
                 <div className="mk-config-row" key={row.key}>
@@ -318,7 +338,7 @@ export function LandingPage() {
 
         {/* ---------- Open source CTA ---------- */}
         <section className="mk-section is-dark">
-          <div className="mk-cta">
+          <div className="mk-cta" data-reveal="fade">
             <h2 className="mk-cta-title">Built in the open.</h2>
             <p className="mk-cta-lede">
               TailorUp is free and open source. Read the code, run it yourself, or contribute to
