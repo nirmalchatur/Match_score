@@ -106,10 +106,29 @@ export interface Toast {
 
 /* ---------- Auth ---------- */
 
+/**
+ * Career stage, as the wire format stores it: lowercase slugs rather than
+ * Django's uppercase choice keys.
+ */
+export type CareerStage = 'student' | 'fresher' | 'professional'
+
+/** Which AI setup the candidate picked during onboarding. */
+export type AiSetup = 'ollama' | 'gemini'
+
 export interface UserProfile {
   headline: string
   discipline: string
   target_locations: string
+  /**
+   * Where the candidate is: student, fresher, or working professional.
+   * Empty until onboarding is finished, so every field here is optional
+   * except the original three.
+   */
+  career_stage?: CareerStage
+  /** Work years. Always 0 for a student or a fresher. */
+  years_experience?: number
+  /** Which AI setup the candidate chose: local Ollama or hosted Gemini. */
+  ai_setup?: AiSetup
   created_at?: string
   updated_at?: string
 }
@@ -242,9 +261,21 @@ export interface TailoringStatus {
  * The catalogue and the minimum come from the server on every GET rather than
  * being hard-coded here. That is the point: if the two ever disagreed, the
  * picker would offer options the server rejects, or hide options it accepts.
- * A hard-coded list in the client is a second source of truth that will drift.
+ * The seven areas a candidate picks from.
+ *
+ * Kept as a union rather than `string` so a typo in a component is a type
+ * error. The server is still the authority -- it sends `kinds` and the
+ * catalogue on every read -- and this union has to stay in step with
+ * `apps/resumes/qualities.KINDS`.
  */
-export type QualityKind = 'technical' | 'project_management' | 'soft_skills'
+export type QualityKind =
+  | 'programming'
+  | 'data_structures'
+  | 'problem_solving'
+  | 'soft_skills'
+  | 'project_management'
+  | 'leadership'
+  | 'hr'
 
 export type QualitySelection = Record<QualityKind, string[]>
 
@@ -261,6 +292,10 @@ export interface QualitiesResponse {
   minimum_total: number
   /** Kinds in presentation order. */
   kinds: QualityKind[]
+  /**
+   * Groups with nothing selected. A hint the picker shows, not an error.
+   */
+  uncovered_groups?: QualityKind[]
 }
 /**
  * The status of the signed-in user's own provider key.

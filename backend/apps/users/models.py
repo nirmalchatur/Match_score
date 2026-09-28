@@ -8,6 +8,7 @@ model swap stays a contained change.
 """
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -22,6 +23,24 @@ class UserProfile(models.Model):
         ("MARKETING", "Marketing"),
         ("OTHER", "Other"),
     ]
+
+    #: Where the candidate is in their working life, asked during onboarding.
+    #:
+    #: "fresher" is kept separate from "student" on purpose: a final-year
+    #: student has not yet entered the market, while a fresher has and is
+    #: actively looking. Collapsing them would make the answer useless for
+    #: exactly the two groups most likely to need different phrasing.
+    CAREER_STAGE_CHOICES = [
+        ("STUDENT", "Student"),
+        ("FRESHER", "Fresher"),
+        ("PROFESSIONAL", "Working professional"),
+    ]
+
+    #: The three values above, as the plain strings the API accepts. The
+    #: uppercase choice keys are an implementation detail of Django's
+    #: ``choices``; the wire format is the lowercase slug, which is what the
+    #: frontend sends and what is stored in older rows.
+    CAREER_STAGES = ("student", "fresher", "professional")
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -48,6 +67,37 @@ class UserProfile(models.Model):
         blank=True,
         default="",
         help_text="Comma-separated list of preferred locations.",
+    )
+
+    #: One of :attr:`CAREER_STAGES`, lowercase, or "" if not answered yet.
+    career_stage = models.CharField(
+        max_length=20,
+        choices=[(value, value.title()) for value in ("student", "fresher", "professional")],
+        blank=True,
+        default="",
+        help_text="Student, fresher, or working professional.",
+    )
+
+    #: Years of work experience. Only meaningful for a professional, and left
+    #: at 0 for everyone else rather than NULL so the API has one shape.
+    #:
+    #: An integer rather than a free-text "5+": the resume parser stores
+    #: numeric years, so a number here can actually be compared against one.
+    years_experience = models.PositiveSmallIntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(60)],
+        help_text="Years of professional experience. 0 for students and freshers.",
+    )
+
+    #: Which AI setup the candidate picked during onboarding: "ollama" for a
+    #: local model, "gemini" for the hosted free tier. Recorded so the docs
+    #: and the Settings screen can point at the right instructions; it does
+    #: not change the server's own AI_PROVIDER setting.
+    ai_setup = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Chosen AI setup: 'ollama' (local) or 'gemini' (hosted).",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -2130,3 +2130,43 @@
   background: #fdeeee;
   font-weight: 600;
 }
+
+/* ------------------------------------------------------- onboarding choices */
+
+/* The radio-card pattern used by the "who are you" and "how AI runs" steps.
+
+   A real <button> rather than a styled <div> so it is focusable, activates
+   on Enter and Space, and reports aria-pressed without any extra handlers. The
+   selected state is a border and a tint rather than a colour change alone, so
+   it still reads without colour vision. */
+.choice-card {
+  border: 1px solid var(--border, #e2e2e6);
+  border-radius: 10px;
+  background: #fff;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.choice-card:hover { border-color: #c9c9d1; }
+
+.choice-card.selected {
+  border-color: #1f1f24;
+  background: #f7f7f9;
+}
+
+.choice-card:focus-visible {
+  outline: 2px solid #1f1f24;
+  outline-offset: 2px;
+}
+
+/* The inline command list in the AI-setup cards. */
+.choice-card pre {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #3c3c46;
+  background: #f1f1f4;
+  border: 1px solid #e6e6ea;
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  white-space: pre;
+}

@@ -149,10 +149,10 @@ export function OnboardingPage() {
               <button
                 type="button"
                 className="btn btn-primary btn-block"
-                onClick={() => navigate('/app/dashboard')}
+                onClick={() => navigate('/setup/skills')}
               >
                 <IconZap size={16} />
-                Continue to dashboard
+                Continue to skills
               </button>
             </div>
           </div>

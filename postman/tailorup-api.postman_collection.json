@@ -362,6 +362,356 @@
       ]
     },
     {
+      "name": "Onboarding answers",
+      "description": "Career stage, years of experience and the AI setup choice, asserted over HTTP. The professional-without-years combination is a contradiction the server refuses, and years sent with a student or fresher are zeroed rather than stored -- both rules enforced server-side so a hand-written PATCH behaves exactly like the onboarding form.",
+      "item": [
+        {
+          "name": "45 A student is stored with no years",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('years are zeroed rather than stored for a student', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.career_stage).to.eql('student');",
+                  "    pm.expect(body.years_experience).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/profile/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile",
+                ""
+              ]
+            },
+            "description": "45 A student is stored with no years",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"career_stage\": \"student\",\n  \"years_experience\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "46 A professional with no years is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the contradiction is refused, not silently stored', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.text()).to.include('years_experience');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/profile/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile",
+                ""
+              ]
+            },
+            "description": "46 A professional with no years is rejected",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"career_stage\": \"professional\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "47 A professional with years is stored",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the answer is kept as sent', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.career_stage).to.eql('professional');",
+                  "    pm.expect(body.years_experience).to.eql(4);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/profile/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile",
+                ""
+              ]
+            },
+            "description": "47 A professional with years is stored",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"career_stage\": \"professional\",\n  \"years_experience\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "48 An unknown career stage is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the stage list is closed', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/profile/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile",
+                ""
+              ]
+            },
+            "description": "48 An unknown career stage is rejected",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"career_stage\": \"wizard\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "49 Both AI setups are accepted",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the hosted choice is recorded', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().ai_setup).to.eql('gemini');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/profile/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile",
+                ""
+              ]
+            },
+            "description": "49 Both AI setups are accepted",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ai_setup\": \"gemini\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "50 An unknown AI setup is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('only the two documented setups are accepted', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/profile/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile",
+                ""
+              ]
+            },
+            "description": "50 An unknown AI setup is rejected",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ai_setup\": \"gpt\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Profile",
       "description": "Workspace profile read/write round trip.",
       "item": [
@@ -376,7 +726,7 @@
                   "pm.test('profile is readable and auto-created on first access', function () {",
                   "    pm.response.to.have.status(200);",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.all.keys('headline', 'discipline', 'target_locations', 'created_at', 'updated_at');",
+                  "    pm.expect(body).to.have.all.keys('headline', 'discipline', 'target_locations', 'career_stage', 'years_experience', 'ai_setup', 'created_at', 'updated_at');",
                   "});"
                 ]
               }
@@ -2436,9 +2786,9 @@
                   "    const body = pm.response.json();",
                   "    pm.expect(body.selected_count).to.eql(0);",
                   "    pm.expect(body.minimum_total).to.eql(7);",
-                  "    pm.expect(body.kinds).to.eql(['technical', 'project_management', 'soft_skills']);",
-                  "    pm.expect(body.catalogue.technical.length).to.be.above(0);",
-                  "    pm.expect(body.catalogue.soft_skills.length).to.be.above(0);",
+                  "    pm.expect(body.kinds).to.eql(['programming', 'data_structures', 'problem_solving', 'soft_skills', 'project_management', 'leadership', 'hr']);",
+                  "    const total = Object.values(body.catalogue).flat().length;",
+                  "    pm.expect(total).to.eql(25);",
                   "});"
                 ]
               }

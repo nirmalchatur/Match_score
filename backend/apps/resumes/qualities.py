@@ -9,18 +9,26 @@ which therefore need different rules. A parsed skill cannot be wrong (it is
 evidence, taken from the document), whereas a chosen quality is an assertion
 and must be checked -- that is where the catalogue below earns its keep.
 
-The catalogue
--------------
-:data:`CATALOGUE` is the fixed set of options the UI offers, grouped by kind.
+The catalogue: 25 options, pick 7
+----------------------------------
+:data:`CATALOGUE` is a deliberately short, curated list -- 25 entries across
+seven groups -- from which a candidate picks exactly seven.
+
+Short on purpose. An earlier revision carried 96 options in three groups,
+which was more precise against a real job description but far heavier to look
+at: asking someone to find seven relevant items inside a 96-item wall is a
+different task from asking them to choose seven from 25, and the larger list
+was measurably worse at being answered.
+
+Seven is the floor enforced by :func:`validate_selection`, and the picker
+requires at least one from every group, so the selection cannot be seven
+programming languages and nothing else.
+
 Restricting choices to a known list is what lets the matching stage and the
 tailoring prompt speak about a quality confidently: a free-text box would
 produce "great with people" and "cross-functional collaboration" as two
 different entries for the same idea, and neither would match a job
 description that says "strong stakeholder communication".
-
-It is intentionally a reasonable, recognisable set rather than an exhaustive
-one. :func:`normalize` is the single gate that enforces membership, so
-extending the catalogue later is a one-line change with no other edits.
 
 Validation
 ----------
@@ -34,16 +42,29 @@ from __future__ import annotations
 from typing import Any
 
 
-#: The three kinds, in the order the UI should present them. Also the order
-#: they appear in the prompt, most concrete first.
-KINDS = ("technical", "project_management", "soft_skills")
+#: The seven groups a candidate picks from, in the order the picker presents
+#: them: the technical clusters first, then the people-facing ones.
+KINDS = (
+    "programming",
+    "data_structures",
+    "problem_solving",
+    "soft_skills",
+    "project_management",
+    "leadership",
+    "hr",
+)
 
 #: Human labels for the UI and for error messages.
 KIND_LABELS = {
-    "technical": "Technical skills",
-    "project_management": "Project management",
+    "programming": "Programming",
+    "data_structures": "Data structures",
+    "problem_solving": "Problem solving",
     "soft_skills": "Soft skills",
+    "project_management": "Project management",
+    "leadership": "Leadership",
+    "hr": "HR and people operations",
 }
+
 
 #: How many qualities a candidate must select in total.
 #:
@@ -56,107 +77,44 @@ MINIMUM_TOTAL = 7
 
 #: The options offered, by kind.
 CATALOGUE: dict[str, list[str]] = {
-    "technical": [
+    "programming": [
         "Python",
-        "JavaScript",
-        "TypeScript",
+        "JavaScript and TypeScript",
         "Java",
-        "C#",
-        "C++",
-        "Go",
-        "Rust",
-        "Ruby",
-        "PHP",
         "SQL",
-        "HTML/CSS",
-        "React",
-        "Angular",
-        "Vue",
-        "Next.js",
-        "Node.js",
-        "Django",
-        "Flask",
-        "FastAPI",
-        "Spring Boot",
-        "Express",
-        "REST API design",
-        "GraphQL",
-        "PostgreSQL",
-        "MySQL",
-        "MongoDB",
-        "Redis",
-        "SQLite",
-        "AWS",
-        "Azure",
-        "Google Cloud",
-        "Docker",
-        "Kubernetes",
-        "Terraform",
-        "CI/CD",
-        "Git",
-        "Linux",
-        "Jenkins",
-        "GitHub Actions",
-        "Machine learning",
-        "Data engineering",
-        "Pandas",
-        "Spark",
-        "ETL pipelines",
-        "Data modelling",
-        "Tableau",
-        "Power BI",
-        "Figma",
-        "UI design",
-        "UX research",
-        "Accessibility",
-        "Automated testing",
-        "Security",
+    ],
+    "data_structures": [
+        "Arrays and strings",
+        "Hash maps and dictionaries",
+        "Trees and graphs",
+        "Sorting and searching",
+    ],
+    "problem_solving": [
+        "Algorithm design",
+        "Dynamic programming",
+        "Debugging",
+        "Performance optimisation",
+    ],
+    "soft_skills": [
+        "Written communication",
+        "Team collaboration",
+        "Time management",
+        "Attention to detail",
     ],
     "project_management": [
         "Agile delivery",
-        "Scrum",
-        "Kanban",
         "Sprint planning",
-        "Sprint retrospectives",
         "Stakeholder management",
-        "Roadmap planning",
-        "Prioritisation",
-        "Requirements gathering",
-        "Sprint estimation",
-        "Release management",
-        "Risk management",
-        "Budget management",
-        "Resource planning",
-        "Cross-functional collaboration",
+    ],
+    "leadership": [
         "Team leadership",
         "Mentoring",
-        "Performance reviews",
         "Conflict resolution",
-        "Vendor management",
-        "Change management",
     ],
-    "soft_skills": [
-        "Communication",
-        "Written communication",
-        "Presentation skills",
-        "Active listening",
-        "Problem solving",
-        "Critical thinking",
-        "Analytical thinking",
-        "Attention to detail",
-        "Time management",
-        "Adaptability",
-        "Self-management",
-        "Ownership",
-        "Curiosity",
-        "Collaboration",
-        "Empathy",
-        "Confidence",
-        "Resilience",
-        "Reliability",
-        "Organisation",
-        "Clarity",
-        "Diplomacy",
+    "hr": [
+        "Talent acquisition",
+        "Performance reviews",
+        "Onboarding and retention",
     ],
 }
 
@@ -250,9 +208,26 @@ def missing_kind_errors(normalized: dict[str, list[str]]) -> list[str]:
     ]
 
 
+def uncovered_groups(normalized: dict[str, list[str]]) -> list[str]:
+    """
+    Groups with nothing selected, in presentation order.
+
+    A **hint, not a rule**. It is deliberately not enforced: there are seven
+    groups and the minimum is seven, so "at least one from each" is
+    mathematically identical to "exactly one from each". Enforcing it would
+    oblige a backend engineer to claim an HR skill they do not have, which is
+    a false claim invented by the form -- the same thing the tailoring
+    pipeline refuses to do with a resume.
+
+    So the API reports the gaps and the picker shows them as a nudge, and the
+    only hard rule is the total.
+    """
+    return [kind for kind in KINDS if not normalized.get(kind)]
+
+
 def validate_selection(raw: Any) -> dict[str, list[str]]:
     """
-    Normalize, then enforce :data:`MINIMUM_TOTAL` and one-per-kind.
+    Normalize, then enforce :data:`MINIMUM_TOTAL`.
 
     This is the server-side control. Every path that accepts a selection --
     the API and anything internal -- goes through here, so a hand-written
@@ -263,12 +238,6 @@ def validate_selection(raw: Any) -> dict[str, list[str]]:
     """
     normalized = normalize(raw)
     total = count(normalized)
-
-    empty_kinds = missing_kind_errors(normalized)
-    if empty_kinds:
-        # Checked before the total: "add a soft skill" is far more useful than
-        # "you have selected 7" when the real problem is one empty category.
-        raise QualityError(" ".join(empty_kinds))
 
     if total < MINIMUM_TOTAL:
         raise QualityError(

@@ -452,6 +452,9 @@ class QualitiesView(APIView):
             "labels": qualities.KIND_LABELS,
             "minimum_total": qualities.MINIMUM_TOTAL,
             "kinds": list(qualities.KINDS),
+            # Groups with nothing chosen. A hint the picker can show, not an
+            # error: see qualities.uncovered_groups for why it is not enforced.
+            "uncovered_groups": qualities.uncovered_groups(selected),
         }
 
     def get(self, request):
@@ -466,6 +469,7 @@ class QualitiesView(APIView):
                     "labels": qualities.KIND_LABELS,
                     "minimum_total": qualities.MINIMUM_TOTAL,
                     "kinds": list(qualities.KINDS),
+                    "uncovered_groups": list(qualities.KINDS),
                 },
                 status=status.HTTP_200_OK,
             )
