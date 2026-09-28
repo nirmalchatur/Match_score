@@ -39,6 +39,11 @@ from apps.resumes.services.document_service import render_resume_document
 
 from apps.resumes.services.parser import ResumeParser
 from apps.resumes.services.resume_profile import ResumeProfile as ResumeProfileService
+from apps.common.throttling import (
+    AIHourlyRateThrottle,
+    AIUserRateThrottle,
+    DocumentRateThrottle,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -565,6 +570,7 @@ def _tailoring_context(user, job_id):
 
 
 class TailorResumeView(APIView):
+    throttle_classes = [AIUserRateThrottle, AIHourlyRateThrottle]
     """
     POST /api/resumes/tailor/  {"job_id": 12}
 
@@ -773,6 +779,7 @@ class AIProviderStatusView(APIView):
 
 
 class ResumeDownloadView(APIView):
+    throttle_classes = [DocumentRateThrottle]
     """
     GET /api/resumes/<pk>/download/<fmt>/   fmt is "docx" or "pdf"
 
