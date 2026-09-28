@@ -21,7 +21,7 @@ from . import qualities
 from .models import Resume, ResumeProfile
 from .serializers import ResumeSerializer
 
-from apps.ai import factory
+from apps.ai import factory, selection
 from apps.ai.exceptions import (
     AIConfigurationError,
     AIError,
@@ -611,7 +611,14 @@ class TailorResumeView(APIView):
             )
 
         try:
+            # Resolve this account's provider first. The deployment default is
+            # only a default: a user who chose differently gets their choice,
+            # and the key lookup below follows whichever provider was resolved
+            # rather than assuming Gemini.
+            effective, _reason = selection.resolve_provider_name(request.user)
+
             outcome = ResumeTailor.tailor_resume(
+                provider=factory.get_ai_provider(effective),
                 resume=_stored_profile(master),
                 job={
                     "title": job.title,
@@ -761,7 +768,15 @@ class AIProviderStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        described = factory.describe_provider()
+        # The effective provider is per user, not global: the deployment picks a
+        # default, but this account may have chosen otherwise. The reason is
+        # returned alongside it, because "why is my resume going to a hosted
+        # provider" is a question the user is entitled to have answered here
+        # rather than by reading logs.
+        effective, reason = selection.resolve_provider_name(request.user)
+        described = factory.describe_provider(effective)
+        described["selection_reason"] = reason
+        described["deployment_default"] = selection.default_provider_name()
 
         # Availability is per user, not global: the provider is configured
         # globally, but Gemini is unusable until *this* account has a key. The
