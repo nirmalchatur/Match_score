@@ -16,6 +16,7 @@ This module never sees the AI response and never contacts a model.
 from __future__ import annotations
 
 import io
+import zipfile
 
 from docx import Document as DocxDocument
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -72,6 +73,49 @@ class ResumeDocxGenerator:
 
         buffer = io.BytesIO()
         doc.save(buffer)
+        return self._normalise_archive(buffer.getvalue())
+
+    # -- determinism -------------------------------------------------------
+
+    #: A fixed modification time for every archive member.
+    #:
+    #: 1980-01-01 is the earliest value the ZIP format can represent, so it is
+    #: the conventional choice for reproducible archives. Any constant works;
+    #: what matters is that it is not the wall clock.
+    _FIXED_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
+
+    @classmethod
+    def _normalise_archive(cls, payload: bytes) -> bytes:
+        """
+        Rewrite the ``.docx`` archive with fixed member timestamps.
+
+        Why this is needed
+        ------------------
+        A ``.docx`` is a ZIP, and ``zipfile.writestr`` stamps each member with
+        the current time when saving. So two renders of an identical
+        :class:`ResumeDocument` produce different bytes whenever they straddle
+        a one-second boundary -- and identical bytes when they do not. That is
+        the worst kind of bug for a test: ``test_output_is_deterministic``
+        passes almost always and fails occasionally for no visible reason.
+
+        Only the member timestamps are rewritten. Each part is copied
+        uncompressed data and re-deflated, so the document content, the part
+        order, and the compression type are all preserved; only the four-byte
+        DOS time/date fields change.
+        """
+        source = zipfile.ZipFile(io.BytesIO(payload))
+        buffer = io.BytesIO()
+
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as target:
+            for info in source.infolist():
+                entry = zipfile.ZipInfo(filename=info.filename, date_time=cls._FIXED_TIMESTAMP)
+                # Carry the original permissions and compression across. Only
+                # the timestamp is being normalised.
+                entry.external_attr = info.external_attr
+                entry.compress_type = info.compress_type
+                entry.create_system = info.create_system
+                target.writestr(entry, source.read(info.filename))
+
         return buffer.getvalue()
 
     # -- setup -------------------------------------------------------------
