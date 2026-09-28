@@ -44,7 +44,69 @@ class MatchEngine:
             "experience": experience_result,
             "requirements": requirement_result,
             "education": education_result,
+            # Reported, never scored. See _quality_match for why adding these
+            # to the weights would be the wrong move.
+            "qualities": cls._quality_match(
+                resume_profile.get("qualities"),
+                jd_profile,
+            ),
             "decision": cls._decision(score),
+        }
+
+    @staticmethod
+    def _quality_match(raw_qualities, jd_profile):
+        """
+        Which of the candidate's chosen qualities this job description values.
+
+        Deliberately excluded from the score, and that is the important design
+        decision here. ``skills`` are evidence parsed out of the uploaded
+        document, so counting them against the JD is a measurement. Qualities
+        are the candidate's own shortlist -- a self-assessment -- and folding
+        them into the weights would let someone raise their match score by
+        ticking more boxes, which is precisely the behaviour a match score
+        exists to prevent. It would also break the meaning of the number: the
+        same resume would score differently depending on what the user
+        selected, which is not a property of the resume.
+
+        So this is reported for emphasis -- "the job wants the two things you
+        said you are good at" -- and the tailoring prompt uses it to decide
+        which of the *evidenced* experience to lead with.
+
+        Returns an empty ``matched`` list and ``note`` when the candidate has
+        chosen nothing, rather than pretending a match: no selection is a
+        different state from "matched none of them".
+        """
+        try:
+            from apps.resumes.qualities import as_list, normalize
+
+            selected = as_list(normalize(raw_qualities))
+        except Exception:  # pragma: no cover - defensive
+            selected = []
+
+        if not selected:
+            return {
+                "matched": [],
+                "selected": [],
+                "note": "No qualities selected",
+            }
+
+        # The JD text is the only thing available to match against, so this is
+        # deliberately a substring check rather than a semantic one: the same
+        # deliberately deterministic approach the rest of this engine takes.
+        haystack = " ".join(
+            str(jd_profile.get(field) or "")
+            for field in ("skills", "requirements", "responsibilities", "title")
+        ).lower()
+
+        matched = [item for item in selected if item.lower() in haystack]
+
+        return {
+            "matched": matched,
+            "selected": selected,
+            "note": (
+                f"{len(matched)} of {len(selected)} selected qualities are "
+                "mentioned in this job description"
+            ),
         }
 
     @staticmethod

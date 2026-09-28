@@ -96,9 +96,10 @@ unsafe request.
 | --- | --- | --- | --- |
 | `/api/auth/register/` | POST | Public | Create an account (auto sign-in) |
 | `/api/auth/login/` | POST | Public | Start a session |
-| `/api/auth/logout/` | POST | Public | End the session |
+| `/api/auth/logout/` | POST | Public | End the session and delete the stored AI key |
 | `/api/auth/me/` | GET | Public | Current account, or `{authenticated: false}` |
 | `/api/auth/profile/` | GET/PATCH | Required | Workspace preferences |
+| `/api/auth/ai-key/` | GET/POST/DELETE | Required | Your own Gemini API key — **never returned** |
 
 Full reference: [`docs/API.md`](docs/API.md).
 

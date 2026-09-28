@@ -10,6 +10,8 @@ one that produces nothing.
 import io
 import json
 import re
+import time
+import zipfile
 
 from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase
@@ -162,6 +164,56 @@ class DocxRendererTests(SimpleTestCase):
         first = ResumeDocxGenerator().render(build_document(PROFILE))
         second = ResumeDocxGenerator().render(build_document(PROFILE))
         self.assertEqual(first, second)
+
+    def test_output_is_deterministic_across_a_second_boundary(self):
+        """
+        The determinism test above is not sufficient on its own.
+
+        ``.docx`` is a ZIP and ``zipfile`` stamps each member with the current
+        time, so the original implementation produced different bytes only when
+        two consecutive renders happened to straddle a one-second boundary --
+        and identical bytes otherwise. The plain test therefore passed nearly
+        always and failed occasionally, for no reason a reader could see.
+
+        This version forces the gap open, so the race cannot hide.
+        """
+        first = ResumeDocxGenerator().render(build_document(PROFILE))
+        time.sleep(1.1)
+        second = ResumeDocxGenerator().render(build_document(PROFILE))
+        self.assertEqual(
+            first,
+            second,
+            "DOCX bytes changed with no input change: the archive still carries "
+            "a wall-clock timestamp",
+        )
+
+    def test_rendered_archive_is_intact(self):
+        """Normalising the timestamps must not corrupt the archive."""
+        payload = ResumeDocxGenerator().render(build_document(PROFILE))
+        archive = zipfile.ZipFile(io.BytesIO(payload))
+
+        # None means every member decompressed and matched its CRC.
+        self.assertIsNone(archive.testzip())
+        self.assertIn("[Content_Types].xml", archive.namelist())
+
+    def test_rendered_document_still_opens(self):
+        """The rewritten archive is a working .docx, not just valid ZIP bytes."""
+        payload = ResumeDocxGenerator().render(build_document(PROFILE))
+        self.assertIn("B.Tech Computer Science, 2020", docx_text(payload))
+
+    def test_every_member_timestamp_is_fixed(self):
+        """
+        Assert the property rather than the symptom.
+
+        Comparing bytes is indirect and only catches the sample it happens to
+        take. Asserting that no member carries a wall-clock time states the
+        actual guarantee, and cannot go flaky.
+        """
+        payload = ResumeDocxGenerator().render(build_document(PROFILE))
+        archive = zipfile.ZipFile(io.BytesIO(payload))
+        timestamps = {info.date_time for info in archive.infolist()}
+
+        self.assertEqual(timestamps, {ResumeDocxGenerator._FIXED_TIMESTAMP})
 
 
 class PdfRendererTests(SimpleTestCase):

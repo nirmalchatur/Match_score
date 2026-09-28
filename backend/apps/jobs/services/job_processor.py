@@ -39,6 +39,9 @@ class JobProcessor:
             "certifications": (
                 resume_profile_model.certifications
             ),
+            # The candidate's chosen qualities, grouped by kind. Reported by
+            # MatchEngine, never scored -- see MatchEngine._quality_match.
+            "qualities": resume_profile_model.qualities,
         }
 
         # Build JD profile

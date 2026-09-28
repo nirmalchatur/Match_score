@@ -45,6 +45,14 @@ class TailoringRequest:
     #: Existing match analysis: matched/missing skills, score, decision.
     match: dict[str, Any] = field(default_factory=dict)
 
+    #: Per-user provider credential, when the user brought their own key.
+    #:
+    #: Excluded from :meth:`to_payload` on purpose: this dict is serialised into
+    #: prompts, and an API key must never reach a model provider's logs or be
+    #: echoed back in an error. Only providers read it, and only
+    #: :meth:`apps.ai.providers.gemini.GeminiProvider` uses it today.
+    api_key: str = ""
+
     def to_payload(self) -> dict[str, Any]:
         """A plain dict copy, safe to serialise into a prompt or request body."""
         return {

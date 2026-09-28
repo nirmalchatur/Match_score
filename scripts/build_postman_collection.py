@@ -657,6 +657,319 @@ profile_after_logout = request(
 
 
 # ---------------------------------------------------------------------------
+# Bring-your-own AI key
+#
+# Runs last, and re-authenticates as the primary account first. Two things make
+# this folder worth having in CI:
+#
+# 1. **It asserts the security contract at the wire level.** Every other place
+#    that talks about "the key is never returned" is a Django test. This one
+#    goes over real HTTP against a real session, so a change to middleware, the
+#    renderer, or a filter that re-serialises the request would be caught here
+#    and nowhere else.
+# 2. **It covers the logout side effect.** Logging out deletes the key. That is
+#    a behaviour in the Django test suite, but logout is also the one request
+#    that must keep returning 204 with an empty body, and the two facts are
+#    easy to satisfy one at a time and not together.
+#
+# The login is needed because the Logout folder above ends with a closed
+# session; without it every request here would 403 and the folder would pass
+# while asserting nothing. Hence the explicit "signed in again" check first: if
+# that regresses, the failure is obvious rather than a cascade of 403s.
+# ---------------------------------------------------------------------------
+
+# A structurally valid but entirely fictional key. Long enough to clear the
+# 8-character minimum, and containing no whitespace, so it exercises the happy
+# path rather than the validators. The prefix matches Google AI Studio's real
+# shape because the 4+4 hint would otherwise look wrong in the report.
+AI_KEY = "AIzaSyD-PostmanFixture0000000000000000000000000abcd"
+AI_KEY_REPLACEMENT = "AIzaSyD-PostmanFixture000000000000000000000000wxyz"
+
+# ---------------------------------------------------------------------------
+# Qualities
+#
+# Runs after the AI-key folder, which ends signed-in. The assertions are about
+# the server's rules rather than the UI's: the picker disables its save button
+# below the minimum, but a hand-written PUT has to be refused too, and that is
+# what these check.
+#
+# The master resume does not exist for this account, so GET has to degrade to an
+# empty selection rather than 404 -- otherwise a brand new user cannot even see
+# the options. PUT, which would have nothing to attach them to, must 404.
+# ---------------------------------------------------------------------------
+
+qualities_get_without_resume = request(
+    "45 /qualities/ is readable before a master resume exists",
+    "GET",
+    "/api/resumes/qualities/",
+    tests=pm(
+        "the picker can render and explain itself to a new account",
+        "pm.response.to.have.status(200);",
+        "const body = pm.response.json();",
+        "pm.expect(body.selected_count).to.eql(0);",
+        "pm.expect(body.minimum_total).to.eql(7);",
+        "pm.expect(body.kinds).to.eql("
+        "['technical', 'project_management', 'soft_skills']);",
+        "pm.expect(body.catalogue.technical.length).to.be.above(0);",
+        "pm.expect(body.catalogue.soft_skills.length).to.be.above(0);",
+    ),
+)
+
+qualities_put_without_resume = request(
+    "46 /qualities/ refuses to save with no master resume",
+    "PUT",
+    "/api/resumes/qualities/",
+    body={
+        "qualities": {
+            "technical": ["Python", "Java", "Go", "Rust"],
+            "project_management": ["Scrum"],
+            "soft_skills": ["Communication", "Empathy"],
+        }
+    },
+    tests=pm(
+        "there is nothing to attach a selection to",
+        "pm.response.to.have.status(404);",
+    ),
+)
+
+qualities_valid_but_no_resume = request(
+    "47 A valid selection is still refused with no master resume",
+    "PUT",
+    "/api/resumes/qualities/",
+    body={
+        "qualities": {
+            "technical": ["Python", "Java", "Go", "Rust"],
+            "project_management": ["Scrum"],
+            "soft_skills": ["Communication", "Empathy"],
+        }
+    },
+    tests=pm(
+        "the 404 is about the missing resume, not the payload",
+        "pm.response.to.have.status(404);",
+        "pm.expect(pm.response.json().error).to.include('master resume');",
+    ),
+)
+
+
+
+
+
+
+ai_key_relogin = request(
+    "30 Log back in to manage the AI key",
+    "POST",
+    "/api/auth/login/",
+    body={"email": "{{seedEmail}}", "password": PASSWORD},
+    tests=merge_tests(
+        REFRESH_CSRF,
+        pm(
+            "the key tests below need a live session",
+            "pm.response.to.have.status(200);",
+            # login/ returns {user: ...}; only /me/ carries `authenticated`,
+            # so asserting that here would read undefined and pass for the
+            # wrong reason.
+            "pm.expect(pm.response.json().user.email).to.eql("
+            "pm.collectionVariables.get('seedEmail'));",
+        ),
+    ),
+)
+
+ai_key_before = request(
+    "31 /ai-key/ reports no key before one is saved",
+    "GET",
+    "/api/auth/ai-key/?provider=gemini",
+    tests=pm(
+        "a fresh account has no key, and the response says so plainly",
+        "pm.response.to.have.status(200);",
+        "const body = pm.response.json();",
+        "pm.expect(body.provider).to.eql('gemini');",
+        "pm.expect(body.configured).to.eql(false);",
+        "pm.expect(body).to.not.have.property('api_key');",
+        "pm.expect(body).to.not.have.property('key_hint');",
+    ),
+)
+
+ai_key_save = request(
+    "32 Save a Gemini API key",
+    "POST",
+    "/api/auth/ai-key/",
+    body={"provider": "gemini", "api_key": AI_KEY},
+    tests=pm(
+        "saving a key reports configured without echoing the key",
+        "pm.response.to.have.status(201);",
+        "const body = pm.response.json();",
+        "pm.expect(body.configured).to.eql(true);",
+        "pm.expect(body).to.not.have.property('api_key');",
+        "// The hint is a 4+4 mask, never the value itself.",
+        "pm.expect(body.key_hint).to.eql('AIza...abcd');",
+        "pm.expect(pm.response.text()).to.not.include('" + AI_KEY + "');",
+    ),
+)
+
+ai_key_read_back = request(
+    "33 A saved key is never returned by GET",
+    "GET",
+    "/api/auth/ai-key/?provider=gemini",
+    tests=pm(
+        "the read path discloses configuration state only",
+        "pm.response.to.have.status(200);",
+        "const body = pm.response.json();",
+        "pm.expect(body.configured).to.eql(true);",
+        "pm.expect(body).to.not.have.property('api_key');",
+        "pm.expect(pm.response.text()).to.not.include('" + AI_KEY + "');",
+        "// Nor any interior fragment: a partial echo is still a leak.",
+        "pm.expect(pm.response.text()).to.not.include('PostmanFixture');",
+    ),
+)
+
+ai_key_replace = request(
+    "34 Replacing a key updates the hint",
+    "POST",
+    "/api/auth/ai-key/",
+    body={"provider": "gemini", "api_key": AI_KEY_REPLACEMENT},
+    tests=pm(
+        "a second save overwrites rather than duplicating",
+        "pm.response.to.have.status(201);",
+        "const body = pm.response.json();",
+        "pm.expect(body.key_hint).to.eql('AIza...wxyz');",
+        "pm.expect(pm.response.text()).to.not.include('" + AI_KEY + "');",
+        "pm.expect(pm.response.text()).to.not.include('"
+        + AI_KEY_REPLACEMENT
+        + "');",
+    ),
+)
+ai_key_bad_provider = request(
+    "35 An unknown provider is rejected",
+    "GET",
+    "/api/auth/ai-key/?provider=not-a-provider",
+    tests=pm(
+        "the provider list is closed, so this cannot be used as free storage",
+        "pm.response.to.have.status(400);",
+    ),
+)
+
+ai_key_url = request(
+    "36 A pasted URL is rejected instead of being stored",
+    "POST",
+    "/api/auth/ai-key/",
+    body={"provider": "gemini", "api_key": "https://aistudio.google.com/apikey"},
+    tests=pm(
+        "copying the page URL rather than the key is caught early",
+        "pm.response.to.have.status(400);",
+    ),
+)
+
+ai_key_too_short = request(
+    "37 A too-short key is rejected",
+    "POST",
+    "/api/auth/ai-key/",
+    body={"provider": "gemini", "api_key": "short"},
+    tests=pm(
+        "an obviously truncated paste is refused",
+        "pm.response.to.have.status(400);",
+    ),
+)
+
+ai_key_delete = request(
+    "38 Remove the stored key",
+    "DELETE",
+    "/api/auth/ai-key/?provider=gemini",
+    tests=pm(
+        "deleting reports unconfigured and returns no key",
+        "pm.response.to.have.status(200);",
+        "const body = pm.response.json();",
+        "pm.expect(body.configured).to.eql(false);",
+        "pm.expect(pm.response.text()).to.not.include('" + AI_KEY_REPLACEMENT + "');",
+    ),
+)
+
+ai_key_delete_again = request(
+    "39 Removing a key that is not there is not an error",
+    "DELETE",
+    "/api/auth/ai-key/?provider=gemini",
+    tests=pm(
+        "the delete is idempotent, so a double click cannot 500",
+        "pm.response.to.have.status(200);",
+        "pm.expect(pm.response.json().configured).to.eql(false);",
+    ),
+)
+
+ai_key_read_deleted = request(
+    "40 The removed key is really gone",
+    "GET",
+    "/api/auth/ai-key/?provider=gemini",
+    tests=pm(
+        "deletion is reflected on the next read",
+        "pm.response.to.have.status(200);",
+        "const body = pm.response.json();",
+        "pm.expect(body.configured).to.eql(false);",
+        "pm.expect(body).to.not.have.property('key_hint');",
+    ),
+)
+
+# The logout side effect, end to end. Save a key, sign out, sign back in, and
+# confirm the key did not survive. The Django suite asserts the row is deleted;
+# this asserts the same thing a user would observe.
+ai_key_save_for_logout = request(
+    "41 Save a key so logout has something to delete",
+    "POST",
+    "/api/auth/ai-key/",
+    body={"provider": "gemini", "api_key": AI_KEY},
+    tests=pm(
+        "a key is stored before signing out",
+        "pm.response.to.have.status(201);",
+        "pm.expect(pm.response.json().configured).to.eql(true);",
+    ),
+)
+
+ai_key_logout = request(
+    "42 Log out with a key stored",
+    "POST",
+    "/api/auth/logout/",
+    # 204 with an empty body: the collection has always asserted this, and the
+    # key-deletion behaviour must not tempt anyone into returning a payload.
+    tests=merge_tests(
+        REFRESH_CSRF,
+        pm(
+            "logout still returns 204 No Content",
+            "pm.response.to.have.status(204);",
+            "pm.expect(pm.response.text()).to.eql('');",
+        ),
+    ),
+)
+
+ai_key_relogin_after_logout = request(
+    "43 Sign back in after logging out",
+    "POST",
+    "/api/auth/login/",
+    body={"email": "{{seedEmail}}", "password": PASSWORD},
+    tests=merge_tests(
+        REFRESH_CSRF,
+        pm(
+            "the session is open again",
+            "pm.response.to.have.status(200);",
+            "pm.expect(pm.response.json().user.email).to.eql("
+            "pm.collectionVariables.get('seedEmail'));",
+        ),
+    ),
+)
+
+ai_key_gone_after_logout = request(
+    "44 Signing out deleted the stored key",
+    "GET",
+    "/api/auth/ai-key/?provider=gemini",
+    tests=pm(
+        "a key does not survive a logout",
+        "pm.response.to.have.status(200);",
+        "const body = pm.response.json();",
+        "pm.expect(body.configured).to.eql(false);",
+        "pm.expect(body).to.not.have.property('key_hint');",
+        "pm.expect(pm.response.text()).to.not.include('" + AI_KEY + "');",
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
 # Collection assembly
 # ---------------------------------------------------------------------------
 
@@ -721,6 +1034,53 @@ FOLDERS = [
         "name": "Logout",
         "description": "Ending a session must actually revoke access.",
         "item": [logout, me_after_logout, jobs_after_logout, profile_after_logout],
+    },
+    {
+        "name": "Bring your own AI key",
+        "description": (
+            "The bring-your-own-key contract, asserted over real HTTP. The key "
+            "is written and deleted, and no response anywhere contains it -- "
+            "only configured state and a 4+4 mask. Ends by proving that "
+            "signing out destroys the stored key. Runs last because it starts "
+            "by logging back in: the Logout folder leaves the session closed, "
+            "and without that step every request here would 403 and the folder "
+            "would pass while asserting nothing."
+        ),
+        "item": [
+            ai_key_relogin,
+            ai_key_before,
+            ai_key_save,
+            ai_key_read_back,
+            ai_key_replace,
+            ai_key_bad_provider,
+            ai_key_url,
+            ai_key_too_short,
+            ai_key_delete,
+            ai_key_delete_again,
+            ai_key_read_deleted,
+            ai_key_save_for_logout,
+            ai_key_logout,
+            ai_key_relogin_after_logout,
+            ai_key_gone_after_logout,
+        ],
+    },
+    {
+        "name": "Qualities",
+        "description": (
+            "The chosen-qualities endpoint, asserted over real HTTP. This "
+            "account has no master resume, which is the interesting case: GET "
+            "must still return the catalogue and the minimum so a brand new "
+            "user can see the options, and PUT must refuse to save a selection "
+            "it has nothing to attach to. The minimum-of-seven rules "
+            "themselves are covered in apps/resumes/tests/test_qualities.py -- "
+            "they cannot be reached over HTTP here, because the missing resume "
+            "is rejected before the payload is ever validated."
+        ),
+        "item": [
+            qualities_get_without_resume,
+            qualities_put_without_resume,
+            qualities_valid_but_no_resume,
+        ],
     },
 ]
 

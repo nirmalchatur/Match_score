@@ -165,7 +165,8 @@ REST_FRAMEWORK = {
 # backend is in use. apps.ai.factory maps AI_PROVIDER onto a provider class, and
 # the provider itself reads its own connection settings from here.
 #
-#   AI_PROVIDER=ollama     local Ollama daemon
+#   AI_PROVIDER=ollama     local Ollama daemon (development; no key needed)
+#   AI_PROVIDER=gemini     Google AI Studio (hosted deployments)
 #   AI_PROVIDER=fake       deterministic in-process double, for tests and CI
 #
 # Leaving AI_PROVIDER empty disables tailoring: the API then returns a clear
@@ -184,6 +185,23 @@ OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "180"))
 
 #: Low by default: tailoring must stay close to the source text, not improvise.
 OLLAMA_TEMPERATURE = float(os.environ.get("OLLAMA_TEMPERATURE", "0.2"))
+
+# --- Google Gemini -------------------------------------------------------
+#
+# The hosted provider. A hosted service cannot run an Ollama daemon, so this is
+# what makes tailoring work on Render.
+#
+# There is deliberately **no** GEMINI_API_KEY. Users bring their own key from
+# the UI and it is stored encrypted (see apps.users.crypto), so a deployment
+# can never spend the owner's quota on someone else's behalf.
+
+#: Defaults to gemini-2.0-flash in the provider. Overridable for anyone who
+#: wants a different model or a newer one when it lands.
+GEMINI_MODEL = (os.environ.get("GEMINI_MODEL") or "").strip()
+
+GEMINI_TIMEOUT = int(os.environ.get("GEMINI_TIMEOUT", "120"))
+
+GEMINI_TEMPERATURE = float(os.environ.get("GEMINI_TEMPERATURE", "0.2"))
 
 # Default to ollama only when it is actually pointed at something, so local
 # development works out of the box while a misconfigured deployment can never

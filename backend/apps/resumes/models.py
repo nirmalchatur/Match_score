@@ -126,6 +126,23 @@ class ResumeProfile(models.Model):
         blank=True,
     )
 
+    #: The candidate's own picks, grouped by kind. Separate from ``skills``
+    #: because these are *chosen*, not parsed: ``skills`` is whatever the
+    #: parser found in the document, while these are claims the user has
+    #: deliberately made about themselves.
+    #:
+    #: The shape is ``{"technical": [...], "project_management": [...],
+    #: "soft_skills": [...]}`` -- see :mod:`apps.resumes.qualities` for the
+    #: canonical form, the minimum count, and the catalogue the UI offers.
+    #:
+    #: A JSONField rather than a table: the set is small, always read and
+    #: written whole, and never queried relationally. A table would buy
+    #: nothing here and would make the "select up to N" UI awkward.
+    qualities = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
     )

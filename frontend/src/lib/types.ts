@@ -213,6 +213,59 @@ export interface TailoringStatus {
   display_name?: string
   /** The configured model, e.g. "llama3.1". Never a URL or a credential. */
   model?: string | null
+  /**
+   * True when the provider is only usable once this account supplies a key.
+   * Set by the server, not the client.
+   */
+  requires_user_key?: boolean
+  /**
+   * Whether *this* account has a key saved. Never the key itself -- the
+   * backend has no route that can return it.
+   */
+  user_key_configured?: boolean
+  server_key_configured?: boolean
+}
+
+
+/**
+ * The candidate's chosen qualities, and everything the picker needs to render.
+ *
+ * The catalogue and the minimum come from the server on every GET rather than
+ * being hard-coded here. That is the point: if the two ever disagreed, the
+ * picker would offer options the server rejects, or hide options it accepts.
+ * A hard-coded list in the client is a second source of truth that will drift.
+ */
+export type QualityKind = 'technical' | 'project_management' | 'soft_skills'
+
+export type QualitySelection = Record<QualityKind, string[]>
+
+export interface QualitiesResponse {
+  /** The canonical, saved selection. */
+  qualities: QualitySelection
+  /** How many are selected in total. */
+  selected_count: number
+  /** Every allowed option, by kind. */
+  catalogue: Record<QualityKind, string[]>
+  /** Display labels, by kind. */
+  labels: Record<QualityKind, string>
+  /** Server-enforced minimum across all kinds. */
+  minimum_total: number
+  /** Kinds in presentation order. */
+  kinds: QualityKind[]
+}
+/**
+ * The status of the signed-in user's own provider key.
+ *
+ * Note what is absent: there is no `api_key` field. The backend deliberately
+ * has no endpoint that returns a stored key, so the value cannot be read back
+ * even by a caller that would like to.
+ */
+export interface AiKeyStatus {
+  provider: string
+  configured: boolean
+  /** A 4+4 mask such as "AIza...4f2b", for telling two keys apart. */
+  key_hint?: string
+  updated_at?: string
 }
 
 

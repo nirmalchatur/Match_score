@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { useAuth } from '../auth/useAuth'
 import { formatDate } from '../lib/format'
-import type { TailoringStatus, UserProfile } from '../lib/types'
+import type { AiKeyStatus, TailoringStatus, UserProfile } from '../lib/types'
 import { Alert, Pill } from '../components/primitives'
+import { QualitiesPicker } from '../components/QualitiesPicker'
 import { IconCheck, IconFile, IconLayers, IconZap } from '../components/Icons'
 
 const DISCIPLINES = [
@@ -26,6 +27,27 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [ai, setAi] = useState<TailoringStatus | null>(null)
+
+  // The signed-in user's own key. `keyValue` is the only place the plaintext
+  // exists on the client, and it is cleared the moment the save resolves.
+  const [keyStatus, setKeyStatus] = useState<AiKeyStatus | null>(null)
+  const [keyValue, setKeyValue] = useState('')
+  const [showKey, setShowKey] = useState(false)
+  const [editingKey, setEditingKey] = useState(false)
+  const [keySaving, setKeySaving] = useState(false)
+  const [keyError, setKeyError] = useState('')
+
+  /**
+   * Whether tailoring will actually work for this account right now.
+   *
+   * A configured provider is not sufficient: a bring-your-own-key provider
+   * also needs *this* user to have saved a key. Treating "the deployment has
+   * Gemini" as "tailoring works" is what produced a button that failed for
+   * everyone who had not pasted a key yet.
+   */
+  const aiReady = ai?.requires_user_key
+    ? Boolean(ai?.user_key_configured)
+    : Boolean(ai?.available)
 
   useEffect(() => {
     let cancelled = false
@@ -50,22 +72,63 @@ export function SettingsPage() {
   useEffect(() => {
     let cancelled = false
 
-    // Read-only. AI configuration is server-side and is deliberately not
-    // editable from the UI: there are no per-user providers, so there is
-    // nothing a user could meaningfully change here.
-    api
-      .tailoringStatus()
-      .then((status) => {
-        if (!cancelled) setAi(status)
-      })
-      .catch(() => {
-        if (!cancelled) setAi(null)
+    // Provider metadata plus this account's key status. Both are needed to
+    // decide whether the tailoring button should be enabled, so they are read
+    // together rather than leaving the button briefly wrong.
+    Promise.allSettled([api.tailoringStatus(), api.getAiKey()])
+      .then(([statusResult, keyResult]) => {
+        if (cancelled) return
+        if (statusResult.status === 'fulfilled') setAi(statusResult.value)
+        if (keyResult.status === 'fulfilled') setKeyStatus(keyResult.value)
       })
 
     return () => {
       cancelled = true
     }
   }, [])
+
+  const submitKey = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (keySaving) return
+
+    const key = keyValue.trim()
+    if (!key) return
+
+    setKeySaving(true)
+    setKeyError('')
+    try {
+      const status = await api.saveAiKey(key)
+      setKeyStatus(status)
+      setEditingKey(false)
+      // Drop the plaintext from component state the moment it is stored. There
+      // is no way to read it back, so holding it longer serves no purpose.
+      setKeyValue('')
+      setShowKey(false)
+      // Re-read provider status so the pill reflects the new key.
+      api.tailoringStatus().then(setAi).catch(() => undefined)
+    } catch (err) {
+      setKeyError(err instanceof ApiError ? err.message : 'Could not save your API key.')
+    } finally {
+      setKeySaving(false)
+    }
+  }
+
+  const removeKey = async () => {
+    if (keySaving) return
+    setKeySaving(true)
+    setKeyError('')
+    try {
+      const status = await api.deleteAiKey()
+      setKeyStatus(status)
+      setKeyValue('')
+      setEditingKey(false)
+      api.tailoringStatus().then(setAi).catch(() => undefined)
+    } catch (err) {
+      setKeyError(err instanceof ApiError ? err.message : 'Could not remove your API key.')
+    } finally {
+      setKeySaving(false)
+    }
+  }
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -208,28 +271,45 @@ export function SettingsPage() {
 
       <section className="card">
         <div className="card-head">
+          <h2>Your strengths</h2>
+        </div>
+        <QualitiesPicker />
+      </section>
+      <section className="card">
+        <div className="card-head">
           <h2>AI</h2>
           <div className="card-head-actions">
-            <Pill tone={ai?.available ? 'success' : 'warning'}>
-              {ai?.available ? 'Ready' : 'Unavailable'}
+            <Pill tone={aiReady ? 'success' : 'warning'}>
+              {aiReady ? 'Ready' : 'Needs a key'}
             </Pill>
           </div>
         </div>
         <div className="card-body">
           <p className="stat-hint" style={{ marginTop: 0, lineHeight: 1.65 }}>
-            Resume tailoring runs on the AI provider configured for this deployment.
-            Configuration is set on the server and is shown here for reference only.
+            Resume tailoring runs on <strong>Google Gemini</strong>. Add your own free API key
+            below to enable it — TailorUp never ships one, and the key is yours alone.
           </p>
+
           <div className="grid-detail" style={{ marginTop: 18 }}>
             <div className="metric">
               <span className="metric-label">Provider</span>
               <span className="metric-value">
-                {ai?.available ? (ai.display_name || ai.provider || 'Configured') : 'Not configured'}
+                {ai?.display_name || ai?.provider || 'Not configured'}
               </span>
             </div>
             <div className="metric">
               <span className="metric-label">Model</span>
               <span className="metric-value">{ai?.model || '—'}</span>
+            </div>
+            <div className="metric">
+              <span className="metric-label">Your key</span>
+              <span className="metric-value">
+                {keyStatus?.configured ? (
+                  <span className="key-hint">{keyStatus.key_hint}</span>
+                ) : (
+                  'Not added'
+                )}
+              </span>
             </div>
             <div className="metric">
               <span className="metric-label">Master resume</span>
@@ -238,16 +318,120 @@ export function SettingsPage() {
               </span>
             </div>
           </div>
-          {!ai?.available ? (
+
+          {!ai?.available && ai?.provider !== 'gemini' ? (
             <div style={{ marginTop: 16 }}>
               <Alert variant="warning">
-                Tailoring is unavailable. Ask an administrator to configure an AI provider
-                on the server.
+                Tailoring is unavailable. This deployment has no AI provider configured — ask an
+                administrator to set one on the server.
               </Alert>
+            </div>
+          ) : null}
+
+          {/* Only offered for a bring-your-own-key provider. For a local Ollama
+              setup there is no key to add, and showing the form would mislead. */}
+          {ai?.requires_user_key ? (
+            <div style={{ marginTop: 20 }}>
+              {keyStatus?.configured && !editingKey ? (
+                <>
+                  <Alert variant="success">
+                    Your API key is saved and tailoring is ready to use.
+                  </Alert>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => {
+                        setEditingKey(true)
+                        setKeyValue('')
+                        setKeyError('')
+                      }}
+                    >
+                      Replace key
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={removeKey}
+                      disabled={keySaving}
+                    >
+                      {keySaving ? 'Removing…' : 'Remove key'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <form onSubmit={submitKey} className="stack" style={{ gap: 12 }}>
+                  {keyStatus?.configured ? (
+                    <Alert variant="info">Enter a new key to replace the saved one.</Alert>
+                  ) : null}
+
+                  <label className="form-label" htmlFor="ai-api-key">
+                    Google AI Studio API key
+                  </label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      id="ai-api-key"
+                      className="input-field"
+                      type={showKey ? 'text' : 'password'}
+                      value={keyValue}
+                      onChange={(e) => setKeyValue(e.target.value)}
+                      placeholder="AIza…"
+                      autoComplete="off"
+                      spellCheck={false}
+                      maxLength={200}
+                      /* A key is a credential: keep it out of autofill,
+                         session-restore and password-manager paths, all of
+                         which would otherwise retain it in the browser. */
+                      name="ai-api-key"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                    />
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setShowKey((v) => !v)}
+                      aria-label={showKey ? 'Hide API key' : 'Show API key'}
+                    >
+                      {showKey ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+
+                  <p className="stat-hint" style={{ margin: 0, lineHeight: 1.6 }}>
+                    Create a free key at{' '}
+                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
+                      Google AI Studio
+                    </a>
+                    . It is stored encrypted, never shown again, and deleted when you sign out.
+                  </p>
+
+                  {keyError ? <Alert variant="danger">{keyError}</Alert> : null}
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={keySaving || !keyValue.trim()}
+                    >
+                      {keySaving ? 'Saving…' : 'Save key'}
+                    </button>
+                    {keyStatus?.configured ? (
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => setEditingKey(false)}
+                        disabled={keySaving}
+                      >
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+              )}
             </div>
           ) : null}
         </div>
       </section>
+
 
       <section className="card">
         <div className="card-head">

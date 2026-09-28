@@ -6,6 +6,7 @@ from .views import (
     LogoutView,
     MeView,
     ProfileView,
+    ProviderCredentialView,
     RegisterView,
 )
 
@@ -40,5 +41,12 @@ urlpatterns = [
         "profile/",
         ProfileView.as_view(),
         name="auth-profile",
+    ),
+    # The user's own Google AI Studio key. Status/save/remove only; the key
+    # itself is never returned by any method.
+    path(
+        "ai-key/",
+        ProviderCredentialView.as_view(),
+        name="auth-ai-key",
     ),
 ]

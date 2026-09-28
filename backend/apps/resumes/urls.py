@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     AIProviderStatusView,
+    QualitiesView,
     ResumeDetailView,
     ResumeDownloadView,
     ResumeListView,
@@ -28,6 +29,12 @@ urlpatterns = [
 
     # Declared before "<int:pk>/" so these literal paths are not swallowed by
     # the detail route.
+    path(
+        "qualities/",
+        QualitiesView.as_view(),
+        name="resume-qualities",
+    ),
+
     path(
         "tailor/",
         TailorResumeView.as_view(),

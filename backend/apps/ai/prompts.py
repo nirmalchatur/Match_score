@@ -38,6 +38,9 @@ FACTUAL_INTEGRITY_RULES = [
     "skills.unsupported_requirements instead of writing it into a bullet.",
     "Only rewrite, reorder and re-emphasise information that is already supported by "
     "the source resume.",
+    "The candidate's chosen qualities are a preference, not a licence. They tell you "
+    "which strengths to lead with; they never justify writing a skill, technology or "
+    "responsibility the source resume does not already evidence.",
     "Prioritise the most relevant existing experience for the target role.",
     "Use the job description's terminology where the underlying fact is genuinely "
     "supported, but never keyword-stuff.",
@@ -119,9 +122,17 @@ def _prompt_blocks(request: TailoringRequest) -> tuple[dict, dict, dict, str]:
 
     # Each role/project carries a stable id. The model must echo the id back so
     # every suggestion stays traceable to its source entry.
+    #
+    # ``qualities`` is the candidate's own shortlist. It is included in the
+    # *source* block rather than as a fourth block because it is a claim about
+    # the candidate, and the rules above already forbid the model from writing
+    # anything the source does not support. Its role is selection, not
+    # permission: where the JD values one of these, prefer the experience that
+    # evidences it.
     source_block = {
         "summary": resume.get("summary", ""),
         "skills": resume.get("skills", []),
+        "qualities": resume.get("qualities", []),
         "experience": resume.get("experience", []),
         "projects": resume.get("projects", []),
         "education": resume.get("education", ""),

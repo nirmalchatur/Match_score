@@ -160,7 +160,34 @@ def build_source_resume(resume_profile: dict) -> dict:
         "certifications": str(resume_profile.get("certifications") or ""),
         "experience": experience,
         "projects": projects,
+        # The candidate's own chosen qualities, flattened to one list. The model
+        # uses them to decide what to *emphasise* among things it can already
+        # evidence -- they never license a new claim, which is why the
+        # factual-integrity rules above still apply to them unchanged.
+        "qualities": _qualities_list(resume_profile.get("qualities")),
     }
+
+
+def _qualities_list(raw) -> list:
+    """
+    Flatten a stored ``qualities`` value to a plain list of strings.
+
+    Tolerant of the three shapes this field has held over time: the canonical
+    ``{"technical": [...], ...}`` mapping, a bare list, and nothing at all.
+    Normalisation failures are swallowed into an empty list on purpose -- a
+    malformed row must not stop a tailoring run, and the worst case of dropping
+    the list is that the prompt simply omits an optional hint.
+    """
+    from apps.resumes import qualities as qualities_module
+
+    try:
+        return qualities_module.as_list(qualities_module.normalize(raw))
+    except Exception:  # pragma: no cover - defensive, see docstring
+        logger.warning(
+            "ai.qualities_unusable: stored qualities could not be normalised; "
+            "continuing without them"
+        )
+        return []
 
 
 def build_job_context(job: dict, jd_profile: dict | None = None) -> dict:
@@ -232,6 +259,7 @@ class ResumeTailor:
         *,
         jd_profile: dict | None = None,
         provider=None,
+        api_key: str = "",
     ) -> TailoringOutcome:
         """
         Produce a validated tailoring of ``resume`` for ``job``.
@@ -245,6 +273,10 @@ class ResumeTailor:
             tailoring agrees with the match score the user already sees.
         :param provider: inject a provider (tests). Defaults to the configured
             one from :func:`apps.ai.factory.get_ai_provider`.
+        :param api_key: the calling user's own provider key, decrypted by the
+            view. Absent for keyless providers like Ollama. It is placed on the
+            request for the provider to read and is kept out of the prompt
+            payload by ``TailoringRequest.to_payload``.
         :raises AIConfigurationError: no usable provider is configured.
         :raises AIProviderUnavailableError: the provider could not be reached.
         :raises AIProviderTimeoutError: the provider did not answer in time.
@@ -262,6 +294,7 @@ class ResumeTailor:
             resume=source,
             job=job_context,
             match=dict(match_analysis or {}),
+            api_key=api_key,
         )
 
         logger.info(

@@ -1539,6 +1539,1048 @@
           }
         }
       ]
+    },
+    {
+      "name": "Bring your own AI key",
+      "description": "The bring-your-own-key contract, asserted over real HTTP. The key is written and deleted, and no response anywhere contains it -- only configured state and a 4+4 mask. Ends by proving that signing out destroys the stored key. Runs last because it starts by logging back in: the Logout folder leaves the session closed, and without that step every request here would 403 and the folder would pass while asserting nothing.",
+      "item": [
+        {
+          "name": "30 Log back in to manage the AI key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function readCsrfToken() {",
+                  "    // Preferred: the cookie jar. Works in the Postman desktop app.",
+                  "    try {",
+                  "        var jar = pm.cookies.get('csrftoken');",
+                  "        if (jar && jar.value) { return jar.value; }",
+                  "    } catch (e) { /* jar API unusable under postman-runtime 5 */ }",
+                  "",
+                  "    // Fallback: scan every Set-Cookie response header.",
+                  "    //",
+                  "    // pm.response.headers.get('Set-Cookie') is unreliable here in two ways.",
+                  "    // postman-runtime 5 removed pm.cookies.list() and makes",
+                  "    // pm.cookies.get() return undefined, so the jar cannot be read at all.",
+                  "    // And .get() on a repeated header returns only ONE of them: a response",
+                  "    // that both signs a user in and rotates the CSRF token sends two",
+                  "    // Set-Cookie headers, and .get() hands back sessionid while silently",
+                  "    // dropping the csrftoken -- so the token appeared to vanish after login.",
+                  "    // headers.all() returns every occurrence, so scan them all.",
+                  "    var headers = pm.response.headers.all();",
+                  "    for (var i = 0; i < headers.length; i++) {",
+                  "        var h = headers[i];",
+                  "        if (String(h.key).toLowerCase() !== 'set-cookie') { continue; }",
+                  "        var m = /(?:^|[,;\\s])csrftoken=([^;,]+)/.exec(String(h.value));",
+                  "        if (m) { return m[1]; }",
+                  "    }",
+                  "    return null;",
+                  "}",
+                  "const token = readCsrfToken();",
+                  "if (token) { pm.collectionVariables.set('csrf', token); }",
+                  "pm.test('the key tests below need a live session', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().user.email).to.eql(pm.collectionVariables.get('seedEmail'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login",
+                ""
+              ]
+            },
+            "description": "30 Log back in to manage the AI key",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{seedEmail}}\",\n  \"password\": \"Str0ng-Passw0rd!42\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "31 /ai-key/ reports no key before one is saved",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a fresh account has no key, and the response says so plainly', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.provider).to.eql('gemini');",
+                  "    pm.expect(body.configured).to.eql(false);",
+                  "    pm.expect(body).to.not.have.property('api_key');",
+                  "    pm.expect(body).to.not.have.property('key_hint');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/?provider=gemini",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "provider",
+                  "value": "gemini"
+                }
+              ]
+            },
+            "description": "31 /ai-key/ reports no key before one is saved"
+          }
+        },
+        {
+          "name": "32 Save a Gemini API key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('saving a key reports configured without echoing the key', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.configured).to.eql(true);",
+                  "    pm.expect(body).to.not.have.property('api_key');",
+                  "    // The hint is a 4+4 mask, never the value itself.",
+                  "    pm.expect(body.key_hint).to.eql('AIza...abcd');",
+                  "    pm.expect(pm.response.text()).to.not.include('AIzaSyD-PostmanFixture0000000000000000000000000abcd');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ]
+            },
+            "description": "32 Save a Gemini API key",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"gemini\",\n  \"api_key\": \"AIzaSyD-PostmanFixture0000000000000000000000000abcd\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "33 A saved key is never returned by GET",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the read path discloses configuration state only', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.configured).to.eql(true);",
+                  "    pm.expect(body).to.not.have.property('api_key');",
+                  "    pm.expect(pm.response.text()).to.not.include('AIzaSyD-PostmanFixture0000000000000000000000000abcd');",
+                  "    // Nor any interior fragment: a partial echo is still a leak.",
+                  "    pm.expect(pm.response.text()).to.not.include('PostmanFixture');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/?provider=gemini",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "provider",
+                  "value": "gemini"
+                }
+              ]
+            },
+            "description": "33 A saved key is never returned by GET"
+          }
+        },
+        {
+          "name": "34 Replacing a key updates the hint",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a second save overwrites rather than duplicating', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.key_hint).to.eql('AIza...wxyz');",
+                  "    pm.expect(pm.response.text()).to.not.include('AIzaSyD-PostmanFixture0000000000000000000000000abcd');",
+                  "    pm.expect(pm.response.text()).to.not.include('AIzaSyD-PostmanFixture000000000000000000000000wxyz');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ]
+            },
+            "description": "34 Replacing a key updates the hint",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"gemini\",\n  \"api_key\": \"AIzaSyD-PostmanFixture000000000000000000000000wxyz\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "35 An unknown provider is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the provider list is closed, so this cannot be used as free storage', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/?provider=not-a-provider",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "provider",
+                  "value": "not-a-provider"
+                }
+              ]
+            },
+            "description": "35 An unknown provider is rejected"
+          }
+        },
+        {
+          "name": "36 A pasted URL is rejected instead of being stored",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('copying the page URL rather than the key is caught early', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ]
+            },
+            "description": "36 A pasted URL is rejected instead of being stored",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"gemini\",\n  \"api_key\": \"https://aistudio.google.com/apikey\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "37 A too-short key is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('an obviously truncated paste is refused', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ]
+            },
+            "description": "37 A too-short key is rejected",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"gemini\",\n  \"api_key\": \"short\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "38 Remove the stored key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('deleting reports unconfigured and returns no key', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.configured).to.eql(false);",
+                  "    pm.expect(pm.response.text()).to.not.include('AIzaSyD-PostmanFixture000000000000000000000000wxyz');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/?provider=gemini",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "provider",
+                  "value": "gemini"
+                }
+              ]
+            },
+            "description": "38 Remove the stored key"
+          }
+        },
+        {
+          "name": "39 Removing a key that is not there is not an error",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the delete is idempotent, so a double click cannot 500', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().configured).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/?provider=gemini",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "provider",
+                  "value": "gemini"
+                }
+              ]
+            },
+            "description": "39 Removing a key that is not there is not an error"
+          }
+        },
+        {
+          "name": "40 The removed key is really gone",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('deletion is reflected on the next read', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.configured).to.eql(false);",
+                  "    pm.expect(body).to.not.have.property('key_hint');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/?provider=gemini",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "provider",
+                  "value": "gemini"
+                }
+              ]
+            },
+            "description": "40 The removed key is really gone"
+          }
+        },
+        {
+          "name": "41 Save a key so logout has something to delete",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a key is stored before signing out', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    pm.expect(pm.response.json().configured).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ]
+            },
+            "description": "41 Save a key so logout has something to delete",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"gemini\",\n  \"api_key\": \"AIzaSyD-PostmanFixture0000000000000000000000000abcd\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "42 Log out with a key stored",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function readCsrfToken() {",
+                  "    // Preferred: the cookie jar. Works in the Postman desktop app.",
+                  "    try {",
+                  "        var jar = pm.cookies.get('csrftoken');",
+                  "        if (jar && jar.value) { return jar.value; }",
+                  "    } catch (e) { /* jar API unusable under postman-runtime 5 */ }",
+                  "",
+                  "    // Fallback: scan every Set-Cookie response header.",
+                  "    //",
+                  "    // pm.response.headers.get('Set-Cookie') is unreliable here in two ways.",
+                  "    // postman-runtime 5 removed pm.cookies.list() and makes",
+                  "    // pm.cookies.get() return undefined, so the jar cannot be read at all.",
+                  "    // And .get() on a repeated header returns only ONE of them: a response",
+                  "    // that both signs a user in and rotates the CSRF token sends two",
+                  "    // Set-Cookie headers, and .get() hands back sessionid while silently",
+                  "    // dropping the csrftoken -- so the token appeared to vanish after login.",
+                  "    // headers.all() returns every occurrence, so scan them all.",
+                  "    var headers = pm.response.headers.all();",
+                  "    for (var i = 0; i < headers.length; i++) {",
+                  "        var h = headers[i];",
+                  "        if (String(h.key).toLowerCase() !== 'set-cookie') { continue; }",
+                  "        var m = /(?:^|[,;\\s])csrftoken=([^;,]+)/.exec(String(h.value));",
+                  "        if (m) { return m[1]; }",
+                  "    }",
+                  "    return null;",
+                  "}",
+                  "const token = readCsrfToken();",
+                  "if (token) { pm.collectionVariables.set('csrf', token); }",
+                  "pm.test('logout still returns 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "    pm.expect(pm.response.text()).to.eql('');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout",
+                ""
+              ]
+            },
+            "description": "42 Log out with a key stored"
+          }
+        },
+        {
+          "name": "43 Sign back in after logging out",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function readCsrfToken() {",
+                  "    // Preferred: the cookie jar. Works in the Postman desktop app.",
+                  "    try {",
+                  "        var jar = pm.cookies.get('csrftoken');",
+                  "        if (jar && jar.value) { return jar.value; }",
+                  "    } catch (e) { /* jar API unusable under postman-runtime 5 */ }",
+                  "",
+                  "    // Fallback: scan every Set-Cookie response header.",
+                  "    //",
+                  "    // pm.response.headers.get('Set-Cookie') is unreliable here in two ways.",
+                  "    // postman-runtime 5 removed pm.cookies.list() and makes",
+                  "    // pm.cookies.get() return undefined, so the jar cannot be read at all.",
+                  "    // And .get() on a repeated header returns only ONE of them: a response",
+                  "    // that both signs a user in and rotates the CSRF token sends two",
+                  "    // Set-Cookie headers, and .get() hands back sessionid while silently",
+                  "    // dropping the csrftoken -- so the token appeared to vanish after login.",
+                  "    // headers.all() returns every occurrence, so scan them all.",
+                  "    var headers = pm.response.headers.all();",
+                  "    for (var i = 0; i < headers.length; i++) {",
+                  "        var h = headers[i];",
+                  "        if (String(h.key).toLowerCase() !== 'set-cookie') { continue; }",
+                  "        var m = /(?:^|[,;\\s])csrftoken=([^;,]+)/.exec(String(h.value));",
+                  "        if (m) { return m[1]; }",
+                  "    }",
+                  "    return null;",
+                  "}",
+                  "const token = readCsrfToken();",
+                  "if (token) { pm.collectionVariables.set('csrf', token); }",
+                  "pm.test('the session is open again', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().user.email).to.eql(pm.collectionVariables.get('seedEmail'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login",
+                ""
+              ]
+            },
+            "description": "43 Sign back in after logging out",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{seedEmail}}\",\n  \"password\": \"Str0ng-Passw0rd!42\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "44 Signing out deleted the stored key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a key does not survive a logout', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.configured).to.eql(false);",
+                  "    pm.expect(body).to.not.have.property('key_hint');",
+                  "    pm.expect(pm.response.text()).to.not.include('AIzaSyD-PostmanFixture0000000000000000000000000abcd');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/ai-key/?provider=gemini",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "ai-key",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "provider",
+                  "value": "gemini"
+                }
+              ]
+            },
+            "description": "44 Signing out deleted the stored key"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Qualities",
+      "description": "The chosen-qualities endpoint, asserted over real HTTP. This account has no master resume, which is the interesting case: GET must still return the catalogue and the minimum so a brand new user can see the options, and PUT must refuse to save a selection it has nothing to attach to. The minimum-of-seven rules themselves are covered in apps/resumes/tests/test_qualities.py -- they cannot be reached over HTTP here, because the missing resume is rejected before the payload is ever validated.",
+      "item": [
+        {
+          "name": "45 /qualities/ is readable before a master resume exists",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the picker can render and explain itself to a new account', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.selected_count).to.eql(0);",
+                  "    pm.expect(body.minimum_total).to.eql(7);",
+                  "    pm.expect(body.kinds).to.eql(['technical', 'project_management', 'soft_skills']);",
+                  "    pm.expect(body.catalogue.technical.length).to.be.above(0);",
+                  "    pm.expect(body.catalogue.soft_skills.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/qualities/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "resumes",
+                "qualities",
+                ""
+              ]
+            },
+            "description": "45 /qualities/ is readable before a master resume exists"
+          }
+        },
+        {
+          "name": "46 /qualities/ refuses to save with no master resume",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('there is nothing to attach a selection to', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/qualities/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "resumes",
+                "qualities",
+                ""
+              ]
+            },
+            "description": "46 /qualities/ refuses to save with no master resume",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qualities\": {\n    \"technical\": [\n      \"Python\",\n      \"Java\",\n      \"Go\",\n      \"Rust\"\n    ],\n    \"project_management\": [\n      \"Scrum\"\n    ],\n    \"soft_skills\": [\n      \"Communication\",\n      \"Empathy\"\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "47 A valid selection is still refused with no master resume",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the 404 is about the missing resume, not the payload', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error).to.include('master resume');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/qualities/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "resumes",
+                "qualities",
+                ""
+              ]
+            },
+            "description": "47 A valid selection is still refused with no master resume",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qualities\": {\n    \"technical\": [\n      \"Python\",\n      \"Java\",\n      \"Go\",\n      \"Rust\"\n    ],\n    \"project_management\": [\n      \"Scrum\"\n    ],\n    \"soft_skills\": [\n      \"Communication\",\n      \"Empathy\"\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [

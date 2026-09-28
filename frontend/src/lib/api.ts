@@ -1,4 +1,5 @@
 import type {
+  AiKeyStatus,
   AnalyzeResponse,
   AuthResponse,
   Job,
@@ -9,6 +10,8 @@ import type {
   TailoringResponse,
   TailoringResult,
   TailoringStatus,
+  QualitiesResponse,
+  QualitySelection,
   UserProfile,
   Application,
   ApplicationStatus,
@@ -274,6 +277,34 @@ export const api = {
     })
   },
 
+  /* ---------- AI provider key (bring your own) ---------- */
+
+  /** Whether this account has a key saved. Never returns the key itself. */
+  getAiKey(provider = 'gemini'): Promise<AiKeyStatus> {
+    return request<AiKeyStatus>(`/auth/ai-key/?provider=${encodeURIComponent(provider)}`)
+  },
+
+  /**
+   * Store the user's own provider key.
+   *
+   * The key is sent once and then forgotten by the client: nothing here
+   * retains it, and there is no getter that could read it back. Callers
+   * should clear their input state as soon as this resolves.
+   */
+  saveAiKey(apiKey: string, provider = 'gemini'): Promise<AiKeyStatus> {
+    return request<AiKeyStatus>('/auth/ai-key/', {
+      method: 'POST',
+      body: JSON.stringify({ provider, api_key: apiKey }),
+    })
+  },
+
+  /** Forget the stored key. Idempotent. */
+  deleteAiKey(provider = 'gemini'): Promise<AiKeyStatus> {
+    return request<AiKeyStatus>(`/auth/ai-key/?provider=${encodeURIComponent(provider)}`, {
+      method: 'DELETE',
+    })
+  },
+
   /* ---------- Jobs ---------- */
 
   listJobs({ q, status, sort }: JobQuery = {}): Promise<Job[]> {
@@ -402,6 +433,29 @@ export const api = {
   /* ---------- AI tailoring ---------- */
 
   /** Is tailoring available at all? Used to disable the button up front. */
+  /**
+   * The candidate's chosen qualities, plus the catalogue to choose from.
+   *
+   * The server owns both the list of valid options and the minimum count, so
+   * both are read from here rather than duplicated in the client.
+   */
+  getQualities(): Promise<QualitiesResponse> {
+    return request<QualitiesResponse>('/resumes/qualities/')
+  },
+
+  /**
+   * Replace the whole selection.
+   *
+   * PUT rather than PATCH: a partial update would leave the client unable to
+   * tell whether the server's stored selection matches what is on screen, and
+   * "the minimum of seven" is a property of the selection as a whole.
+   */
+  saveQualities(qualities: QualitySelection): Promise<QualitiesResponse> {
+    return request<QualitiesResponse>('/resumes/qualities/', {
+      method: 'PUT',
+      body: JSON.stringify({ qualities }),
+    })
+  },
   tailoringStatus(): Promise<TailoringStatus> {
     return request<TailoringStatus>('/resumes/tailor/status/')
   },

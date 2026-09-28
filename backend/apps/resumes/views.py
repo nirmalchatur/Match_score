@@ -17,6 +17,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from . import qualities
 from .models import Resume, ResumeProfile
 from .serializers import ResumeSerializer
 
@@ -31,6 +32,8 @@ from apps.ai.tailor import ResumeTailor, build_source_resume
 from apps.ai.validators import validate as validate_tailoring
 from apps.jobs.models import Job
 from apps.jobs.services.jd_profile import JDProfile
+from apps.users.crypto import CredentialCryptoError
+from apps.users.models import ProviderCredential
 
 from apps.resumes.services.document_service import render_resume_document
 
@@ -38,6 +41,29 @@ from apps.resumes.services.parser import ResumeParser
 from apps.resumes.services.resume_profile import ResumeProfile as ResumeProfileService
 
 logger = logging.getLogger(__name__)
+
+
+def _user_api_key(user) -> str:
+    """Decrypt the caller's own provider key, or return "" if they have none.
+
+    Returns a plain string rather than the model so that a caller cannot
+    accidentally keep a database object (and therefore the ciphertext) alive
+    past the request, and so the "no key" case needs no branching at the call
+    site.
+
+    Raises :class:`CredentialCryptoError` only when a row exists but cannot be
+    decrypted; ``reveal_key`` removes that row on the way out, so the next
+    request honestly reports "not configured".
+    """
+    credential = ProviderCredential.objects.filter(
+        user=user,
+        provider="gemini",
+    ).first()
+
+    if credential is None:
+        return ""
+
+    return credential.reveal_key()
 
 
 class InvalidResumeUpload(ValueError):
@@ -371,7 +397,104 @@ def _stored_profile(resume) -> dict:
         "education": profile.education or "",
         "projects": profile.projects or "",
         "certifications": profile.certifications or "",
+        # Chosen qualities ride along with the parsed profile so the tailoring
+        # prompt and the match analysis can both see them. Normalised on read
+        # as well as on write, because a row written before this field existed
+        # holds {} rather than the canonical three-key shape.
+        "qualities": qualities.normalize(profile.qualities),
     }
+
+
+def _master_profile(user) -> ResumeProfile | None:
+    """
+    The signed-in account's master ``ResumeProfile``, or ``None``.
+
+    Created on demand: an account can have a master resume whose profile row
+    was never written (a profile-less upload predates the profile services),
+    and the qualities endpoint should still work for it rather than 404.
+    """
+    master = (
+        Resume.objects.filter(user=user, is_master=True)
+        .order_by("-created_at")
+        .first()
+    )
+    if master is None:
+        return None
+
+    profile, _ = ResumeProfile.objects.get_or_create(resume=master)
+    return profile
+
+
+class QualitiesView(APIView):
+    """
+    GET/PUT ``/api/resumes/qualities/`` -- the candidate's chosen qualities.
+
+    Split from ``/api/resumes/master/`` because the two answer different
+    questions. That endpoint reports what the *parser* found; this one holds
+    what the *user* claims, and it has a validation rule the other does not:
+    at least :data:`~apps.resumes.qualities.MINIMUM_TOTAL` across all three
+    categories, and at least one in each.
+
+    ``GET`` also returns the catalogue and the minimum, so the picker does not
+    hard-code options that the server would then reject. A client that sends
+    fewer than the minimum is refused -- the UI disables its save button, but
+    that is a courtesy, not the control.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def _payload(self, profile) -> dict:
+        selected = qualities.normalize(profile.qualities)
+        return {
+            "qualities": selected,
+            "selected_count": qualities.count(selected),
+            "catalogue": qualities.CATALOGUE,
+            "labels": qualities.KIND_LABELS,
+            "minimum_total": qualities.MINIMUM_TOTAL,
+            "kinds": list(qualities.KINDS),
+        }
+
+    def get(self, request):
+        profile = _master_profile(request.user)
+        if profile is None:
+            return Response(
+                {
+                    "error": "Upload a master resume before choosing qualities.",
+                    "qualities": qualities.normalize(None),
+                    "selected_count": 0,
+                    "catalogue": qualities.CATALOGUE,
+                    "labels": qualities.KIND_LABELS,
+                    "minimum_total": qualities.MINIMUM_TOTAL,
+                    "kinds": list(qualities.KINDS),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(self._payload(profile), status=status.HTTP_200_OK)
+
+    def put(self, request):
+        profile = _master_profile(request.user)
+        if profile is None:
+            return Response(
+                {"error": "Upload a master resume before choosing qualities."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        raw = request.data.get("qualities", request.data)
+        try:
+            selected = qualities.validate_selection(raw)
+        except qualities.QualityError as exc:
+            # 400 with a human-readable message. The UI shows it as-is, which
+            # is why it is worded as an instruction rather than as a code.
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile.qualities = selected
+        profile.save(update_fields=["qualities", "updated_at"])
+
+        return Response(self._payload(profile), status=status.HTTP_200_OK)
 
 
 def _load_job(user, job_id):
@@ -460,6 +583,23 @@ class TailorResumeView(APIView):
         if error is not None:
             return error
 
+        # The user's own key, decrypted here and now -- at the single moment it
+        # is needed -- rather than held in memory for the session. Absent for a
+        # keyless provider like Ollama, which simply ignores it.
+        try:
+            api_key = _user_api_key(request.user)
+        except CredentialCryptoError:
+            # reveal_key() has already dropped the undecryptable row, so the
+            # UI will fall back to "not configured" and ask for a re-paste.
+            return Response(
+                {
+                    "error": "Your saved API key could not be read and has been "
+                              "removed. Please add it again in Settings.",
+                    "code": "ai_key_unreadable",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             outcome = ResumeTailor.tailor_resume(
                 resume=_stored_profile(master),
@@ -473,6 +613,7 @@ class TailorResumeView(APIView):
                 # rather than recomputed.
                 match_analysis=job.match_result or {},
                 jd_profile=jd_profile,
+                api_key=api_key,
             )
         except AITailoringValidationError as exc:
             # Fabricated output is never returned as a suggestion. The
@@ -611,6 +752,19 @@ class AIProviderStatusView(APIView):
 
     def get(self, request):
         described = factory.describe_provider()
+
+        # Availability is per user, not global: the provider is configured
+        # globally, but Gemini is unusable until *this* account has a key. The
+        # button is therefore enabled per user, and the reason is specific
+        # enough to act on ("add your key") instead of a generic outage.
+        described["requires_user_key"] = bool(
+            described.get("provider") == "gemini"
+        )
+        described["user_key_configured"] = ProviderCredential.objects.filter(
+            user=request.user,
+            provider="gemini",
+        ).exists()
+
         return Response(described, status=status.HTTP_200_OK)
 
 
