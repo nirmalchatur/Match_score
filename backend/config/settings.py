@@ -352,9 +352,35 @@ if not DEBUG:
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
-
+#
+# TailorUp sends no email: there is no password-reset flow and no
+# notifications. The backend is still configured deliberately rather than left
+# to Django's default, because mail.E001 (`check --deploy`, added in Django
+# 6.1) rejects the console backend outside DEBUG. That check has no
+# counterpart in 5.2, so it only ever fires in CI and in production.
+#
+# Outside DEBUG the backend is SMTP. If nothing is configured, sending raises
+# a clear connection error instead of printing a message body into a log that
+# nobody reads -- which is the failure mode the console backend was hiding.
 MAILERS = {
     'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+        'BACKEND': os.environ.get("EMAIL_BACKEND") or (
+            "django.core.mail.backends.console.EmailBackend"
+            if DEBUG
+            else "django.core.mail.backends.smtp.EmailBackend"
+        ),
     },
 }
+
+# Only meaningful once a real mail service is configured. Absent today; kept
+# here so enabling email is a config change rather than a code change.
+_SMTP_HOST = (os.environ.get("SMTP_HOST") or "").strip()
+if _SMTP_HOST and os.environ.get("EMAIL_BACKEND", "") == "" and not DEBUG:
+    MAILERS['default'].update({
+        'HOST': _SMTP_HOST,
+        'PORT': int(os.environ.get("SMTP_PORT", "587")),
+        'USE_TLS': (os.environ.get("SMTP_USE_TLS") or "True").strip().lower()
+        in ("1", "true", "yes"),
+        'USERNAME': os.environ.get("SMTP_USERNAME", ""),
+        'PASSWORD': os.environ.get("SMTP_PASSWORD", ""),
+    })
