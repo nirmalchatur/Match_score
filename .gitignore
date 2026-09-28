@@ -98,3 +98,5 @@ dist/
 node_modules/
 npm-debug.log*
 yarn-debug.log*
+# Local audit/test environment (Python 3.10 + Django 5.2, see docs/DEVELOPMENT.md)
+.venv-audit/

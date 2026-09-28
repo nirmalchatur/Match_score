@@ -1,0 +1,181 @@
+/* ============================================================
+   Motion
+
+   All animation for the marketing page. Split out of
+   marketing.css so the "how it moves" question is answerable in
+   one file, and so motion can be removed without touching layout.
+
+   Two rules govern everything here:
+
+   1. **Content is never hidden by default.** Scroll reveals only
+      apply while `<html data-reveal-ready>` is set, which
+      `useReveal` adds from JavaScript. No JS, a failed bundle, or
+      a crawler that skips scripts all get the finished,
+      fully-visible page. An animation must never be load-bearing
+      for readability.
+
+   2. **Reduced motion means none of it.** The final block turns off
+      every duration and delay, rather than relying on each
+      individual rule to remember the check.
+   ============================================================ */
+
+/* ---------- Scroll reveal ---------- */
+
+[data-reveal-ready] [data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  transition:
+    opacity 620ms var(--ease),
+    transform 620ms var(--ease);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+[data-reveal-ready] [data-reveal].is-revealed {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+/* No travel for large blocks. A tall section sliding 18px reads as a
+   wobble; a card reads as a rise. */
+[data-reveal-ready] [data-reveal='fade'] {
+  transform: none;
+}
+
+/* ---------- Hero entrance (on mount, not on scroll) ---------- */
+
+@keyframes mk-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.mk-animate .mk-hero-copy > * {
+  animation: mk-rise 700ms var(--ease) both;
+}
+
+.mk-animate .mk-hero-copy > *:nth-child(1) { animation-delay: 40ms; }
+.mk-animate .mk-hero-copy > *:nth-child(2) { animation-delay: 110ms; }
+.mk-animate .mk-hero-copy > *:nth-child(3) { animation-delay: 180ms; }
+.mk-animate .mk-hero-copy > *:nth-child(4) { animation-delay: 250ms; }
+.mk-animate .mk-hero-copy > *:nth-child(5) { animation-delay: 320ms; }
+
+.mk-animate .mk-report {
+  animation: mk-rise 820ms var(--ease) both;
+  animation-delay: 240ms;
+}
+
+/* ---------- Match-score bars ---------- */
+
+@keyframes mk-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* The bars are decorative score read-outs. `transform-origin: left` plus
+   scaleX animates on the compositor and never triggers layout, unlike
+   animating `width`. */
+.mk-animate .mk-bar-fill {
+  transform-origin: left center;
+  animation: mk-grow 900ms var(--ease) both;
+  animation-delay: 620ms;
+}
+
+.mk-animate .mk-bar:nth-child(2) .mk-bar-fill { animation-delay: 700ms; }
+.mk-animate .mk-bar:nth-child(3) .mk-bar-fill { animation-delay: 780ms; }
+.mk-animate .mk-bar:nth-child(4) .mk-bar-fill { animation-delay: 860ms; }
+
+/* ---------- Interactive affordances ---------- */
+
+.mk-card,
+.mk-step,
+.mk-config,
+.mk-report {
+  transition:
+    transform 260ms var(--ease),
+    box-shadow 260ms var(--ease),
+    border-color 260ms var(--ease);
+}
+
+@media (hover: hover) {
+  .mk-card:hover,
+  .mk-step:hover,
+  .mk-config:hover {
+    transform: translateY(-3px);
+  }
+
+  .mk-card:hover {
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+}
+
+/* Nav links get an underline that wipes in from the left, so hover has
+   motion rather than just a colour swap. */
+.mk-links a {
+  position: relative;
+}
+
+.mk-links a::after {
+  content: '';
+  position: absolute;
+  left: 11px;
+  right: 11px;
+  bottom: 2px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 240ms var(--ease);
+}
+
+.mk-links a:hover::after,
+.mk-links a:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.mk-links a:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ---------- Reduced motion: turn the whole file off ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal-ready] [data-reveal],
+  [data-reveal-ready] [data-reveal].is-revealed {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .mk-animate .mk-hero-copy > *,
+  .mk-animate .mk-report,
+  .mk-animate .mk-bar-fill {
+    animation: none;
+  }
+
+  .mk-animate .mk-bar-fill {
+    transform: none;
+  }
+
+  .mk-card,
+  .mk-step,
+  .mk-config,
+  .mk-report,
+  .mk-links a::after {
+    transition: none;
+  }
+
+  @media (hover: hover) {
+    .mk-card:hover,
+    .mk-step:hover,
+    .mk-config:hover {
+      transform: none;
+    }
+  }
+}

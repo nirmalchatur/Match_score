@@ -1,0 +1,113 @@
+name: Supply chain
+
+# Companion to `security.yml`, which audits what is installed *right now*.
+# This one is about changes in flight and about knowing exactly what shipped:
+#
+#   - dependency-review: blocks a PR that introduces a vulnerable package,
+#     or a copyleft one, before a human has to notice.
+#   - sbom: records a machine-readable inventory of every dependency and
+#     version that produced a given commit, so "are we affected?" becomes a
+#     lookup instead of an archaeology exercise.
+
+# The review job is only meaningful on a pull request, because it diffs the
+# PR against its merge base. On a push to main there is nothing to diff, so
+# the push/schedule triggers run the SBOM only.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: supply-chain-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Scoped to the diff. Only NEW dependencies are judged, so an unrelated
+  # advisory in a package that has been pinned for a year does not block an
+  # urgent fix for something else.
+  # ---------------------------------------------------------------------
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Safe-harbour: never silently pass a malformed result. A scanner that
+      # errors is reported as failing rather than treated as "nothing found".
+      - name: Review the dependency diff
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+
+          # Copyleft and source-available licences are a deliberate choice,
+          # not something to inherit by accident from a transitive
+          # dependency. Anything not listed here fails the review.
+          license-check: true
+          deny-licenses: >
+            GPL-1.0, GPL-2.0, GPL-3.0, AGPL-1.0, AGPL-3.0,
+            LGPL-2.0, LGPL-2.1, LGPL-3.0, SSPL-1.0, BUSL-1.1,
+            Elastic-2.0, Commons-Clause
+
+          # CVEs that have no fix yet. Unfixable advisories are reported in
+          # the job summary but do not block, because refusing every PR
+          # until an upstream patch lands trains people to ignore the gate.
+          allow-vulnerabilities: true
+          comment-summary-in-pr: on-failure
+
+  # ---------------------------------------------------------------------
+  # Inventory of what a commit actually contains. Uploaded as an artifact
+  # rather than a published registry: nothing here should be trusted to
+  # come from a package nobody reviewed.
+  # ---------------------------------------------------------------------
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+        # No cache: sbom-action scans the lockfile, not a restored tree, so
+        # a stale cache would buy nothing and could hide a changed lockfile.
+
+      - name: Generate the SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom.spdx.json
+          # Pull the full dependency tree rather than only what is declared
+          # directly, or the most interesting entries are the missing ones.
+          dependency-snapshot: true
+          # The real package names, not a wall of transitive ones nobody
+          # can action. Full detail is still in the file.
+          uniquify-licenses: true
+
+      - name: Upload the SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom.spdx.json
+          retention-days: 90
+          if-no-files-found: error

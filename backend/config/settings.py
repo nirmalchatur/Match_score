@@ -33,6 +33,26 @@ def env_list(name: str, default: str = "") -> list:
 
 
 # ---------------------------------------------------------------------------
+# Primary keys
+#
+# Without this, Django falls back to AutoField (32-bit) and raises
+# models.W042 on every model that does not name a primary key explicitly.
+# Two reasons it is set rather than silenced:
+#
+#   1. The warning was real. An AutoField column tops out at ~2.1 billion
+#      rows; a table that hits it needs a migration under pressure, which is
+#      the worst time to discover the constraint.
+#   2. `makemigrations --check` fails while W042 is outstanding, because
+#      Django would otherwise keep proposing an AlterField. CI runs that
+#      check, so leaving it unset breaks the build for a cosmetic setting.
+#
+# This is the setting `startproject` writes into a new project's settings;
+# it was lost when the app configs were written by hand. Widen, never narrow:
+# the migration below is a non-destructive integer widening.
+# ---------------------------------------------------------------------------
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ---------------------------------------------------------------------------
 # Security
 #
 # Local development falls back to the in-repo defaults. In production these

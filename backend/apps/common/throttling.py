@@ -12,13 +12,37 @@ What throttling is and is not
 -----------------------------
 It is *not* an authorisation control. It never decides who may read a resume,
 and it must not be the reason a request is refused for the wrong reason --
-ownership is decided by the views, and ``SECURITY.md`` records the order:
+ownership is decided by the views and the querysets, never here.
+
+The real order
+--------------
+An earlier version of this file claimed::
 
     authentication -> permission -> ownership -> throttling -> business logic
 
-DRF runs ``check_throttles`` during ``initial()``, which is after
-authentication and permission but before the handler, so this ordering holds by
-construction.
+That is wrong, and it was wrong in the direction that matters. DRF's
+``initial()`` runs authentication, then permission, then throttling, and
+only then does the request reach the handler. Object-level ownership is not
+checked there: it is enforced by the querysets, which filter to
+``request.user`` and are evaluated once the handler runs. So the actual order
+is::
+
+    authentication -> permission -> throttling -> object-level ownership -> handler
+
+Throttling therefore happens *before* ownership. That is safe, and the reason
+is worth stating precisely rather than leaving to inference:
+
+    Ownership is enforced by filtering the queryset, not by inspecting a
+    loaded object.
+
+Because a non-owner never retrieves the row, they get 404 whether or not
+they are under quota. The worst a throttled caller learns is that *they*
+have exhausted their own budget -- a fact about their own traffic, carrying
+no information about whether any given resume or job exists. Had ownership
+been decided by loading an object and comparing its owner, running throttling
+first would have been a genuine oracle. It is not.
+
+``SECURITY.md`` records this ordering and the reasoning.
 
 A ``None`` rate means "unlimited". ``_rate()`` in settings returns ``None``
 when throttling is switched off, which is how the whole layer becomes a no-op

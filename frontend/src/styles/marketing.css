@@ -25,6 +25,28 @@
   color: var(--ink);
 }
 
+/* ---------- Theme isolation ----------
+   The marketing page has its own fixed art direction: a LIGHT nav
+   over a DARK hero. The app-level `data-theme="dark"` block re-points
+   --ink/--text/--paper to light values, which previously leaked in
+   here and rendered the nav as white text on the nav's hardcoded
+   white background (unreadable).
+
+   Re-declaring the light token set on `.landing` re-scopes those
+   variables to this subtree only, so the app theme toggle cannot
+   repaint the landing page while the rest of the app still follows it. */
+.landing {
+  --ink: #0a0a0a;
+  --paper: #ffffff;
+  --bg: #ffffff;
+  --bg-panel: #fafafa;
+  --text: #0a0a0a;
+  --text-muted: #4a4a4a;
+  --text-dim: #6e6e6e;
+  --border: rgba(10, 10, 10, 0.13);
+  --border-mid: rgba(10, 10, 10, 0.22);
+}
+
 .landing main {
   flex: 1;
 }

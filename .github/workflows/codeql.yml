@@ -1,0 +1,72 @@
+name: CodeQL
+
+# `security.yml` answers "did someone ship a secret or a known-vulnerable
+# package?". This answers the question that greps and audits structurally
+# cannot: "is there a code path that is unsafe by construction?".
+#
+# CodeQL builds a database of the whole program and queries it, so it sees
+# flows across files -- a value parsed from a request and passed into a shell
+# call three modules away is still one finding. For a Django + React app the
+# queries that matter most are the ones that reach the database layer with
+# user input, and Django's ORM already parameterises those. The point of
+# running this is to prove that, and to catch the day someone adds a
+# `.raw()`, an `extra()`, or a `dangerouslySetInnerHTML`.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Weekly, so a newly published CodeQL query reaches an unchanged codebase
+  # too. Without this, a new rule would only ever run once someone touched
+  # the file it applies to.
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+  # Required to upload CodeQL's SARIF results to the code-scanning tab.
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Only languages this repo actually ships. A matrix entry for a
+        # language with no source makes CodeQL exit successfully while
+        # scanning nothing, which reads as coverage that does not exist.
+        language: [javascript-typescript, python]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # A PR from a fork has no write token, so results cannot be
+          # uploaded. Analysis still runs, which is the point of running it
+          # on forks; only the upload step is skipped.
+          queries: security-extended
+          packages: |
+            backend
+            frontend/src
+
+      # Auto-detected for JS. Python is resolved from the project layout
+      # rather than left to a language server that may not be installed.
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}

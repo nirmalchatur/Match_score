@@ -1,0 +1,85 @@
+# Keeps dependencies patched without a human remembering to.
+#
+# The audits in `.github/workflows/security.yml` and `supply-chain.yml` are
+# detection. Dependabot is the response: without it, a new advisory for a
+# pinned package is a finding nobody has a fix for yet, because every
+# `requirements.txt` entry here is pinned to an exact version.
+#
+# The security updates are grouped so that one compromised or broken release
+# cannot hold up the others -- an ungrouped `cryptography` bump should not
+# block the weekly `urllib3` patch.
+version: 2
+
+updates:
+  # --- Python: the API, the ORM layer, and the crypto that guards keys ---
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels: [dependencies, security]
+    groups:
+      # Django and DRF move together and share deprecations; splitting them
+      # produces two PRs where one usually cannot merge.
+      django-stack:
+        patterns: [django, djangorestframework, django-cors-headers]
+      document-generation:
+        patterns: [python-docx, reportlab, pypdf]
+      crypto:
+        # Fernet. Advisories here are the highest-severity this project can
+        # have, so they are never grouped with anything that could delay them.
+        patterns: [cryptography]
+      database:
+        patterns: [psycopg, psycopg-binary, dj-database-url]
+      # Everything unremarkable: TLS, parsing, small utilities. One PR.
+      maintenance:
+        patterns: ['*']
+        exclude-patterns:
+          - django
+          - djangorestframework
+          - django-cors-headers
+          - python-docx
+          - reportlab
+          - pypdf
+          - cryptography
+          - psycopg
+          - psycopg-binary
+          - dj-database-url
+
+  # --- JavaScript: React, the router, the build toolchain ---
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels: [dependencies, security]
+    groups:
+      # Vite/Rolldown/Terser move in lockstep; a mismatched pair is a build
+      # that fails in CI and not locally.
+      build-toolchain:
+        patterns: [vite, rolldown, '@vitejs/*', typescript, esbuild]
+      react-core:
+        patterns: ['react', 'react-dom', 'react-router-dom', '@types/react*']
+      testing:
+        patterns: [vitest, '@testing-library/*', 'jsdom', eslint, 'eslint-*']
+
+  # --- CI itself ---
+  # Actions are third-party code with write access to the repository. This is
+  # the ecosystem most worth keeping current and the one most often forgotten.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Etc/UTC
+    labels: [dependencies, security, ci]
+    groups:
+      actions:
+        patterns: ['*']
