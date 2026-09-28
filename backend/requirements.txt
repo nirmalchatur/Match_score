@@ -16,8 +16,8 @@ charset-normalizer==3.5.1
 # dependency audit in CI fails the build on them, and rightly so -- this
 # package guards every stored credential.
 cryptography==50.0.1
-Django==6.1
-djangorestframework==3.18.0
+Django==6.1.1
+djangorestframework==3.18.1
 idna==3.20
 psycopg==3.3.4
 psycopg-binary==3.3.4
@@ -29,7 +29,7 @@ sqlparse==0.6.0
 typing_extensions==4.16.0
 tzdata==2026.4
 urllib3==2.8.0
-django-cors-headers==4.7.0
+django-cors-headers==4.9.0
 
 # Deployment (production)
 gunicorn==26.2.0
