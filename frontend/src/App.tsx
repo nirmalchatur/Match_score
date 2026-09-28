@@ -14,6 +14,7 @@ import { useToasts } from './hooks/useToasts'
 import type { Job, ViewKey } from './lib/types'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
+import { ApiKeyButton } from './components/ApiKeyButton'
 import { Toasts } from './components/Toasts'
 import { IconPlus, IconRefresh } from './components/Icons'
 import { DashboardPage } from './pages/DashboardPage'
@@ -145,6 +146,7 @@ function AppShell() {
         jobCount={jobs.length}
         email={user?.email ?? ''}
         displayName={displayName}
+        jobs={jobs}
         onLogout={() => { void logout() }}
       />
 
@@ -157,6 +159,7 @@ function AppShell() {
           avatarLabel={displayName || user?.email}
           actions={
             <>
+              <ApiKeyButton />
               <button
                 type="button"
                 className="btn btn-ghost btn-icon"

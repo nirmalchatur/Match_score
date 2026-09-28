@@ -2170,3 +2170,411 @@
   overflow-x: auto;
   white-space: pre;
 }
+
+/* ==========================================================================
+   Job-desk theme
+   ==========================================================================
+
+   The palette was already black and white and stays that way. What changes is
+   the *geometry and density*, because that is what made this read as a salon
+   rather than a job-desk tool: 10-16px radii on everything, soft diffuse
+   glows, generous padding, and cards that float.
+
+   What a hiring tool should feel like is a terminal and a ledger: tight
+   corners, hairline rules, data in a monospace face, and rows dense enough to
+   compare at a glance. So:
+
+   - radii collapse from 6-16px to 2-6px
+   - the diffuse glows become hard, offset shadows with no blur
+   - cards gain a visible hairline so they read as rows, not floating tiles
+   - numeric data (scores, counts, dates) is monospace and tabular, so columns
+     of digits line up instead of jittering
+
+   Specificity is the same as the base rules and this block is last in the
+   cascade, so these win without needing !important anywhere.
+   ========================================================================== */
+
+/* -- geometry: tight corners ------------------------------------------- */
+
+:root {
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r-md: 4px;
+  --r-lg: 5px;
+  --r-xl: 6px;
+
+  /* Hard, unblurred shadows. A blurred glow reads as decor; a 1px offset
+     reads as a physical edge, which is what a dense tool wants. */
+  --glow-violet: 1px 1px 0 rgba(10, 10, 10, 0.12);
+  --glow-violet-sm: 1px 1px 0 rgba(10, 10, 10, 0.12);
+  --glow-blue-sm: 1px 1px 0 rgba(10, 10, 10, 0.1);
+  --glow-green-sm: 1px 1px 0 rgba(10, 10, 10, 0.1);
+}
+
+.card {
+  border: 1px solid var(--line, #e3e3e6);
+  border-radius: var(--r-lg);
+  box-shadow: none;
+  background: var(--paper, #fff);
+}
+
+.card-head {
+  border-bottom: 1px solid var(--line, #e3e3e6);
+  background: transparent;
+  padding: 10px 14px;
+}
+
+.card-head h2,
+.card-head h3 {
+  letter-spacing: -0.01em;
+}
+
+/* -- the brand mark: a bolt in a hard-edged tile ----------------------- */
+
+.brand-mark {
+  border-radius: var(--r-md);
+  box-shadow: none;
+  background: var(--accent);
+  color: var(--paper);
+  /* The bolt is filled with currentColor, so the tile provides the contrast. */
+  line-height: 0;
+}
+
+.brand-name {
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+/* -- rows read as a ledger --------------------------------------------- */
+
+.job-row {
+  border-bottom: 1px solid var(--line, #e3e3e6);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  transition: background 90ms linear;
+}
+
+.job-row:hover { background: #fafafa; }
+
+.job-row.selected {
+  background: var(--accent);
+  color: var(--paper);
+  box-shadow: none;
+}
+
+.job-row.selected .stat-hint,
+.job-row.selected .job-row-meta { color: rgba(255, 255, 255, 0.72); }
+
+.job-row-title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* -- numbers line up --------------------------------------------------- */
+
+.mono,
+.job-row-meta time,
+.score-ring,
+.metric-value {
+  font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace);
+  /* Tabular figures stop columns of scores from jittering as digits change. */
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-value { letter-spacing: -0.02em; }
+
+/* -- section labels read like a form, not a spa ------------------------ */
+
+.section-title,
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+/* -- buttons: a tool, not a call to action ---------------------------- */
+
+.btn {
+  border-radius: var(--r-sm);
+  font-weight: 550;
+  letter-spacing: -0.005em;
+  box-shadow: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-primary:hover { background: #242428; }
+
+.btn-ghost { border-radius: var(--r-sm); }
+
+/* -- pills become status chips ---------------------------------------- */
+
+.pill,
+.nav-count {
+  border-radius: var(--r-xs);
+  font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* -- sidebar: a tool rail -------------------------------------------- */
+
+.sidebar { border-right: 1px solid var(--line, #e3e3e6); }
+
+.nav-item {
+  border-radius: var(--r-sm);
+  font-weight: 500;
+}
+
+.nav-item.active {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.nav-divider { border-color: var(--line, #e3e3e6); }
+
+/* -- forms: labelled, boxed, dense ------------------------------------ */
+
+.form-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+input,
+select,
+textarea {
+  border-radius: var(--r-sm);
+  border-color: var(--line, #d8d8dc);
+}
+
+/* -- the application status table ------------------------------------- */
+
+/* A real <table>: this is tabular data -- one row per application, fixed
+   columns, scannable -- and a grid of divs cannot give column alignment or
+   sort by anything but hand-written comparison. */
+.apps-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.apps-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 650;
+  color: #6b6b73;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line, #d8d8dc);
+  white-space: nowrap;
+}
+
+.apps-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line, #ececef);
+  vertical-align: middle;
+}
+
+.apps-table tbody tr:hover { background: #fafafa; }
+.apps-table tbody tr:last-child td { border-bottom: none; }
+
+.apps-table .cell-role { font-weight: 600; }
+.apps-table .cell-company { color: #5a5a63; }
+
+.apps-table .cell-num {
+  font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* The stage tracker. A select rather than free text, because "moved to third
+   round" is a small closed set and free text would make every row a typo. */
+.stage-select {
+  font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace);
+  font-size: 12px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--line, #d8d8dc);
+  background: #fff;
+  padding: 4px 6px;
+  min-width: 150px;
+}
+
+.stage-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.apps-table .row-saving { opacity: 0.55; }
+
+/* ------------------------------------------------- stage pills (tracker) */
+
+/* The stage is the one value the user edits, so it gets a pill for the
+   current state next to the control that changes it -- the pill is a readout,
+   the select is the input. Two widgets on purpose: a pill that is itself
+   clickable has no affordance and no keyboard story. */
+.stage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+  padding: 2px 7px;
+  border-radius: var(--r-xs);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.st-live  { color: #0b5c2e; border-color: #bfe0cb; background: #eef8f1; }
+.st-offer { color: #14532d; border-color: #8fbf9f; background: #e2f2e6; }
+.st-closed { color: #6b6b73; border-color: #dedee2; background: #f5f5f7; }
+.st-idle  { color: #4a4a52; border-color: #d8d8dc; background: #fafafa; }
+
+/* ------------------------------------------------- top bar: API key button */
+
+.key-wrap { position: relative; }
+
+.key-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line, #d8d8dc);
+  border-radius: var(--r-sm);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 550;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.key-btn:hover { background: #f6f6f8; }
+
+.key-btn.is-on {
+  border-color: #bfe0cb;
+  background: #eef8f1;
+  color: #0b5c2e;
+}
+
+.key-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.key-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 41;
+  width: 330px;
+  padding: 14px;
+  border: 1px solid var(--line, #d8d8dc);
+  border-radius: var(--r-md);
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(10, 10, 10, 0.14);
+}
+
+.key-pop-head { margin-bottom: 8px; }
+.key-note { margin: 0 0 10px; line-height: 1.6; }
+.key-actions { display: flex; gap: 8px; margin-top: 10px; }
+.key-err { color: var(--danger, #b3261e); font-size: 12px; margin: 8px 0 0; }
+
+/* The security claim, stated at the point we ask for trust. */
+.key-trust {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, #ececef);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: #5a5a63;
+}
+
+.key-trust strong { color: var(--accent); }
+
+.key-fine { margin: 8px 0 0; font-size: 11.5px; color: #6b6b73; }
+
+/* ---------------------------------------------------------- dev console */
+
+.devterm-toggle { width: 100%; }
+
+.devterm {
+  margin: 6px 0 2px;
+  border: 1px solid #2a2a30;
+  border-radius: var(--r-md);
+  background: #0b0b0e;
+  color: #d8d8e0;
+  font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace);
+  font-size: 11.5px;
+  line-height: 1.6;
+  overflow: hidden;
+}
+
+.devterm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 9px;
+  border-bottom: 1px solid #232329;
+  color: #7d7d8a;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+}
+
+.devterm-x {
+  background: none;
+  border: 0;
+  color: #7d7d8a;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.devterm-x:hover { color: #fff; }
+
+.devterm-out {
+  height: 210px;
+  overflow-y: auto;
+  padding: 8px 9px;
+}
+
+.devterm-line { white-space: pre-wrap; word-break: break-word; }
+.devterm-line.tone-dim { color: #6f6f7d; }
+.devterm-line.tone-err { color: #ff8f85; }
+
+.devterm-prompt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border-top: 1px solid #232329;
+}
+
+.devterm-prompt span { color: #5ee08a; }
+
+.devterm-prompt input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: #d8d8e0;
+  font: inherit;
+  padding: 0;
+}
+
+.devterm-prompt input::placeholder { color: #4a4a56; }

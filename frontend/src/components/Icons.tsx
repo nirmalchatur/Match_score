@@ -22,9 +22,21 @@ function Svg({ size = 18, children, ...rest }: IconProps) {
   )
 }
 
+/**
+ * The TailorUp mark: a lightning bolt.
+ *
+ * Replaces a four-pointed sparkle, which read as generic AI decoration and
+ * had nothing to do with the product. A bolt says "fast, targeted, one hit" --
+ * which is the actual claim: one resume, one job, sharpened for that posting.
+ *
+ * Drawn as a filled path rather than a stroked outline because the two
+ * diagonal strokes overlap; a stroke would show the seam at 16px. The tail is
+ * squared off rather than tapered so the silhouette stays readable when the
+ * mark is rendered as small as a favicon.
+ */
 export const IconLogo = (p: IconProps) => (
-  <Svg {...p} strokeWidth={2}>
-    <path d="M12 2.5 14.6 9.4 21.5 12l-6.9 2.6L12 21.5 9.4 14.6 2.5 12l6.9-2.6z" />
+  <Svg {...p} strokeWidth={1.5} fill="currentColor" stroke="none">
+    <path d="M13.6 2 4.8 13.2h5.1L8.9 22 19.2 10.4h-5.4L15.1 2z" />
   </Svg>
 )
 
@@ -260,3 +272,27 @@ export const IconPalette = (p: IconProps) => (
   </Svg>
 )
 
+
+export const IconLock = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="4.5" y="10.5" width="15" height="9.5" rx="1.5" />
+    <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+  </Svg>
+)
+
+export const IconKey = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="8" cy="12" r="3.6" />
+    <path d="M11.6 12H21" />
+    <path d="M17.5 12v3.2" />
+    <path d="M20 12v2.2" />
+  </Svg>
+)
+
+export const IconTerminal = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2.5" y="4" width="19" height="16" rx="2" />
+    <path d="M6.5 9.5 9.5 12l-3 2.5" />
+    <path d="M12.5 15h5" />
+  </Svg>
+)

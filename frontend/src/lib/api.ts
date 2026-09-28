@@ -423,7 +423,9 @@ export const api = {
 
   updateApplication(
     id: number,
-    payload: Partial<Pick<Application, 'notes' | 'tailored_resume'>>,
+    // `status` was missing here even though the serializer has always
+    // accepted it, so the tracker could not move an application along.
+    payload: Partial<Pick<Application, 'notes' | 'tailored_resume' | 'status'>>,
   ): Promise<Application> {
     return request<Application>(`/applications/${id}/`, {
       method: 'PATCH',
