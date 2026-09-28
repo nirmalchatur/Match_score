@@ -227,3 +227,32 @@ AI_PROVIDER=ollama OLLAMA_BASE_URL=http://localhost:11434 OLLAMA_MODEL=llama3.1 
   python -c "import os,django;os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings');django.setup();from apps.ai import factory;from apps.ai.providers.base import TailoringRequest;from apps.ai.tests.fixtures import SOURCE_PROFILE;from apps.ai.tailor import ResumeTailor;print(ResumeTailor.tailor_resume(SOURCE_PROFILE, {'title':'Backend Engineer','company':'Acme','description':'Django and PostgreSQL.'}, {'score':80}).as_dict()['validation'])"
 ```
 
+---
+
+## Verified local run
+
+Recorded rather than asserted. Chain, in order, with nothing mocked:
+
+    provider factory -> OllamaProvider -> llama3.1 (real weights)
+      -> extract_json -> schema normalise -> factual validation
+
+| stage | result |
+|---|---|
+| provider | `ollama`, model `llama3.1` |
+| health | True - Ollama is running and 'llama3.1' is installed. |
+| generation | raw response in **364.0s**, 1614 chars |
+| schema | parsed `TailoringResult` |
+| factual validation | `status='valid'`, no violations |
+
+Environment: llama3.1 8B, Q4_K_M, CPU inference, no GPU.
+
+Two things worth knowing before deploying:
+
+- **364s is the real number on CPU.** Usable, not interactive. The default
+  `OLLAMA_TIMEOUT` of 180 will time out on hardware without a GPU; raise it.
+- **`size_vram: 0`** -- the model ran entirely from system RAM.
+
+The validation verdict is the result that matters. The product promise is that
+the AI cannot invent resume facts, and the factual validator raised no
+violations on a real model response rather than a stub.
+
