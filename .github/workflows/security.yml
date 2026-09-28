@@ -60,8 +60,10 @@ jobs:
           VITE_GEMINI_API_KEY: AIzaSyCANARYCANARYCANARYCANARYCANARYCAN
         run: npm run build
 
+      # Built into frontend/dist, not the repo root, so the scan below is
+      # pointed at that path rather than at "dist".
       - name: Scan the built bundle for credential material
-        run: python3 .github/scripts/scan_bundle_secrets.py dist
+        run: python3 .github/scripts/scan_bundle_secrets.py frontend/dist
 
   # ---------------------------------------------------------------------
   # Secrets in source: catches a key committed to a file, which lives in the
@@ -104,12 +106,21 @@ jobs:
         working-directory: backend
         run: pip install -r requirements.txt
 
+      # NOTE: the variable names are exactly the ones config/settings.py and
+      # render.yaml use -- DEBUG / SECRET_KEY / ALLOWED_HOSTS, with no
+      # DJANGO_ prefix. An earlier version of this file set DJANGO_DEBUG and
+      # friends, which Django silently ignored, so DEBUG stayed at its
+      # development default of True and the check failed for the wrong reason.
+      #
+      # The key is long and varied because security.W009 rejects a short or
+      # low-entropy SECRET_KEY, and `check --deploy` promotes warnings to
+      # failures. It is a throwaway for a check that never opens a socket.
       - name: check --deploy
         working-directory: backend
         env:
-          DJANGO_SECRET_KEY: ci-only-not-a-real-secret-0000000000000000
-          DJANGO_DEBUG: 'False'
-          DJANGO_ALLOWED_HOSTS: 'ci.invalid'
+          SECRET_KEY: ci-only-throwaway-8Jd2Xq9Lm4Np7Rt3Vw6Yb1Hs5Cf0Zg7Ke9Mu2Iv
+          DEBUG: 'False'
+          ALLOWED_HOSTS: 'ci.invalid'
         run: python manage.py check --deploy
 
   # ---------------------------------------------------------------------

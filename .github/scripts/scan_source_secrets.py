@@ -39,6 +39,9 @@ ALLOWLIST = {
     # needed: the JSON is committed, so the scanner sees it.
     "postman/tailorup-api.postman_collection.json",
     "scripts/build_postman_collection.py",
+    # Holds the deliberate canary the bundle job builds with. It is the
+    # assertion, not a leak -- and it must be flagged if it ever moves.
+    ".github/workflows/security.yml",
 }
 
 PATTERNS = [
