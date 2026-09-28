@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { useReveal } from '../hooks/useReveal'
+import { HelpPanel } from '../components/HelpPanel'
 import {
   IconArrowRight,
   IconBriefcase,
@@ -16,6 +18,14 @@ import {
 } from '../components/Icons'
 
 const GITHUB_URL = 'https://github.com/nirmalchatur/Match_score'
+
+/**
+ * Public contact address, shown on the landing page for contributors.
+ *
+ * Kept as one named constant rather than typed inline in three places, so a
+ * change of address is a one-line edit instead of a search.
+ */
+const CONTACT_EMAIL = 'nirmalch1004@gmail.com'
 
 /* ---------- Workflow ---------- */
 
@@ -137,6 +147,9 @@ export function LandingPage() {
   // reads correctly if the observer never runs.
   useReveal()
 
+  // The same documentation panel the sidebar uses, reachable before sign-up.
+  const [helpOpen, setHelpOpen] = useState(false)
+
   return (
     <div className="landing mk-animate">
       <div className="mk-bg" aria-hidden="true" />
@@ -157,6 +170,14 @@ export function LandingPage() {
             <a href={GITHUB_URL} target="_blank" rel="noreferrer">
               GitHub
             </a>
+            <a href={`mailto:${CONTACT_EMAIL}`}>Contribute</a>
+            {/* Help was only reachable from the signed-in sidebar, so it did not
+                exist on this page at all. It is the same panel, rendered here
+                too, because "what does this thing do" is asked before signing up
+                at least as often as after. */}
+            <button type="button" className="mk-help-trigger" onClick={() => setHelpOpen(true)}>
+              Help
+            </button>
           </nav>
 
           <div className="mk-nav-actions">
@@ -355,9 +376,12 @@ export function LandingPage() {
                 View on GitHub
                 <IconArrowRight size={16} />
               </a>
-              <Link to={primaryTo} className="btn btn-ghost btn-lg">
-                {signedIn ? 'Open dashboard' : 'Get started free'}
-              </Link>
+              <a
+                className="btn btn-ghost btn-lg mk-contact-btn"
+                href={`mailto:${CONTACT_EMAIL}?subject=TailorUp%20contribution`}
+              >
+                Want to contribute? Email us
+              </a>
             </div>
           </div>
         </section>
@@ -401,6 +425,8 @@ export function LandingPage() {
           <span>Built in the open.</span>
         </div>
       </footer>
+
+      <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   )
 }

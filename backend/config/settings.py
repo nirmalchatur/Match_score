@@ -305,7 +305,14 @@ OLLAMA_MODEL = (os.environ.get("OLLAMA_MODEL") or "").strip()
 
 #: Seconds to wait for the provider. Local models are slow on a cold start, so
 #: this is generous; the API surfaces a timeout rather than hanging.
-OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "180"))
+#:
+#: 600 rather than the 180 this used to default to, because a real llama3.1
+#: tailoring run on CPU-only hardware has been measured at 364 seconds. At 180
+#: the request is abandoned part-way through generation and the user gets a
+#: timeout error instead of a tailored resume. GPU inference finishes in well
+#: under 30s, so 180 was never the right number for the CPU case -- it was
+#: simply never exercised there.
+OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "600"))
 
 #: Low by default: tailoring must stay close to the source text, not improvise.
 OLLAMA_TEMPERATURE = float(os.environ.get("OLLAMA_TEMPERATURE", "0.2"))

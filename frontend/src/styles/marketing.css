@@ -47,6 +47,61 @@
   --border-mid: rgba(10, 10, 10, 0.22);
 }
 
+/* The Help entry in the landing nav is a <button>, not an <a>, because it
+   opens a panel rather than navigating. Without this it inherits the UA's
+   button chrome -- grey background, border, centred text -- and sits visibly
+   wrong next to the anchors beside it. The underline wipe is borrowed from
+   motion.css's .mk-links a:hover::after, which cannot reach it because this
+   is a different element. */
+.mk-help-trigger {
+  padding: 6px 11px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-muted);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: color var(--t-fast) var(--ease);
+}
+
+.mk-help-trigger::after {
+  content: '';
+  position: absolute;
+  left: 11px;
+  right: 11px;
+  bottom: 2px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 240ms var(--ease);
+}
+
+.mk-help-trigger:hover,
+.mk-help-trigger:focus-visible {
+  color: var(--ink);
+}
+
+.mk-help-trigger:hover::after,
+.mk-help-trigger:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.mk-help-trigger:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-help-trigger,
+  .mk-help-trigger::after {
+    transition: none;
+  }
+}
+
 .landing main {
   flex: 1;
 }
