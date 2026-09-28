@@ -2,13 +2,14 @@ import { useState } from 'react'
 import type { Job, ViewKey } from '../lib/types'
 import { initials } from '../lib/format'
 import { DevTerminal } from './DevTerminal'
+import { HelpPanel } from './HelpPanel'
 import {
+  BrandMark,
   IconBriefcase,
   IconDashboard,
   IconFile,
   IconHelp,
   IconKanban,
-  IconLogo,
   IconLogout,
   IconRadar,
   IconSettings,
@@ -66,6 +67,7 @@ export function Sidebar({
    */
   const [confirmingLogout, setConfirmingLogout] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
 
   const requestLogout = () => {
     if (leaving) return
@@ -90,9 +92,7 @@ export function Sidebar({
     <aside className="sidebar">
       <div className="sidebar-brand">
         <span className="brand">
-          <span className="brand-mark">
-            <IconLogo size={17} />
-          </span>
+          <BrandMark size={22} className="brand-emblem" />
           <span className="brand-name">TailorUp</span>
         </span>
       </div>
@@ -104,10 +104,21 @@ export function Sidebar({
         <div className="nav-divider" />
         {SECONDARY.map(renderItem)}
         <div className="nav-divider" />
-        <a className="nav-item" href="/docs/README.md" target="_blank" rel="noreferrer">
+        {/* Was an <a href="/docs/README.md">. The frontend is a static Vite
+            bundle and serves nothing under /docs, so that link asked the app
+            host for a Markdown file that is not there and 404'd. The docs live
+            in the repository, not in the deployment, so the reference material
+            is rendered in-app instead. */}
+        <button
+          type="button"
+          className="nav-item"
+          onClick={() => setHelpOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={helpOpen}
+        >
           <IconHelp size={17} />
           <span>Help</span>
-        </a>
+        </button>
         <DevTerminal jobs={jobs} />
       </nav>
 
@@ -172,6 +183,8 @@ export function Sidebar({
           </div>
         </div>
       ) : null}
+
+      <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />
     </aside>
   )
 }

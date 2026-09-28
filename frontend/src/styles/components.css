@@ -2775,4 +2775,226 @@ textarea {
   font-size: 13px;
   color: var(--text-muted);
   cursor: pointer;
+
+/* ---------- Help panel ---------- */
+
+.help-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.help-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(860px, 100%);
+  /* Cap the height so the panel scrolls internally on a short viewport rather
+     than running off the bottom of the screen. */
+  max-height: min(720px, 88vh);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.24);
+  overflow: hidden;
+}
+
+.help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.help-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text);
+}
+
+.help-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.help-body {
+  display: grid;
+  /* Collapse to one column on narrow screens: a 150px tab rail beside readable
+     prose is worse than tabs stacked above it. */
+  grid-template-columns: 190px 1fr;
+  min-height: 0;
+  flex: 1;
+}
+
+.help-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.help-tab {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.help-tab:hover {
+  background: var(--accent-faint);
+  color: var(--text);
+}
+
+.help-tab.active {
+  background: var(--accent-faint);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.help-content {
+  padding: 20px 22px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.help-heading {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.help-content p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.62;
+  color: var(--text-muted);
+}
+
+.help-content h4 {
+  margin: 20px 0 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.help-content ul,
+.help-content ol {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.help-content li {
+  margin-bottom: 7px;
+}
+
+.help-content strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.help-content code {
+  padding: 1px 5px;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--accent-faint);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+}
+
+.help-terms {
+  margin: 0 0 12px;
+  display: grid;
+  gap: 1px;
+}
+
+.help-term {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.help-term dt,
+.help-term dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.help-term dd {
+  color: var(--text-muted);
+}
+
+.help-note {
+  padding: 10px 12px;
+  font-size: 13px;
+  background: var(--accent-faint);
+  border-left: 2px solid var(--border-mid);
+  border-radius: 0 6px 6px 0;
+}
+
+.help-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 11px 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+}
+
+.help-foot a {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .help-body {
+    grid-template-columns: 1fr;
+  }
+
+  .help-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .help-tab {
+    white-space: nowrap;
+  }
+
+  .help-term {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-tab {
+    transition: none;
+  }
+}
+
 }

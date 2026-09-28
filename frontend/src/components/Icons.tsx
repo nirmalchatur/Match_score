@@ -100,6 +100,73 @@ export const IconCheck = (p: IconProps) => (
   </Svg>
 )
 
+/**
+ * The TailorUp brand mark: an impossible tribar.
+ *
+ * "Elusion" taken literally. A Penrose tribar cannot be built in flat space --
+ * each joint is locally plausible, the whole is impossible, and the eye keeps
+ * re-resolving which bar is in front. That is the product in one shape: a
+ * resume presented as a whole that cannot be simultaneously true for every
+ * posting. You are not being lied to; you are being shown a genuine
+ * rearrangement.
+ *
+ * Drawn as three separate quads rather than one path, because the illusion
+ * depends on each bar having its own consistent near/far tone. A single
+ * continuous path flattens into an ordinary triangle and the effect is lost --
+ * which is, in the end, exactly the point.
+ *
+ * Deliberately not stroked. Outlines would add a visible seam at the joints
+ * where the illusion is doing its work.
+ */
+export const BrandMark = ({
+  size = 28,
+  className,
+  ...rest
+}: SVGProps<SVGSVGElement> & { size?: number }) => {
+  const id = 'tailorup-tribar'
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+      className={className}
+      role="img"
+      aria-label="TailorUp"
+      {...rest}
+    >
+      <defs>
+        {/* One gradient across the whole mark, so the three bars read as a
+            single object seen from an impossible angle rather than three
+            unrelated shapes. */}
+        <linearGradient id={id} x1="8" y1="6" x2="56" y2="58">
+          <stop offset="0%" stopColor="var(--brand-accent, #245F73)" />
+          <stop offset="55%" stopColor="var(--brand-accent, #245F73)" />
+          <stop offset="100%" stopColor="var(--brand-warm, #733E24)" />
+        </linearGradient>
+      </defs>
+
+      {/* Three bars of a tribar. Each is a parallelogram-ish quad whose depth
+          ordering contradicts its neighbour: top-right reads as nearest, the
+          bottom bar as farthest. No consistent assignment exists. */}
+      <path d="M32 6 58 44 48 50 22 12z" fill={`url(#${id})`} />
+      <path d="M58 44 32 62 6 24 16 18z" fill={`url(#${id})`} opacity="0.82" />
+      <path d="M6 24 22 12 48 50 32 62z" fill={`url(#${id})`} opacity="0.64" />
+
+      {/* The single bright inlay that names the product: a needle drawing a
+          seam. It reads as lying on top of the mark, which is the one depth
+          cue the eye can actually resolve. */}
+      <path
+        d="M31 20.5 36.5 29 33.4 29 30.2 24.6 27.2 28.2 24.6 24.6z"
+        fill="var(--paper, #fff)"
+        opacity="0.92"
+      />
+    </svg>
+  )
+}
+
+export default BrandMark
+
 export const IconClose = (p: IconProps) => (
   <Svg {...p} strokeWidth={2}>
     <path d="M6 6l12 12M18 6 6 18" />
