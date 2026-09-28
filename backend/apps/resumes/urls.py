@@ -10,6 +10,7 @@ from .views import (
     MasterResumeView,
     SaveTailoredResumeView,
     SetMasterResumeView,
+    TailorProgressView,
     TailorResumeView,
 )
 
@@ -48,6 +49,11 @@ urlpatterns = [
         name="resume-tailor-save",
     ),
 
+    path(
+        "tailor/progress/",
+        TailorProgressView.as_view(),
+        name="resume-tailor-progress",
+    ),
     path(
         "tailor/status/",
         AIProviderStatusView.as_view(),

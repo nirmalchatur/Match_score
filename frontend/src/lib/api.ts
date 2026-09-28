@@ -10,6 +10,7 @@ import type {
   TailoringResponse,
   TailoringResult,
   TailoringStatus,
+  TailoringProgress,
   QualitiesResponse,
   QualitySelection,
   UserProfile,
@@ -477,6 +478,18 @@ export const api = {
   },
   tailoringStatus(): Promise<TailoringStatus> {
     return request<TailoringStatus>('/resumes/tailor/status/')
+  },
+
+  /**
+   * Live progress for the most recent tailoring run.
+   *
+   * `since` is the `elapsed` cursor from the previous poll, so the server only
+   * returns events the caller has not already seen. Omit it for the first
+   * call, which returns the whole buffer for this account.
+   */
+  tailoringProgress(since?: number): Promise<TailoringProgress> {
+    const query = since == null ? '' : `?since=${encodeURIComponent(String(since))}`
+    return request<TailoringProgress>(`/resumes/tailor/progress/${query}`)
   },
 
   /**

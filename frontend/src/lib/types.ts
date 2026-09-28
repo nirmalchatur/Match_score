@@ -233,6 +233,27 @@ export interface TailoringResponse {
   master_resume_id: number
 }
 
+/**
+ * One progress event from a tailoring run.
+ *
+ * `elapsed` is seconds since the run started, from the server's monotonic
+ * clock. The client uses it as a cursor so a poll returns only new events, and
+ * displays it as the running timer.
+ */
+export interface TailoringProgressEvent {
+  elapsed: number
+  phase: string
+  message: string
+  level: 'info' | 'error' | 'done'
+}
+
+/** A poll response: new events plus the cursor to send next time. */
+export interface TailoringProgress {
+  elapsed: number
+  active: boolean
+  events: TailoringProgressEvent[]
+}
+
 export interface TailoringStatus {
   provider: string | null
   available: boolean

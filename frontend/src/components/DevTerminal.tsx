@@ -33,6 +33,20 @@ const BANNER = [
   'Read-only diagnostics. Nothing here changes stored data.',
 ]
 
+/** How often to ask the server for progress. Two seconds is responsive enough
+ *  to feel live and slow enough not to matter on the API budget. */
+const POLL_MS = 2000
+
+/** mm:ss, or h:mm:ss past an hour. A run is long enough to need the hour. */
+function formatElapsed(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`
+}
+
 export function DevTerminal({ jobs = [] }: { jobs?: Job[] }) {
   const [open, setOpen] = useState(false)
   const [lines, setLines] = useState<Line[]>(BANNER.map((text) => ({ text, tone: 'dim' })))
@@ -160,6 +174,62 @@ export function DevTerminal({ jobs = [] }: { jobs?: Job[] }) {
     },
     [jobs, print, runQuality, runStatus],
   )
+
+  /**
+   * Live tailoring progress.
+   *
+   * Polls only while the console is open, so a closed console costs nothing,
+   * and stops as soon as the run reports a terminal state. A CPU run lasts
+   * minutes, so the alternative -- nothing on screen until it finishes -- is
+   * indistinguishable from a hang.
+   *
+   * Polling rather than a stream because the run holds a server worker for
+   * minutes either way; a long-lived connection would pin one worker per
+   * concurrent user for the duration.
+   */
+  useEffect(() => {
+    if (!open) return
+
+    let stopped = false
+    let timer = 0
+    let cursor: number | undefined
+    // The `since` cursor is inclusive, so the last event comes back on every
+    // poll. Tracking what has been shown keeps the final line from repeating.
+    const seen = new Set<string>()
+
+    const tick = async () => {
+      if (stopped) return
+      try {
+        const data = await api.tailoringProgress(cursor)
+        cursor = data.elapsed
+        for (const event of data.events) {
+          const key = `${event.elapsed}:${event.phase}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          print(
+            `[${formatElapsed(event.elapsed)}] ${event.message}`,
+            event.level === 'error' ? 'err' : event.level === 'done' ? 'ok' : 'dim',
+          )
+        }
+        // A run that has emitted anything and is no longer active has ended,
+        // whether it finished or failed. Stop polling either way.
+        if (data.events.length && !data.active) {
+          stopped = true
+          return
+        }
+      } catch {
+        // A failed poll is not worth reporting every couple of seconds. The
+        // run itself surfaces its own error where it matters.
+      }
+      if (!stopped) timer = window.setTimeout(tick, POLL_MS)
+    }
+
+    timer = window.setTimeout(tick, 0)
+    return () => {
+      stopped = true
+      window.clearTimeout(timer)
+    }
+  }, [open, print])
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     // Up/Down walk the history in reverse of how it is stored, which is
