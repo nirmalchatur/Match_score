@@ -28,6 +28,20 @@ export function SettingsPage() {
   const [error, setError] = useState('')
   const [ai, setAi] = useState<TailoringStatus | null>(null)
 
+  /**
+   * Set when the provider/key status calls *fail*, as opposed to reporting that
+   * nothing is configured.
+   *
+   * These were previously indistinguishable, and the null case was rendered as
+   * a confident server-side diagnosis: a dropped request showed "Tailoring is
+   * unavailable. This deployment has no AI provider configured -- ask an
+   * administrator", which is both untrue and points at the wrong person.
+   */
+  const [aiLoadError, setAiLoadError] = useState('')
+
+  /** Re-runs the status load. Exposed so the error state can offer a retry. */
+  const [aiReloadToken, setAiReloadToken] = useState(0)
+
   // The signed-in user's own key. `keyValue` is the only place the plaintext
   // exists on the client, and it is cleared the moment the save resolves.
   const [keyStatus, setKeyStatus] = useState<AiKeyStatus | null>(null)
@@ -75,17 +89,29 @@ export function SettingsPage() {
     // Provider metadata plus this account's key status. Both are needed to
     // decide whether the tailoring button should be enabled, so they are read
     // together rather than leaving the button briefly wrong.
+    //
+    // A rejection is recorded rather than swallowed: `allSettled` kept the
+    // rejected case indistinguishable from "not configured", which is how a
+    // failed request came to be reported as a broken deployment.
     Promise.allSettled([api.tailoringStatus(), api.getAiKey()])
       .then(([statusResult, keyResult]) => {
         if (cancelled) return
+        const problems: string[] = []
         if (statusResult.status === 'fulfilled') setAi(statusResult.value)
+        else problems.push('provider status')
         if (keyResult.status === 'fulfilled') setKeyStatus(keyResult.value)
+        else problems.push('API key status')
+        setAiLoadError(
+          problems.length
+            ? `Could not load ${problems.join(' and ')}. Nothing below is accurate until this succeeds.`
+            : '',
+        )
       })
 
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [aiReloadToken])
 
   const submitKey = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -363,8 +389,8 @@ export function SettingsPage() {
         <div className="card-head">
           <h2>AI</h2>
           <div className="card-head-actions">
-            <Pill tone={aiReady ? 'success' : 'warning'}>
-              {aiReady ? 'Ready' : 'Needs a key'}
+            <Pill tone={aiLoadError ? 'warning' : aiReady ? 'success' : 'warning'}>
+              {aiLoadError ? 'Unknown' : aiReady ? 'Ready' : 'Needs a key'}
             </Pill>
           </div>
         </div>
@@ -378,17 +404,21 @@ export function SettingsPage() {
             <div className="metric">
               <span className="metric-label">Provider</span>
               <span className="metric-value">
-                {ai?.display_name || ai?.provider || 'Not configured'}
+                {aiLoadError
+                  ? 'Unknown'
+                  : ai?.display_name || ai?.provider || 'Not configured'}
               </span>
             </div>
             <div className="metric">
               <span className="metric-label">Model</span>
-              <span className="metric-value">{ai?.model || '—'}</span>
+              <span className="metric-value">{aiLoadError ? 'Unknown' : ai?.model || '—'}</span>
             </div>
             <div className="metric">
               <span className="metric-label">Your key</span>
               <span className="metric-value">
-                {keyStatus?.configured ? (
+                {aiLoadError ? (
+                  'Unknown'
+                ) : keyStatus?.configured ? (
                   <span className="key-hint">{keyStatus.key_hint}</span>
                 ) : (
                   'Not added'
@@ -403,7 +433,28 @@ export function SettingsPage() {
             </div>
           </div>
 
-          {!ai?.available && ai?.provider !== 'gemini' ? (
+          {aiLoadError ? (
+            <div style={{ marginTop: 16 }}>
+              <Alert variant="danger">
+                {aiLoadError}{' '}
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setAiReloadToken((n) => n + 1)}
+                >
+                  Retry
+                </button>
+              </Alert>
+            </div>
+          ) : null}
+
+          {/*
+            Only ever shown for a deployment that genuinely has no provider at
+            all. It must not be reachable when `ai` is merely unknown, and it
+            must never appear for a bring-your-own-key provider: that case is
+            "add your key", not "ask an administrator".
+          */}
+          {!aiLoadError && ai && !ai.available && ai.provider !== 'gemini' ? (
             <div style={{ marginTop: 16 }}>
               <Alert variant="warning">
                 Tailoring is unavailable. This deployment has no AI provider configured — ask an

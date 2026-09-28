@@ -1,8 +1,9 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { atsLabel } from '../lib/format'
-import { IconTerminal } from './Icons'
+import { IconTerminal, IconClose } from './Icons'
 import type { Job, TailoringStatus } from '../lib/types'
+import { createPortal } from 'react-dom'
 
 /**
  * A developer console for the workspace.
@@ -195,43 +196,58 @@ export function DevTerminal({ jobs = [] }: { jobs?: Job[] }) {
     )
   }
 
-  return (
-    <div className="devterm">
-      <div className="devterm-head">
-        <span className="mono">console</span>
-        <button
-          type="button"
-          className="devterm-x"
-          onClick={() => setOpen(false)}
-          aria-label="Close console"
-        >
-          x
-        </button>
-      </div>
+  // Rendered through a portal so it is never constrained by the sidebar's
+  // 232px column. A terminal needs horizontal room to be readable; inline in
+  // the nav it wrapped after about twenty characters, which read as broken
+  // rather than merely small.
+  return createPortal(
+    <div
+      className="devterm-scrim"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Developer console"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) setOpen(false)
+      }}
+    >
+      <div className="devterm">
+        <div className="devterm-head">
+          <span className="mono">console</span>
+          <button
+            type="button"
+            className="devterm-x"
+            onClick={() => setOpen(false)}
+            aria-label="Close console"
+          >
+            <IconClose size={14} />
+          </button>
+        </div>
 
-      <div className="devterm-out" role="log" aria-live="polite">
-        {lines.map((line, index) => (
-          <div key={index} className={`devterm-line tone-${line.tone ?? 'ok'}`}>
-            {line.text || ' '}
-          </div>
-        ))}
-        <div ref={endRef} />
-      </div>
+        <div className="devterm-out" role="log" aria-live="polite">
+          {lines.map((line, index) => (
+            <div key={index} className={`devterm-line tone-${line.tone ?? 'ok'}`}>
+              {line.text || ' '}
+            </div>
+          ))}
+          <div ref={endRef} />
+        </div>
 
-      <div className="devterm-prompt">
-        <span className="mono">&gt;</span>
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          aria-label="Console command"
-          spellCheck={false}
-          autoComplete="off"
-          placeholder="help"
-        />
+        <div className="devterm-prompt">
+          <span className="mono">&gt;</span>
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            aria-label="Console command"
+            spellCheck={false}
+            autoComplete="off"
+            placeholder="help"
+          />
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

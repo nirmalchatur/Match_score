@@ -45,6 +45,21 @@
         href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
       />
     </noscript>
+      <!-- Applied before first paint so a dark-theme user never gets a white
+         flash while React boots. Mirrors resolve() in hooks/useTheme.ts. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('tailorup.theme');
+          var dark = stored === 'dark' ||
+            (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
