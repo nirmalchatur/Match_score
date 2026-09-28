@@ -1,24 +1,18 @@
 /* ============================================================
    Marketing - public landing page
 
-   Layout, type scale and responsive behaviour live here.
+   Monochrome editorial system. Ink on paper. Because there is no
+   hue to carry hierarchy, the page gets its drama from VALUE
+   INVERSION instead: the workflow and the closing call-to-action
+   are full-bleed black blocks with white type, and the rest sits
+   on white with hairline rules. Sharp corners, a hard offset
+   shadow on the report card, and a 1px-gap grid for the
+   capability cards.
 
-   The *surface treatment* -- radii, shadows, borders, press
-   states -- lives in `styles/clay.css`, loaded after this file.
-   This file no longer describes the art direction, because the
-   art direction changed: what used to be called a "monochrome
-   editorial system... sharp corners, a hard offset shadow" is now
-   claymorphism, and leaving the old description here would make the
-   stylesheet lie about itself.
-
-   What remains here is structure: the hero, the report card
-   composition, the capability grid, the footer. Those decisions did
-   not change when the surface treatment did.
-
-   Every selector is prefixed `mk-` on purpose. This file loads
-   AFTER components.css, so an unprefixed `.section-title` would
-   silently override the small uppercase label that the Dashboard,
-   Jobs, Resumes and Applications pages rely on.
+   Every selector here is prefixed `mk-` on purpose. This file
+   loads AFTER components.css, so an unprefixed `.section-title`
+   would silently override the small uppercase label that the
+   Dashboard, Jobs, Resumes and Applications pages rely on.
    ============================================================ */
 
 .landing {
