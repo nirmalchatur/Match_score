@@ -195,7 +195,7 @@ OLLAMA_TEMPERATURE = float(os.environ.get("OLLAMA_TEMPERATURE", "0.2"))
 # the UI and it is stored encrypted (see apps.users.crypto), so a deployment
 # can never spend the owner's quota on someone else's behalf.
 
-#: Defaults to gemini-2.0-flash in the provider. Overridable for anyone who
+#: Defaults to gemini-3.8-flash in the provider. Overridable for anyone who
 #: wants a different model or a newer one when it lands.
 GEMINI_MODEL = (os.environ.get("GEMINI_MODEL") or "").strip()
 
