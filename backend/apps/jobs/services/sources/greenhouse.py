@@ -25,6 +25,8 @@ from bs4 import BeautifulSoup
 
 from apps.jobs.services.job_collector import JobData
 
+from .base import JobSource
+
 
 class GreenhouseCollector:
     """
@@ -655,3 +657,39 @@ class GreenhouseCollector:
         except Exception:
             # If parsing fails, return original
             return description.strip()
+
+
+# ---------------------------------------------------------------------------
+# Registry adapter
+# ---------------------------------------------------------------------------
+
+
+class GreenhouseSource(JobSource):
+    """
+    Adapts :class:`GreenhouseCollector` to the registry's interface.
+
+    Split from the collector rather than merged into it on purpose. The
+    collector is the older, more heavily tested class with a large public
+    surface (``_is_greenhouse_url``, ``_parse_response``, and more) that
+    existing tests and callers depend on. Giving it a base class would have
+    meant either changing those signatures or leaving a second, near-identical
+    class behind. This wrapper adds only the two methods the registry needs and
+    delegates the real work, so nothing existing changes.
+    """
+
+    name = "greenhouse"
+    label = "Greenhouse"
+
+    def matches(self, url: str) -> bool:
+        host = self.host_of(url)
+        if not host:
+            return False
+        # _is_greenhouse_url takes a netloc and already enforces the dot
+        # boundary plus the reserved-subdomain rules, so reuse it rather than
+        # writing a second, looser check.
+        return GreenhouseCollector._is_greenhouse_url(host)
+
+    def collect(self, url: str):
+        data = GreenhouseCollector.collect(url)
+        data.source = self.name
+        return data

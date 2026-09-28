@@ -50,7 +50,7 @@ const PATH_TO_VIEW = Object.entries(PATHS).reduce<Record<string, ViewKey>>(
  * the dashboard pages for whichever /app route is active.
  */
 function AppShell() {
-  const { markSessionExpired, user } = useAuth()
+  const { logout, markSessionExpired, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -137,6 +137,7 @@ function AppShell() {
         jobCount={jobs.length}
         email={user?.email ?? ''}
         displayName={displayName}
+        onLogout={() => { void logout() }}
       />
 
       <div className="main-panel">

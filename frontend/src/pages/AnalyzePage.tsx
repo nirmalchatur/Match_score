@@ -1,5 +1,7 @@
 import type { Job } from '../lib/types'
 import { IconLink, IconRadar, IconTarget, IconZap } from '../components/Icons'
+import { AtsBadge } from '../components/AtsBadge'
+import { atsLabel } from '../lib/format'
 import { JobDetail } from '../components/JobDetail'
 import { UrlForm } from '../components/UrlForm'
 import { Alert } from '../components/primitives'
@@ -8,7 +10,7 @@ const STAGES = [
   {
     Icon: IconLink,
     title: 'Collect',
-    body: 'Fetches the posting from the Greenhouse board and pulls out company, title, and location.',
+    body: 'Fetches the posting from whichever board hosts it and pulls out company, title, and location.',
   },
   {
     Icon: IconRadar,
@@ -39,10 +41,19 @@ export function AnalyzePage({ analyzing, error, result, onAnalyze }: Props) {
             Job URL
           </div>
           <p className="prose" style={{ marginBottom: 16 }}>
-            Paste a Greenhouse job link. The pipeline collects the posting, parses the description,
-            and scores it against your master resume.
+            Paste any job link. Greenhouse, Workday and Lever postings are read
+            directly; anything else falls back to the page&rsquo;s structured
+            job data. The pipeline then parses the description and scores it
+            against your master resume.
           </p>
           <UrlForm onSubmit={onAnalyze} busy={analyzing} />
+
+          {result?.source ? (
+            <div className="stat-hint" style={{ marginTop: 14 }}>
+              Read from <AtsBadge source={result.source} />{' '}
+              <span>({atsLabel(result.source)})</span>
+            </div>
+          ) : null}
         </div>
       </section>
 

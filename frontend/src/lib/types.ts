@@ -37,6 +37,15 @@ export interface Job {
   title: string
   location: string
   description: string
+  /**
+   * Which board this posting was read from: "greenhouse", "workday",
+   * "generic", or a slug added later. Set by the server's ATS registry;
+   * the UI maps it to a badge and must not derive it from the URL itself.
+   *
+   * Optional because a job analysed before this field existed has no value,
+   * and the server defaults it to "generic" rather than sending null.
+   */
+  source?: string
   match_score: number | null
   match_result?: Record<string, unknown> | null
   decision?: string

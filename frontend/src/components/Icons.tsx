@@ -216,6 +216,14 @@ export const IconBell = (p: IconProps) => (
   </Svg>
 )
 
+export const IconLogout = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M15 17l5-5-5-5" />
+    <path d="M20 12H9" />
+    <path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6" />
+  </Svg>
+)
+
 export const IconKanban = (p: IconProps) => (
   <Svg {...p}>
     <rect x="3" y="4" width="5" height="16" rx="1.5" />

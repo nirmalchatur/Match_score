@@ -5,7 +5,8 @@ The original assertions are preserved; the setup now creates an account and
 authenticates, because the analyze endpoint is account-scoped.
 """
 
-from unittest.mock import patch
+import json
+from unittest.mock import Mock, patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -155,3 +156,97 @@ class JobAnalyzeAPIViewTest(TestCase):
             mock_process.call_args[0][1],
             self.user,
         )
+
+
+class AnalyzeAnyBoardTests(TestCase):
+    """
+    POST /api/jobs/analyze/ must accept any job link, not just Greenhouse.
+
+    The endpoint used to call ``GreenhouseCollector.collect`` directly, so a
+    Workday link came back as ``"URL is not a Greenhouse job board"`` -- a
+    validation error for something the user had done nothing wrong about.
+    These go through the real registry and the real adapters, with only the
+    network mocked, so the routing itself is under test.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="any@e.test", email="any@e.test", password="pw-12345"
+        )
+        self.client.force_login(self.user)
+        self.resume = Resume.objects.create(
+            user=self.user, name="M", resume_type="MASTER", is_master=True
+        )
+        ResumeProfile.objects.create(
+            resume=self.resume, skills=["Python"], experience={"total_years": 3.0}
+        )
+
+    def analyze(self, url):
+        return self.client.post(
+            "/api/jobs/analyze/",
+            data=json.dumps({"url": url}),
+            content_type="application/json",
+        )
+
+    @patch("apps.jobs.services.sources.workday.requests.get")
+    def test_a_workday_link_is_analysed(self, mock_get):
+        response = Mock(status_code=200)
+        response.json.return_value = {
+            "jobPostingInfo": {
+                "title": "Platform Engineer",
+                "company": "Acme",
+                "location": "London",
+                "jobDescription": "<ul><li>Python</li><li>Kubernetes</li></ul>",
+            }
+        }
+        mock_get.return_value = response
+
+        result = self.analyze(
+            "https://acme.wd1.myworkdayjobs.com/en-GB/Platform_JR-1"
+        )
+
+        self.assertEqual(result.status_code, 200, result.content)
+        self.assertEqual(result.json()["job"]["source"], "workday")
+        self.assertEqual(result.json()["job"]["title"], "Platform Engineer")
+
+    @patch("apps.jobs.services.sources.generic.requests.get")
+    def test_an_arbitrary_careers_page_is_analysed(self, mock_get):
+        response = Mock(status_code=200)
+        response.text = (
+            "<html><head>"
+            '<script type="application/ld+json">'
+            '{"@type":"JobPosting","title":"Data Engineer",'
+            '"description":"<p>Own the data platform end to end for the team.</p>",'
+            '"hiringOrganization":{"name":"Globex"}}'
+            "</script></head><body></body></html>"
+        )
+        mock_get.return_value = response
+
+        result = self.analyze("https://globex.com/careers/data-engineer")
+
+        self.assertEqual(result.status_code, 200, result.content)
+        body = result.json()["job"]
+        self.assertEqual(body["source"], "generic")
+        self.assertEqual(body["company"], "Globex")
+
+    @patch("apps.jobs.services.sources.generic.requests.get")
+    def test_the_saved_job_is_labelled_for_the_ui(self, mock_get):
+        """The badge comes from the stored column, not from re-deriving it."""
+        response = Mock(status_code=200)
+        response.text = (
+            "<html><head><script type=\"application/ld+json\">"
+            '{"@type":"JobPosting","title":"Engineer",'
+            '"description":"<p>Build and maintain services for our customers.</p>"}'
+            "</script></head><body></body></html>"
+        )
+        mock_get.return_value = response
+
+        self.analyze("https://example.com/careers/1")
+        job = Job.objects.get(user=self.user)
+        self.assertEqual(job.source, "generic")
+
+    def test_a_javascript_url_is_refused(self):
+        """Never fetched, never followed: a javascript: URL is not a page."""
+        result = self.analyze("javascript:alert(1)")
+        self.assertEqual(result.status_code, 400)
+        self.assertFalse(Job.objects.filter(user=self.user).exists())
