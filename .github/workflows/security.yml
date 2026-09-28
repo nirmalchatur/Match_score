@@ -106,22 +106,13 @@ jobs:
         working-directory: backend
         run: pip install -r requirements.txt
 
-      # NOTE: the variable names are exactly the ones config/settings.py and
-      # render.yaml use -- DEBUG / SECRET_KEY / ALLOWED_HOSTS, with no
-      # DJANGO_ prefix. An earlier version of this file set DJANGO_DEBUG and
-      # friends, which Django silently ignored, so DEBUG stayed at its
-      # development default of True and the check failed for the wrong reason.
-      #
-      # The key is long and varied because security.W009 rejects a short or
-      # low-entropy SECRET_KEY, and `check --deploy` promotes warnings to
-      # failures. It is a throwaway for a check that never opens a socket.
-      - name: check --deploy
+      # The project pins Django 6.1, which needs Python 3.12. The gate is a
+      # written policy rather than a bare `check --deploy` so that a warning
+      # nobody can reproduce locally does not block every merge. See the
+      # script for what is and is not enforced.
+      - name: Enforce the deployment policy
         working-directory: backend
-        env:
-          SECRET_KEY: ci-only-throwaway-8Jd2Xq9Lm4Np7Rt3Vw6Yb1Hs5Cf0Zg7Ke9Mu2Iv
-          DEBUG: 'False'
-          ALLOWED_HOSTS: 'ci.invalid'
-        run: python manage.py check --deploy
+        run: python ../.github/scripts/check_deploy_policy.py
 
   # ---------------------------------------------------------------------
   # Known-vulnerable dependencies.
