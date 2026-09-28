@@ -18,9 +18,12 @@ from apps.ai.exceptions import (
     AIProviderUnavailableError,
 )
 from apps.ai.providers.fake import FakeAIProvider
+from apps.ai.providers.gemini import GeminiProvider
 from apps.ai.tests.fixtures import SOURCE_PROFILE, valid_payload
 from apps.jobs.models import Job
 from apps.resumes.models import Resume, ResumeProfile
+from apps.users.models import ProviderCredential
+from apps.users.tests.test_ai_credentials import FAKE_KEY
 
 
 def post_json(client, url, payload):
@@ -349,3 +352,86 @@ class ProviderStatusTests(TailoringApiTestCase):
         self.assertIn(
             self.client.get("/api/resumes/tailor/status/").status_code, (401, 403)
         )
+
+
+class GeminiAvailabilityTests(TailoringApiTestCase):
+    """
+    The button must enable exactly when this account can actually tailor.
+
+    ``GeminiProvider.health()`` returns ``False`` with no server key, and
+    ``factory.describe_provider()`` never calls it -- it reports
+    ``available=True`` for any constructible provider. That split is
+    deliberate (a per-user key is not knowable to the provider), but it means
+    "unavailable" is decided in two places, and a change to either can silently
+    leave the button disabled for a user who has entered a valid key. So the
+    end-to-end contract is pinned here rather than inferred from the parts.
+
+    ``button_enabled()`` below reproduces the exact expression from
+    ``TailorResume.tsx``. The frontend has no test runner in this project, so
+    that expression lives here as the executable copy of the rule.
+    """
+
+    def status(self):
+        with override_settings(AI_PROVIDER="gemini"):
+            response = self.client.get("/api/resumes/tailor/status/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        # The real bug this guards: the key must not be present in any form.
+        self.assertNotIn(FAKE_KEY, json.dumps(body))
+        return body
+
+    def button_enabled(self, body):
+        return bool(body["available"]) and not (
+            body["requires_user_key"] and not body["user_key_configured"]
+        )
+
+    def _save_key(self, user, key=FAKE_KEY):
+        credential = ProviderCredential(user=user, provider="gemini")
+        credential.set_key(key)
+        credential.save()
+        return credential
+
+    def test_button_is_enabled_once_the_user_has_saved_a_key(self):
+        self._save_key(self.user)
+        body = self.status()
+        self.assertTrue(body["requires_user_key"])
+        self.assertTrue(body["user_key_configured"])
+        self.assertTrue(
+            self.button_enabled(body),
+            "A user with a stored key must be able to tailor",
+        )
+
+    def test_button_is_disabled_without_a_key(self):
+        body = self.status()
+        self.assertTrue(body["requires_user_key"])
+        self.assertFalse(body["user_key_configured"])
+        self.assertFalse(
+            self.button_enabled(body),
+            "Without a key the button must stay disabled, not fail on click",
+        )
+
+    def test_one_users_key_does_not_enable_another_users_button(self):
+        """The status is per account: a neighbour's key must not leak through."""
+        self._save_key(self.other)
+        body = self.status()
+        self.assertFalse(body["user_key_configured"])
+        self.assertFalse(self.button_enabled(body))
+
+    def test_removing_the_key_disables_the_button_again(self):
+        self._save_key(self.user)
+        self.assertTrue(self.button_enabled(self.status()))
+        ProviderCredential.objects.filter(user=self.user).delete()
+        self.assertFalse(self.button_enabled(self.status()))
+
+    def test_availability_ignores_health_because_a_key_is_per_user(self):
+        """
+        The provider is permanently "unhealthy" by its own account.
+
+        Asserted to document why ``health()`` is not consulted: with
+        bring-your-own-key there is no server-side credential for it to find, so
+        treating its ``False`` as authoritative would disable tailoring for
+        every user, forever.
+        """
+        healthy, _ = GeminiProvider().health()
+        self.assertFalse(healthy)
+        self.assertTrue(self.status()["available"])
