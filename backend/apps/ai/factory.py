@@ -67,18 +67,27 @@ def available_providers() -> list[str]:
     return sorted(_registry)
 
 
-def get_ai_provider() -> AIProvider:
+def get_ai_provider(name: str | None = None) -> AIProvider:
     """
     Build the configured provider.
 
-    Raises :class:`AIConfigurationError` when ``AI_PROVIDER`` is unset or names a
-    provider that is not registered. That is deliberately a configuration error
-    rather than a silent fallback to a stub: falling back would let a
-    misconfigured deployment look healthy while serving canned text to users.
+    Raises :class:`AIConfigurationError` when the effective name is empty or
+    names a provider that is not registered. That is deliberately a
+    configuration error rather than a silent fallback to a stub: falling back
+    would let a misconfigured deployment look healthy while serving canned
+    text to users.
+
+    ``name`` overrides the server-wide ``AI_PROVIDER`` for this one call, which
+    is how a per-user choice is honoured. It is resolved by the *caller* (see
+    :func:`apps.ai.selection.resolve_provider_name`), not here: the factory
+    stays ignorant of users, because a provider has no business knowing who is
+    asking. Pass ``None`` to use the deployment default, which keeps every
+    existing caller behaving exactly as before.
     """
     from django.conf import settings
 
-    name = (getattr(settings, "AI_PROVIDER", "") or "").strip().lower()
+    chosen = (name if name is not None else getattr(settings, "AI_PROVIDER", "")) or ""
+    name = chosen.strip().lower()
 
     if not name:
         raise AIConfigurationError(
@@ -97,15 +106,16 @@ def get_ai_provider() -> AIProvider:
     return factory()
 
 
-def describe_provider() -> dict:
+def describe_provider(name: str | None = None) -> dict:
     """
     Non-secret provider metadata, safe to expose through the API.
 
     Never includes the base URL or any credential: provider configuration must
-    stay server-side.
+    stay server-side. ``name`` overrides the deployment default for one call,
+    matching :func:`get_ai_provider`.
     """
     try:
-        provider = get_ai_provider()
+        provider = get_ai_provider(name)
     except AIConfigurationError as exc:
         return {
             "provider": None,
