@@ -2712,3 +2712,67 @@ textarea {
   .confirm-scrim,
   .confirm-card { animation: none; }
 }
+
+/* ---------- Resume upload ----------
+   The control that was missing entirely: "Manage resumes" described the API
+   call in prose and nothing on the page could perform it. */
+.upload-form {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  margin-top: 4px;
+}
+
+.upload-form .form-label { margin: 0; }
+
+.upload-drop {
+  position: relative;
+  width: 100%;
+  padding: 18px;
+  border: 1px dashed var(--border-mid);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  text-align: center;
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.upload-drop:hover { border-color: var(--accent-mid); }
+
+/* The input sits over the whole drop target, so the label is the button. */
+.upload-drop input[type='file'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-drop input[type='file']:focus-visible {
+  outline: 2px solid var(--accent-mid);
+  outline-offset: 2px;
+}
+
+.upload-picked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.upload-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
