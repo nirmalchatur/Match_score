@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -148,6 +149,84 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # an HttpOnly session cookie and no secret is readable from JavaScript.
 # CSRF is enforced by Django for all unsafe methods on session requests.
 
+# ---------------------------------------------------------------------------
+# API rate limiting
+#
+# DRF's built-in throttling is used rather than django-ratelimit or Redis. It
+# needs no new dependency, and Redis would be the wrong tool: the counters are
+# small and short-lived, and the project has no Redis to begin with.
+#
+# Throttling is explicitly NOT an authorisation control. It sits *after*
+# authentication, permission and ownership checks (see SECURITY.md); it exists
+# to stop one client from spending the owner's AI quota or CPU, not to decide
+# who may read a resume. Every ownership test in the suite still passes with
+# throttling switched on.
+# ---------------------------------------------------------------------------
+
+TAILORUP_RATE_LIMIT_ENABLED = env_bool("TAILORUP_RATE_LIMIT_ENABLED", default=True)
+
+# The test suite is the one place the global budget must not apply. With limits
+# on, 500 tests firing the same endpoints exhaust a 60/min allowance and start
+# failing 429 for reasons that have nothing to do with what they assert -- 59
+# of them did exactly that when this was first switched on.
+#
+# `setdefault` rather than assignment: an explicit TAILORUP_RATE_LIMIT_ENABLED
+# in the environment still wins, so anyone deliberately testing the throttled
+# path can ask for it. The tests that assert 429 patch the rate table
+# themselves (see apps/common/tests/test_rate_limiting.py), so this removes
+# global throttling without blinding the tests that verify it.
+if "test" in sys.argv:
+    os.environ.setdefault("TAILORUP_RATE_LIMIT_ENABLED", "False")
+
+
+def _rate(scope: str, default: str) -> str | None:
+    """Read a rate like ``5/min`` from the environment.
+
+    Returns ``None`` when throttling is off, which is how the throttle classes
+    become no-ops: DRF treats a ``None`` rate as "never throttled" rather than
+    as a malformed value.
+
+    The enabled flag is re-read on every call rather than captured at import.
+    A module-level copy goes stale the moment anything sets the variable after
+    startup -- which a test does, and which would otherwise make the switch
+    look broken while silently doing nothing.
+    """
+    if not env_bool("TAILORUP_RATE_LIMIT_ENABLED", default=True):
+        return None
+    return (os.environ.get(f"TAILORUP_RATE_LIMIT_{scope}") or default).strip()
+
+
+RATE_LIMIT_AUTH = _rate("AUTH", "5/min")
+RATE_LIMIT_SIGNUP = _rate("SIGNUP", "5/hour")
+RATE_LIMIT_ANONYMOUS = _rate("ANONYMOUS", "30/min")
+RATE_LIMIT_USER = _rate("USER", "60/min")
+RATE_LIMIT_AI = _rate("AI", "5/min")
+RATE_LIMIT_AI_HOURLY = _rate("AI_HOURLY", "20/hour")
+RATE_LIMIT_DOCUMENT = _rate("DOCUMENT", "10/min")
+
+# Rate limiting is stateful, so it needs a cache. LocMemCache is per-process
+# and therefore only exact for a single worker; gunicorn runs several. Set
+# TAILORUP_CACHE_URL to a shared cache in production (see DEPLOYMENT.md) or the
+# effective limit becomes "limit x number of workers".
+_cache_url = (os.environ.get("TAILORUP_CACHE_URL") or "").strip()
+if _cache_url and _cache_url.startswith("redis://"):
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _cache_url,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "tailorup-throttle",
+            # Counters only need to outlive the request. A long timeout would
+            # pin memory in a long-lived process for no benefit.
+            "TIMEOUT": 3600,
+        }
+    }
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
@@ -155,6 +234,31 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'apps.common.throttling.AnonRateThrottle',
+        'apps.common.throttling.UserRateThrottle',
+    ],
+    # One consistent 429 body, and a Retry-After header DRF does not send by
+    # default. Without it a browser has no way to know when to try again and
+    # guesses "now", which turns a rate limit into a retry storm.
+    'EXCEPTION_HANDLER': 'apps.common.throttle_handler.rate_limit_handler',
+    # Every scope a throttle in apps.common.throttling declares MUST appear
+    # here. DRF's get_rate() raises KeyError -- which surfaces as a 500 -- for
+    # any scope it cannot find, so omitting the scoped ones is not a fallback
+    # to "unlimited", it is a broken endpoint. An earlier version listed only
+    # anon and user, and every tailored-resume and document call returned 500.
+    #
+    # A None value is meaningful, not a placeholder: it means "unlimited",
+    # which is how the whole layer goes inert when throttling is disabled.
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': RATE_LIMIT_ANONYMOUS,
+        'user': RATE_LIMIT_USER,
+        'auth': RATE_LIMIT_AUTH,
+        'signup': RATE_LIMIT_SIGNUP,
+        'ai': RATE_LIMIT_AI,
+        'ai_hourly': RATE_LIMIT_AI_HOURLY,
+        'document': RATE_LIMIT_DOCUMENT,
+    },
 }
 
 

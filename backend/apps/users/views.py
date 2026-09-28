@@ -38,6 +38,8 @@ from .serializers import (
     UserSerializer,
 )
 
+from apps.common.throttling import SignupRateThrottle, StrictAnonRateThrottle
+
 
 class CsrfTokenView(APIView):
     """GET /api/auth/csrf/ — hand the SPA a CSRF token it can actually read.
@@ -57,6 +59,7 @@ class CsrfTokenView(APIView):
 
 
 class RegisterView(APIView):
+    throttle_classes = [SignupRateThrottle]
     """POST /api/auth/register/ — create an account and sign in."""
 
     permission_classes = [AllowAny]
@@ -78,6 +81,7 @@ class RegisterView(APIView):
 
 
 class LoginView(APIView):
+    throttle_classes = [StrictAnonRateThrottle]
     """POST /api/auth/login/ — start a session."""
 
     permission_classes = [AllowAny]
