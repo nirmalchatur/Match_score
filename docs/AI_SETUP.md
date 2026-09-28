@@ -24,7 +24,7 @@ their own free key into **Settings → AI**, and it is stored encrypted. That me
 
 ```bash
 AI_PROVIDER=gemini
-GEMINI_MODEL=gemini-2.0-flash   # optional, this is the default
+GEMINI_MODEL=gemini-3.8-flash   # optional, this is the default
 GEMINI_TIMEOUT=120              # optional
 ```
 

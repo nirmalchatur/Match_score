@@ -12,7 +12,7 @@ work there. Local development still uses ``AI_PROVIDER=ollama``.
 Configuration (environment only; nothing is hardcoded):
 
     AI_PROVIDER=gemini
-    GEMINI_MODEL=gemini-2.0-flash # optional, this is the default
+    GEMINI_MODEL=gemini-3.8-flash # optional, this is the default
     GEMINI_TIMEOUT=120            # optional
 
 There is deliberately **no** ``GEMINI_API_KEY``. This provider is
@@ -44,7 +44,20 @@ API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 
 #: Cheap, fast, and good enough for rewrite-shaped work. A default, not a
 #: requirement: it is a setting and can be overridden.
-DEFAULT_MODEL = "gemini-2.0-flash"
+#:
+#: Google shuts models down on a schedule, and a shut-down model answers 404
+#: for every key. The previous default, gemini-2.0-flash, was shut down in June
+#: 2026, which broke every user of this app at once. Note that gemini-2.5-flash
+#: is *not* a safe substitute even though it is not formally deprecated: Google
+#: limits 2.5-series access to keys that have used them before, so a freshly
+#: created bring-your-own key gets refused. Their guidance for new projects is
+#: the 3.x Flash line, which is what this uses.
+DEFAULT_MODEL = "gemini-3.8-flash"
+
+#: Tried in order when the configured model is gone. A retirement is a Google
+#: schedule, not something a user can fix, so the call is retried on a model
+#: that is current rather than failing the user's tailoring outright.
+FALLBACK_MODELS = ("gemini-3.7-flash", "gemini-3.6-flash")
 
 #: Gemini is asked for JSON by schema as well as in the prompt, because the
 #: model is far more reliable when both agree. schemas.py still parses
@@ -133,6 +146,27 @@ class GeminiProvider(AIProvider):
             detail=f"no text parts in response: {str(payload)[:400]}",
         )
 
+    def _post(self, model: str, body: dict, key: str):
+        """One ``generateContent`` call, with transport errors translated."""
+        url = f"{API_ROOT}/models/{model}:generateContent"
+        try:
+            return requests.post(
+                url,
+                json=body,
+                timeout=self.timeout,
+                headers={"x-goog-api-key": key},
+            )
+        except requests.Timeout as exc:
+            raise AIProviderTimeoutError(
+                "The AI provider took too long to respond. Please try again.",
+                detail=f"POST {url} timed out after {self.timeout}s: {exc}",
+            ) from exc
+        except requests.RequestException as exc:
+            raise AIProviderUnavailableError(
+                "The AI provider is not available. Please try again later.",
+                detail=f"POST {url} failed: {exc}",
+            ) from exc
+
     def tailor_resume(self, request) -> str:
         key = self._key_for(request)
         if not key:
@@ -153,34 +187,63 @@ class GeminiProvider(AIProvider):
             },
         }
 
-        url = f"{API_ROOT}/models/{self.model}:generateContent"
+        tried: list[str] = []
+        used = self.model
+        for model in (self.model, DEFAULT_MODEL, *FALLBACK_MODELS):
+            if model in tried:
+                continue
+            tried.append(model)
+            response = self._post(model, body, key)
+            used = model
+            if response.status_code != 404:
+                break
+            # A 404 here means the model is gone, never that the key is bad:
+            # Google authenticates before it resolves the model, so an invalid
+            # key is a 400/401/403 and is handled below without any fallback.
+            logger.warning(
+                "ai.model_retired provider=gemini model=%s; trying the next one",
+                model,
+            )
+
+        url = f"{API_ROOT}/models/{used}:generateContent"
         logger.info(
             "ai.provider_request provider=gemini model=%s user_key=%s",
-            self.model,
+            used,
             "yes" if (getattr(request, "api_key", "") or "").strip() else "no",
         )
 
-        try:
-            response = requests.post(
-                url,
-                json=body,
-                timeout=self.timeout,
-                headers={"x-goog-api-key": key},
+        if response.status_code == 400:
+            # A 400 is INVALID_ARGUMENT about the *request*, not the key. The
+            # common cause on Gemini 3.x is sampling parameters: Google dropped
+            # temperature/top_p/top_k in the 3 migration and answers a bare
+            # "Request contains an invalid argument" for them. Retry once with
+            # the bare minimum before giving up, so a model that dislikes
+            # `temperature` does not take the whole feature down with it.
+            minimal = dict(body)
+            minimal["generationConfig"] = {"responseMimeType": "application/json"}
+            logger.warning(
+                "ai.generation_config_rejected provider=gemini model=%s; "
+                "retrying without sampling parameters",
+                used,
             )
-        except requests.Timeout as exc:
-            raise AIProviderTimeoutError(
-                "The AI provider took too long to respond. Please try again.",
-                detail=f"POST {url} timed out after {self.timeout}s: {exc}",
-            ) from exc
-        except requests.RequestException as exc:
-            raise AIProviderUnavailableError(
-                "The AI provider is not available. Please try again later.",
-                detail=f"POST {url} failed: {exc}",
-            ) from exc
+            retry = self._post(used, minimal, key)
+            if retry.status_code == 200:
+                return self._extract_content(retry)
+            if retry.status_code in (401, 403):
+                response = retry
+            else:
+                raise AIProviderUnavailableError(
+                    "Gemini rejected the request as invalid. Your API key is "
+                    "fine; this is a server-side configuration problem. Please "
+                    "contact the app owner.",
+                    detail=f"POST {url} returned 400, and still "
+                    f"{retry.status_code} without sampling parameters: "
+                    f"{response.text[:300]} / {retry.text[:300]}",
+                )
 
-        if response.status_code in (400, 401, 403):
-            # Almost always an invalid, wrong-type, or out-of-quota key. The
-            # fix is on the user's side, so say that rather than "try later".
+        if response.status_code in (401, 403):
+            # Genuinely the user's key: invalid, wrong-type, or out of quota.
+            # The fix is on their side, so say that rather than "try later".
             raise AIProviderUnavailableError(
                 "Gemini rejected the API key. Check it in Google AI Studio.",
                 detail=f"POST {url} returned {response.status_code}: "
@@ -188,9 +251,15 @@ class GeminiProvider(AIProvider):
             )
 
         if response.status_code == 404:
+            # Every configured and fallback model has been retired. This says
+            # what it is -- a server-side model problem, nothing to do with the
+            # user's key -- because the old wording ("does not exist") sent
+            # people to Google AI Studio to re-check a perfectly good key.
             raise AIProviderUnavailableError(
-                f"The configured AI model '{self.model}' does not exist.",
-                detail=f"POST {url} returned 404 for model {self.model!r}",
+                "This deployment is pointing at an AI model that Google has "
+                "retired. Your API key is fine. Please contact the app owner.",
+                detail=f"POST {url} returned 404 for model {used!r}; "
+                f"tried {tried!r}",
             )
 
         if response.status_code == 429:

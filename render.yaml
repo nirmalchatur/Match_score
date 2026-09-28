@@ -71,10 +71,10 @@ services:
       # a single leaked deployment cannot be used by anyone.
       - key: AI_PROVIDER
         value: "gemini"
-      # Optional. gemini-2.0-flash is the provider's default; set this only to
-      # pin a different model.
+      # Pinned to a model that is actually live. gemini-2.0-flash was shut down
+      # by Google in June 2026 and answered 404 for every user's key.
       - key: GEMINI_MODEL
-        value: "gemini-2.0-flash"
+        value: "gemini-3.8-flash"
       # Generation timeout in seconds. Matches gunicorn's --timeout above, so a
       # slow tailoring call is answered with a real error rather than a worker
       # kill.

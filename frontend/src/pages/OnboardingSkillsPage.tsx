@@ -55,7 +55,15 @@ export function OnboardingSkillsPage() {
   // Not blocking. Seven areas and a minimum of seven means "one from each" is
   // really "exactly one from each", which would oblige a backend engineer to
   // claim an HR skill they do not have. The gaps are surfaced, not enforced.
-  const gaps = data?.uncovered_groups ?? []
+  //
+  // Derived from `selected`, NOT from `data.uncovered_groups`. That server
+  // field only changes on save -- and this page navigates away the moment the
+  // save succeeds -- so reading it left the banner claiming all seven areas
+  // were empty no matter what the user had picked. `data` carries the
+  // catalogue and the rules; `selected` is the live answer.
+  const gaps = (data?.kinds ?? []).filter(
+    (kind) => (selected?.[kind] ?? []).length === 0,
+  )
 
   const toggle = useCallback((kind: QualityKind, value: string) => {
     setError('')
@@ -140,8 +148,12 @@ export function OnboardingSkillsPage() {
         {gaps.length > 0 && count > 0 ? (
           <div style={{ marginBottom: 18 }}>
             <Alert variant="info">
-              Nothing selected yet in {gaps.map((kind) => data.labels[kind]).join(', ')}.
-              {ready ? ' You can save as it is.' : ''}
+              {gaps.length === data.kinds.length
+                ? 'Nothing selected in any area yet.'
+                : `No pick yet in ${gaps.length} of ${data.kinds.length} areas: ${gaps
+                    .map((kind) => data.labels[kind])
+                    .join(', ')}.`}
+              {ready ? ' You can save as it is -- a rounded profile is not required.' : ''}
             </Alert>
           </div>
         ) : null}
