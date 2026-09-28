@@ -10,7 +10,7 @@ import logging
 import os
 
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -831,5 +831,74 @@ class ResumeDownloadView(APIView):
         response["Content-Disposition"] = 'attachment; filename="%s"' % filename
         response["Content-Length"] = str(len(payload))
         # Personal documents must not be cached by shared proxies.
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
+class ResumeFileView(APIView):
+    """
+    GET /api/resumes/<pk>/file/ -- the originally uploaded document.
+
+    Why this exists rather than linking MEDIA_URL directly
+    ------------------------------------------------------
+    The "Open" button used to point at the raw upload path, which was broken
+    twice over:
+
+    1. ``api.fileUrl`` returned a root-relative ``/media/...`` unchanged, so
+       the browser resolved it against the *frontend* origin. The SPA is on
+       Vercel and the API on Render, so the request went to the wrong host and
+       404'd.
+    2. Even with the right host, nothing serves ``/media/`` in production.
+       ``django.conf.urls.static.static()`` is a no-op unless ``DEBUG`` is on
+       -- verified: it returns zero routes here -- so the route in
+       ``config/urls.py`` only ever worked in development.
+
+    Routing through an authenticated view fixes both, and it is also the only
+    version that is *safe*. Serving uploads as plain static files would make
+    every resume world-readable at a guessable URL, bypassing the tenant
+    boundary every other endpoint in this project enforces by scoping the
+    query to ``request.user``. A resume is a personal document; it is not a
+    public asset.
+
+    The download endpoint renders a fresh document from the structured profile
+    and is unaffected -- it never went through MEDIA_URL.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        # Scoped by owner, so another account's id is indistinguishable from a
+        # missing one -- both 404, never 403, which would confirm it exists.
+        resume = Resume.objects.filter(user=request.user, pk=pk).first()
+        if resume is None or not resume.file:
+            return Response(
+                {"error": "Resume not found.", "code": "resume_missing"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            # `open` on the FieldFile, not read(): read() loads the whole
+            # document into memory, and a 10 MB PDF per request is a way to
+            # make the worker hold a lot of nothing.
+            handle = resume.file.open("rb")
+        except (FileNotFoundError, OSError):
+            # The row points at a file that is gone -- a deploy that lost the
+            # media volume, most likely. Say so plainly rather than 500.
+            logger.warning("resume.file_missing resume=%s", pk)
+            return Response(
+                {
+                    "error": "The uploaded file is no longer available. Please re-upload it.",
+                    "code": "file_missing",
+                },
+                status=status.HTTP_410_GONE,
+            )
+
+        # `inline`, not `attachment`: this is what "Open" means, and the
+        # browser should render the PDF in a tab rather than download it.
+        response = FileResponse(handle, content_type="application/pdf")
+        name = os.path.basename(resume.file.name) or "resume.pdf"
+        response["Content-Disposition"] = 'inline; filename="%s"' % name
+        # Personal document: never cached by a shared proxy or the browser's
+        # shared cache.
         response["Cache-Control"] = "private, no-store"
         return response

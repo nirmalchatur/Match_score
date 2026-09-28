@@ -368,10 +368,27 @@ export const api = {
    * root-relative to the API origin (e.g. "/media/resumes/master.pdf").
    * Only bare, unrooted paths get the API prefix applied.
    */
+  /**
+   * The original uploaded document, through the authenticated API route.
+   *
+   * The old version linked MEDIA_URL directly and was broken twice: a
+   * root-relative `/media/...` was returned unchanged, so the browser
+   * resolved it against the *frontend* origin (Vercel) rather than the API
+   * (Render), and nothing serves `/media/` in production anyway because
+   * Django's `static()` is a no-op unless DEBUG is on.
+   *
+   * Going through the API also means the file is tenant-scoped, so a resume
+   * is not a world-readable asset at a guessable URL.
+   */
+  resumeFileUrl(resumeId: number): string {
+    return `${BASE_URL}/resumes/${resumeId}/file/`
+  },
+
   fileUrl(path: string): string {
     if (/^https?:\/\//i.test(path)) return path
-    if (path.startsWith('/')) return path
-    return `${BASE_URL}/${path}`
+    // Root-relative paths belong to the API, not the frontend. Returning
+    // them unchanged silently pointed the browser at the wrong host.
+    return `${BASE_URL.replace(/\/api$/, '')}/${path.replace(/^\//, '')}`
   },
 
   /* ---------- Applications ---------- */

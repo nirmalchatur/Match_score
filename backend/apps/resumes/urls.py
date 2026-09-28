@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     AIProviderStatusView,
     QualitiesView,
+    ResumeFileView,
     ResumeDetailView,
     ResumeDownloadView,
     ResumeListView,
@@ -63,6 +64,15 @@ urlpatterns = [
         "<int:pk>/set-master/",
         SetMasterResumeView.as_view(),
         name="resume-set-master",
+    ),
+
+    # The original upload, served through an authenticated view rather than
+    # MEDIA_URL: a static route would make every resume world-readable at a
+    # guessable URL, bypassing the tenant boundary the API enforces.
+    path(
+        "<int:pk>/file/",
+        ResumeFileView.as_view(),
+        name="resume-file",
     ),
 
     path(

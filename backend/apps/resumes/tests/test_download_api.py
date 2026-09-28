@@ -322,3 +322,99 @@ class DownloadListingTests(DownloadApiTestCase):
         self.client.logout()
         self.client.force_login(self.other)
         self.assertEqual(self.client.get("/api/resumes/").json(), [])
+
+
+class ResumeFileEndpointTests(TestCase):
+    """
+    GET /api/resumes/<pk>/file/ -- the original upload.
+
+    This is what the "Open" button points at. It exists because linking
+    MEDIA_URL was broken twice over, and the third problem it fixes is the
+    important one: a static route would make every resume readable by anyone
+    who guessed the URL.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="owner@example.test", email="owner@example.test", password="pw-12345"
+        )
+        self.other = User.objects.create_user(
+            username="other@example.test", email="other@example.test", password="pw-12345"
+        )
+
+    def make_resume(self, user, name="cv.pdf"):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        upload = SimpleUploadedFile(name, b"%PDF-1.4 fake bytes for testing", content_type="application/pdf")
+        return Resume.objects.create(
+            user=user, name="CV", resume_type="MASTER", is_master=True, file=upload
+        )
+
+    def test_the_owner_can_open_their_own_upload(self):
+        resume = self.make_resume(self.user)
+        self.client.force_login(self.user)
+        response = self.client.get(f"/api/resumes/{resume.id}/file/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("inline", response["Content-Disposition"])
+        b"".join(response.streaming_content)
+
+    def test_another_account_gets_404_not_403(self):
+        """
+        403 would confirm the id exists.
+
+        Every other read in this project answers 404 for a record owned by
+        someone else, and this endpoint must not become the exception.
+        """
+        resume = self.make_resume(self.other)
+        self.client.force_login(self.user)
+        self.assertEqual(
+            self.client.get(f"/api/resumes/{resume.id}/file/").status_code, 404
+        )
+
+    def test_anonymous_visitors_are_rejected(self):
+        resume = self.make_resume(self.user)
+        self.client.logout()
+        self.assertIn(
+            self.client.get(f"/api/resumes/{resume.id}/file/").status_code, (401, 403)
+        )
+
+    def test_a_resume_without_an_upload_is_404(self):
+        """Tailored resumes are generated, so they have no file to open."""
+        resume = Resume.objects.create(
+            user=self.user, name="Tailored", resume_type="TAILORED"
+        )
+        self.client.force_login(self.user)
+        self.assertEqual(
+            self.client.get(f"/api/resumes/{resume.id}/file/").status_code, 404
+        )
+
+    def test_a_missing_file_on_disk_is_reported_not_500(self):
+        """
+        A deploy that lost its media volume leaves rows pointing nowhere.
+
+        That is a real, recoverable condition for the user, so it gets a 410
+        with an instruction rather than a stack trace.
+        """
+        resume = self.make_resume(self.user)
+        resume.file.storage.delete(resume.file.name)
+        self.client.force_login(self.user)
+        response = self.client.get(f"/api/resumes/{resume.id}/file/")
+        self.assertEqual(response.status_code, 410)
+        self.assertEqual(response.json()["code"], "file_missing")
+
+    def test_the_response_is_not_cacheable(self):
+        """A personal document must not sit in a shared proxy's cache."""
+        resume = self.make_resume(self.user)
+        self.client.force_login(self.user)
+        response = self.client.get(f"/api/resumes/{resume.id}/file/")
+        self.assertIn("no-store", response["Cache-Control"])
+
+    def test_the_route_does_not_leak_a_filesystem_path(self):
+        resume = self.make_resume(self.user)
+        self.client.force_login(self.user)
+        response = self.client.get(f"/api/resumes/{resume.id}/file/")
+        b"".join(response.streaming_content)
+        # Only the bare filename may appear, never MEDIA_ROOT.
+        self.assertNotIn("media\\", response["Content-Disposition"])
+        self.assertNotIn("media/", response["Content-Disposition"])
