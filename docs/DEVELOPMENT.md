@@ -90,6 +90,42 @@ Tests never call a real model. They use `FakeProvider`; the real
 `OllamaProvider` has its own suite that mocks HTTP. Rerunning a genuine model
 request costs several minutes, so do it deliberately, not as a smoke test.
 
+## Diagnostics
+
+Two scripts live in `backend/` and are prefixed with `_` so they read as
+tooling rather than application modules. They are not imported by anything
+and no test touches them.
+
+```bash
+cd backend
+
+# Is the provider wired up, and is the daemon actually answering?
+python _check_provider.py
+
+# One real, capped generation. Prints the model's output and how long it took.
+python _demo_ollama.py
+```
+
+`_check_provider.py` prints the resolved settings, describes the provider, and
+then calls `provider.health()` — the one call that touches the network, so it
+distinguishes *configured* from *reachable*. It exits non-zero when the
+provider cannot be built or the daemon does not answer, so it is usable in a
+script.
+
+It exists because "AI is not configured" and "the daemon is down" and "the
+model is not pulled" all present as the same vague failure otherwise, and the
+difference between them is the whole diagnosis.
+
+`_demo_ollama.py` sends a fixed, generic prompt with `num_predict` capped, so
+it returns in seconds rather than the minutes a real tailoring run costs. It
+proves the transport, the model and the output. It is **not** a tailoring run
+and must not be read as evidence that the tailoring contract holds — that is
+covered by the test suite with `FakeProvider`, and by the one real end-to-end
+run recorded in `AI_SETUP.md`.
+
+Both are read-only with respect to your data: neither reads a resume, and
+neither writes to the database.
+
 ## Rate limiting during development
 
 Throttling is on by default and will otherwise throttle your own test suite.
