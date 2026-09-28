@@ -547,6 +547,13 @@
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
+/*
+ * Selection is a left rule plus a faint tint. It was briefly a full inversion
+ * (background: var(--accent)) which turned the row into a solid black bar and
+ * swallowed the status pill; the pill has its own colours and cannot survive
+ * its container flipping underneath it.
+ */
+
 .job-row-title {
   font-size: 13.5px;
   font-weight: 500;
@@ -577,6 +584,23 @@
   align-items: center;
   gap: 10px;
 }
+
+.job-row-title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Numbers line up: a column of scores must not jitter as digits change. */
+.mono,
+.job-row-meta time,
+.score-ring,
+.metric-value {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-value { letter-spacing: -0.02em; }
+
 
 
 /* ---------- Metric tiles ---------- */
@@ -2079,7 +2103,7 @@
   letter-spacing: 0.02em;
   flex: 0 0 auto;
   border: 1px solid var(--border, #e2e2e6);
-  background: #f4f4f6;
+  background: var(--hover);
   color: #55555f;
 }
 
@@ -2123,7 +2147,7 @@
   color: #55555f;
 }
 
-.sidebar-logout:hover { background: #f2f2f4; }
+.sidebar-logout:hover { background: var(--hover); }
 
 .sidebar-logout.confirming {
   color: var(--danger, #b3261e);
@@ -2142,11 +2166,11 @@
 .choice-card {
   border: 1px solid var(--border, #e2e2e6);
   border-radius: 10px;
-  background: #fff;
+  background: var(--input-bg);
   transition: border-color 120ms ease, background 120ms ease;
 }
 
-.choice-card:hover { border-color: #c9c9d1; }
+.choice-card:hover { border-color: var(--border-mid); }
 
 .choice-card.selected {
   border-color: #1f1f24;
@@ -2245,43 +2269,6 @@
   letter-spacing: -0.02em;
 }
 
-/* -- rows read as a ledger --------------------------------------------- */
-
-.job-row {
-  border-bottom: 1px solid var(--line, #e3e3e6);
-  border-radius: var(--r-sm);
-  padding: 9px 12px;
-  transition: background 90ms linear;
-}
-
-.job-row:hover { background: #fafafa; }
-
-.job-row.selected {
-  background: var(--accent);
-  color: var(--paper);
-  box-shadow: none;
-}
-
-.job-row.selected .stat-hint,
-.job-row.selected .job-row-meta { color: rgba(255, 255, 255, 0.72); }
-
-.job-row-title {
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-/* -- numbers line up --------------------------------------------------- */
-
-.mono,
-.job-row-meta time,
-.score-ring,
-.metric-value {
-  font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace);
-  /* Tabular figures stop columns of scores from jittering as digits change. */
-  font-variant-numeric: tabular-nums;
-}
-
-.metric-value { letter-spacing: -0.02em; }
 
 /* -- section labels read like a form, not a spa ------------------------ */
 
@@ -2307,7 +2294,7 @@
   border-color: var(--accent);
 }
 
-.btn-primary:hover { background: #242428; }
+.btn-primary:hover { background: var(--btn-primary-hover); }
 
 .btn-ghost { border-radius: var(--r-sm); }
 
@@ -2370,7 +2357,7 @@ textarea {
   text-transform: uppercase;
   letter-spacing: 0.07em;
   font-weight: 650;
-  color: #6b6b73;
+  color: var(--text-dim);
   padding: 8px 10px;
   border-bottom: 1px solid var(--line, #d8d8dc);
   white-space: nowrap;
@@ -2382,11 +2369,11 @@ textarea {
   vertical-align: middle;
 }
 
-.apps-table tbody tr:hover { background: #fafafa; }
+.apps-table tbody tr:hover { background: var(--row-hover); }
 .apps-table tbody tr:last-child td { border-bottom: none; }
 
 .apps-table .cell-role { font-weight: 600; }
-.apps-table .cell-company { color: #5a5a63; }
+.apps-table .cell-company { color: var(--text-dim); }
 
 .apps-table .cell-num {
   font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace);
@@ -2402,7 +2389,7 @@ textarea {
   font-size: 12px;
   border-radius: var(--r-xs);
   border: 1px solid var(--line, #d8d8dc);
-  background: #fff;
+  background: var(--input-bg);
   padding: 4px 6px;
   min-width: 150px;
 }
@@ -2435,10 +2422,10 @@ textarea {
   white-space: nowrap;
 }
 
-.st-live  { color: #0b5c2e; border-color: #bfe0cb; background: #eef8f1; }
-.st-offer { color: #14532d; border-color: #8fbf9f; background: #e2f2e6; }
-.st-closed { color: #6b6b73; border-color: #dedee2; background: #f5f5f7; }
-.st-idle  { color: #4a4a52; border-color: #d8d8dc; background: #fafafa; }
+.st-live  { color: var(--ok-fg); border-color: var(--ok-line); background: var(--ok-surface); }
+.st-offer { color: var(--ok-fg-strong); border-color: var(--ok-line-strong); background: var(--ok-surface-strong); }
+.st-closed { color: var(--text-dim); border-color: var(--border); background: var(--surface-2); }
+.st-idle  { color: var(--text-muted); border-color: var(--border); background: var(--surface-2); }
 
 /* ------------------------------------------------- top bar: API key button */
 
@@ -2450,7 +2437,7 @@ textarea {
   gap: 6px;
   border: 1px solid var(--line, #d8d8dc);
   border-radius: var(--r-sm);
-  background: #fff;
+  background: var(--input-bg);
   font-size: 12px;
   font-weight: 550;
   padding: 5px 10px;
@@ -2458,12 +2445,12 @@ textarea {
   white-space: nowrap;
 }
 
-.key-btn:hover { background: #f6f6f8; }
+.key-btn:hover { background: var(--hover); }
 
 .key-btn.is-on {
-  border-color: #bfe0cb;
-  background: #eef8f1;
-  color: #0b5c2e;
+  border-color: var(--ok-line);
+  background: var(--ok-surface);
+  color: var(--ok-fg);
 }
 
 .key-scrim {
@@ -2481,7 +2468,7 @@ textarea {
   padding: 14px;
   border: 1px solid var(--line, #d8d8dc);
   border-radius: var(--r-md);
-  background: #fff;
+  background: var(--input-bg);
   box-shadow: 0 8px 28px rgba(10, 10, 10, 0.14);
 }
 
@@ -2513,10 +2500,10 @@ textarea {
 
 .devterm {
   margin: 6px 0 2px;
-  border: 1px solid #2a2a30;
+  border: 1px solid var(--term-line);
   border-radius: var(--r-md);
-  background: #0b0b0e;
-  color: #d8d8e0;
+  background: var(--term-bg);
+  color: var(--term-fg);
   font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace);
   font-size: 11.5px;
   line-height: 1.6;
@@ -2528,8 +2515,8 @@ textarea {
   align-items: center;
   justify-content: space-between;
   padding: 5px 9px;
-  border-bottom: 1px solid #232329;
-  color: #7d7d8a;
+  border-bottom: 1px solid var(--term-line);
+  color: var(--term-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 10px;
@@ -2538,14 +2525,14 @@ textarea {
 .devterm-x {
   background: none;
   border: 0;
-  color: #7d7d8a;
+  color: var(--term-muted);
   cursor: pointer;
   font-size: 13px;
   line-height: 1;
   padding: 0 2px;
 }
 
-.devterm-x:hover { color: #fff; }
+.devterm-x:hover { color: var(--term-fg); }
 
 .devterm-out {
   height: 210px;
@@ -2554,27 +2541,174 @@ textarea {
 }
 
 .devterm-line { white-space: pre-wrap; word-break: break-word; }
-.devterm-line.tone-dim { color: #6f6f7d; }
-.devterm-line.tone-err { color: #ff8f85; }
+.devterm-line.tone-dim { color: var(--term-muted); }
+.devterm-line.tone-err { color: var(--term-err); }
 
 .devterm-prompt {
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 6px 9px;
-  border-top: 1px solid #232329;
+  border-top: 1px solid var(--term-line);
 }
 
-.devterm-prompt span { color: #5ee08a; }
+.devterm-prompt span { color: var(--term-ok); }
 
 .devterm-prompt input {
   flex: 1;
   background: none;
   border: none;
   outline: none;
-  color: #d8d8e0;
+  color: var(--term-fg);
   font: inherit;
   padding: 0;
 }
 
-.devterm-prompt input::placeholder { color: #4a4a56; }
+.devterm-prompt input::placeholder { color: var(--term-faint); }
+
+/* ---------- Theme toggle ----------
+   Segmented control, hairline border, ink fill when active. It sits in the
+   topbar rather than in Settings because the theme is the one setting people
+   reach for without being told to, and burying it is how you get people
+   filing "the dark mode is broken" when it is merely hidden. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.theme-opt {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.theme-opt + .theme-opt {
+  border-left: 1px solid var(--border-soft);
+}
+
+.theme-opt:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.theme-opt.is-active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.theme-opt:focus-visible {
+  outline: 2px solid var(--accent-mid);
+  outline-offset: -2px;
+}
+
+@media (max-width: 720px) {
+  .theme-opt { padding: 5px 8px; font-size: 11px; }
+}
+
+/* ---------- Developer console ----------
+   Was inlined into the 232px sidebar, where monospace output wrapped after
+   roughly twenty characters. It is now a bottom-anchored modal so the command
+   line and its output have room to be read. */
+.devterm-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 24px;
+  background: var(--overlay);
+  backdrop-filter: blur(2px);
+  animation: devterm-fade 140ms var(--ease-out);
+}
+
+.devterm-scrim .devterm {
+  width: min(920px, 100%);
+  max-height: 62vh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  animation: devterm-rise 180ms var(--ease-out);
+}
+
+.devterm-scrim .devterm-out {
+  min-height: 220px;
+  overflow-y: auto;
+}
+
+@keyframes devterm-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes devterm-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .devterm-scrim,
+  .devterm-scrim .devterm { animation: none; }
+}
+
+/* ---------- Confirm dialog ----------
+   Replaces the old "click again to sign out" two-step, which was not a real
+   confirmation: it changed a label and then acted on a button that had said
+   something else a moment earlier. */
+.confirm-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--overlay);
+  animation: devterm-fade 140ms var(--ease-out);
+}
+
+.confirm-card {
+  width: min(420px, 100%);
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  animation: devterm-rise 180ms var(--ease-out);
+}
+
+.confirm-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.confirm-body {
+  margin: 0 0 20px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm-scrim,
+  .confirm-card { animation: none; }
+}

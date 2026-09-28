@@ -154,7 +154,180 @@
   --t-base: 200ms;
   --t-slow: 450ms;
 
+  /* --- Component tokens ---------------------------------------------
+     These exist because the matching rules in components.css were
+     written with literal colours, which meant they could not follow a
+     theme change. Each one is defined in both themes, so a rule only
+     has to say `var(--x)` and never has to know which theme is on. */
+  --hover: #f4f4f6;
+  --row-hover: #fafafa;
+  --btn-primary-hover: #242428;
+  --input-bg: #ffffff;
+  --overlay: rgba(10, 10, 10, 0.45);
+
+  /* Status pills and the key button read as green. Green is kept because
+     "your key is saved" must not be mistakable for "this is missing". */
+  --ok-fg: #0b5c2e;
+  --ok-surface: #eef8f1;
+  --ok-line: #bfe0cb;
+  --ok-fg-strong: #14532d;
+  --ok-surface-strong: #e2f2e6;
+  --ok-line-strong: #8fbf9f;
+
+  /* The developer console is a terminal: dark in both themes, because a
+     terminal that inverted with the OS would be wrong, not delightful. */
+  --term-bg: #0b0b0e;
+  --term-fg: #d8d8e0;
+  --term-line: #232329;
+  --term-muted: #7d7d8a;
+  --term-faint: #4a4a56;
+  --term-err: #ff8f85;
+  --term-ok: #5ee08a;
+
   color-scheme: light;
+}
+
+/* ============================================================
+   Dark theme.
+
+   The product is ink on paper. Dark mode is the same system with
+   the values inverted, not a second palette: the accent IS the
+   text colour, so hierarchy is still carried by value and rule
+   rather than hue. Every token above is overridden here so that
+   the ~390 `var()` call sites in components.css need no change
+   at all.
+
+   Set by `useTheme`, which writes `data-theme` on <html> and
+   persists the choice. A user who has never chosen a theme gets
+   the system preference instead (see the media query at the end).
+   ============================================================ */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* --- Core ink & paper (inverted) --- */
+  --ink: #f4f4f5;
+  --paper: #0a0a0b;
+
+  /* --- Legacy brand slots, remapped onto the inverted ramp --- */
+  --sand: #1c1c1f;
+  --mist: #8e8e99;
+  --deep: #f4f4f5;
+  --rust: #c4c4cc;
+
+  /* --- Canvas & surfaces --- */
+  --bg: #0a0a0b;
+  --bg-panel: #101012;
+  --bg-elevated: #17171a;
+  --surface: #141416;
+  --surface-2: #1c1c20;
+  --surface-3: #24242a;
+
+  /* --- Borders: white at low alpha, the exact inverse of the
+         light theme's black. Keeps hairlines visible without
+         the muddiness a solid grey would produce. --- */
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.15);
+  --border-mid: rgba(255, 255, 255, 0.26);
+  --border-strong: #6f6f7a;
+  --border-input: rgba(255, 255, 255, 0.3);
+
+  /* --- Text.
+         --text-dim is #9a9aa4 (5.4:1 on --bg) so small labels
+         still clear WCAG AA for normal text. --- */
+  --text: #f4f4f5;
+  --text-muted: #c2c2ca;
+  --text-dim: #9a9aa4;
+
+  /* --- Primary (inverted ink) --- */
+  --accent: #f4f4f5;
+  --accent-soft-text: #f4f4f5;
+  --accent-mid: #c2c2ca;
+  --accent-faint: rgba(255, 255, 255, 0.05);
+  --accent-12: rgba(255, 255, 255, 0.12);
+  --accent-15: rgba(255, 255, 255, 0.15);
+  --accent-20: rgba(255, 255, 255, 0.2);
+  --accent-35: rgba(255, 255, 255, 0.35);
+  --accent-line: rgba(255, 255, 255, 0.85);
+
+  /* --- Secondary (graphite) --- */
+  --rust-soft-text: #d6d6dd;
+  --rust-mid: #9a9aa4;
+  --rust-faint: rgba(255, 255, 255, 0.06);
+  --rust-12: rgba(255, 255, 255, 0.12);
+  --rust-15: rgba(255, 255, 255, 0.15);
+  --rust-20: rgba(255, 255, 255, 0.2);
+  --rust-35: rgba(255, 255, 255, 0.35);
+  --rust-line: rgba(255, 255, 255, 0.32);
+
+  /* --- Supporting tints --- */
+  --blue: #f4f4f5;
+  --blue-soft-text: #f4f4f5;
+  --blue-12: rgba(255, 255, 255, 0.12);
+  --blue-20: rgba(255, 255, 255, 0.2);
+
+  --pink: #f4f4f5;
+  --green: #f4f4f5;
+
+  /* --- Status: same value-weight encoding, inverted.
+         danger is the one hue that survives, because "this failed"
+         must not be readable as "this is fine". --- */
+  --success: #f4f4f5;
+  --success-strong: #f4f4f5;
+  --success-bg: #1e1e22;
+  --success-border: rgba(255, 255, 255, 0.55);
+  --warning: #c2c2ca;
+  --warning-bg: #1a1a1e;
+  --warning-border: rgba(255, 255, 255, 0.24);
+  --danger: #ff8f85;
+  --danger-bg: #241514;
+  --danger-border: rgba(255, 143, 133, 0.45);
+  --neutral-bg: #1c1c20;
+  --neutral-border: rgba(255, 255, 255, 0.16);
+
+  /* --- Legacy swatch slots (inverted) --- */
+  --tech-cyan: #f4f4f5;
+  --tech-blue: #c2c2ca;
+  --tech-green: #9a9aa4;
+  --tech-violet: #8e8e99;
+
+  /* --- Elevation: shadows deepen rather than lighten --- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 24px -12px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 24px 60px -24px rgba(0, 0, 0, 0.8);
+  --glow-violet: 0 0 24px rgba(255, 255, 255, 0.08), 0 0 48px rgba(255, 255, 255, 0.04);
+  --glow-violet-sm: 0 0 12px rgba(255, 255, 255, 0.08);
+  --glow-blue-sm: 0 0 12px rgba(255, 255, 255, 0.07);
+  --glow-green-sm: 0 0 16px rgba(255, 255, 255, 0.07);
+  /* --- Component tokens (dark) --- */
+  --hover: #1e1e22;
+  --row-hover: #16161a;
+  --btn-primary-hover: #ffffff;
+  --input-bg: #17171a;
+  --overlay: rgba(0, 0, 0, 0.65);
+
+  --ok-fg: #7ee2a8;
+  --ok-surface: #10231a;
+  --ok-line: #1f4a33;
+  --ok-fg-strong: #9df0c0;
+  --ok-surface-strong: #13301f;
+  --ok-line-strong: #2a6446;
+
+  --term-bg: #08080a;
+  --term-fg: #d8d8e0;
+  --term-line: #1d1d22;
+  --term-muted: #8a8a97;
+  --term-faint: #55555f;
+  --term-err: #ff8f85;
+  --term-ok: #5ee08a;
+
+}
+
+/* No stored preference: follow the operating system. Declared after
+   the explicit blocks so a user's saved choice always wins. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme='light']):not([data-theme='dark']) {
+    color-scheme: dark;
+  }
 }
 
 /* ---------- Reset ---------- */

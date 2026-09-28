@@ -52,32 +52,31 @@ export function Sidebar({
   jobs?: Job[]
 }) {
   /**
-   * Signing out is destructive enough to confirm, but not so much that a
-   * modal is warranted.
+   * Signing out used to be a two-click confirm: the first click rewrote the
+   * label to "Click again to sign out", the second acted on it.
    *
-   * The first click arms the button and the second confirms; navigating or
-   * waiting disarms it. `leaving` guards the case where the click that follows
-   * confirmation is the one that unmounts this component -- without it the
-   * component would try to set state after unmount and React would warn.
+   * That is the worst of both patterns. It is not a real confirmation, because
+   * nothing is *shown* -- the label changes and a hurried second click lands on
+   * a button that used to say something else. And it disarms on blur, so a
+   * click that starts elsewhere and ends here can fire it outright.
+   *
+   * Replaced with a real dialog: an explicit, described choice with Cancel and
+   * Sign out, focus moved into it, Escape to dismiss. `leaving` guards the
+   * click that unmounts this component, which would otherwise warn React.
    */
   const [confirmingLogout, setConfirmingLogout] = useState(false)
   const [leaving, setLeaving] = useState(false)
 
   const requestLogout = () => {
     if (leaving) return
-    if (!confirmingLogout) {
-      setConfirmingLogout(true)
-      return
-    }
-    setLeaving(true)
-    onLogout()
+    setConfirmingLogout(true)
   }
   const renderItem = ({ key, label, Icon, count }: NavItem) => (
     <button
       key={key}
       type="button"
       className={`nav-item${view === key ? ' active' : ''}`}
-      onClick={() => { setConfirmingLogout(false); onNavigate(key) }}
+      onClick={() => onNavigate(key)}
       aria-current={view === key ? 'page' : undefined}
       title={label}
     >
@@ -123,16 +122,56 @@ export function Sidebar({
 
         <button
           type="button"
-          className={`nav-item sidebar-logout${confirmingLogout ? ' confirming' : ''}`}
+          className="nav-item sidebar-logout"
           onClick={requestLogout}
-          onBlur={() => setConfirmingLogout(false)}
-          aria-label={confirmingLogout ? 'Confirm sign out' : 'Sign out'}
-          title={confirmingLogout ? 'Click again to sign out' : 'Sign out'}
+          aria-haspopup="dialog"
         >
           <IconLogout size={17} />
-          <span>{confirmingLogout ? 'Click again to sign out' : 'Sign out'}</span>
+          <span>Sign out</span>
         </button>
       </div>
+
+      {confirmingLogout ? (
+        <div
+          className="confirm-scrim"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="signout-title"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setConfirmingLogout(false)
+          }}
+        >
+          <div className="confirm-card">
+            <h2 id="signout-title" className="confirm-title">
+              Sign out of TailorUp?
+            </h2>
+            <p className="confirm-body">
+              Your saved API key is removed from this server when you sign out, and you will need
+              to paste it again to use tailoring.
+            </p>
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setConfirmingLogout(false)}
+                autoFocus
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setLeaving(true)
+                  onLogout()
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </aside>
   )
 }

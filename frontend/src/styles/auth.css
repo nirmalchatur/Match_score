@@ -46,7 +46,7 @@
   flex-direction: column;
   justify-content: center;
   padding: 60px 56px;
-  background: linear-gradient(160deg, #ffffff 0%, var(--sand) 100%);
+  background: linear-gradient(160deg, var(--paper) 0%, var(--sand) 100%);
   border-right: 1px solid var(--border-soft);
 }
 

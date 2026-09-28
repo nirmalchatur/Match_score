@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { initials } from '../lib/format'
 import { IconBell, IconSearch } from './Icons'
+import ThemeToggle from './ThemeToggle'
 
 export function Topbar({
   title,
@@ -36,6 +37,7 @@ export function Topbar({
 
       <div className="topbar-actions">
         {actions}
+        <ThemeToggle />
         <span className="bell" role="img" aria-label="Notifications">
           <IconBell size={18} />
         </span>
