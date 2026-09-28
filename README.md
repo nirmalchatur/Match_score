@@ -1081,7 +1081,7 @@ GitHub:
 [https://github.com/nirmalchatur](https://github.com/nirmalchatur)
 
 LinkedIn:
-[https://linkedin.com/in/nirmal-chaturvedi-0931b225](https://linkedin.com/in/nirmal-chaturvedi-0931b225)
+[https://www.linkedin.com/in/nirmal-chaturvedi-0931b2257/](https://www.linkedin.com/in/nirmal-chaturvedi-0931b2257/)
 
 ---
 

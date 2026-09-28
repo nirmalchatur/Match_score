@@ -952,3 +952,208 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------- 404, thank-you, legal ---------- */
+
+/* A thin shell for pages that are not the marketing page but borrow its
+   typography. Deliberately not `.landing`, which pins the light token set. */
+.mk-landing-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 48px 24px calc(48px + env(safe-area-inset-bottom));
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.notfound {
+  width: min(560px, 100%);
+  text-align: center;
+}
+
+.notfound-mark {
+  margin-bottom: 22px;
+}
+
+.notfound-code {
+  margin: 0 0 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.notfound-title {
+  margin: 0 0 12px;
+  font-family: var(--serif);
+  font-size: clamp(30px, 6vw, 44px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.notfound-body {
+  margin: 0 0 26px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.notfound-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.thanks-list {
+  list-style: none;
+  margin: 0 0 26px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  text-align: left;
+  max-width: 380px;
+  margin-inline: auto;
+}
+
+.thanks-list li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.thanks-list svg {
+  color: var(--brand-accent, #245F73);
+  flex: none;
+}
+
+.legal {
+  width: min(720px, 100%);
+}
+
+.legal-eyebrow {
+  margin: 0 0 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.legal-title {
+  margin: 0 0 28px;
+  font-family: var(--serif);
+  font-size: clamp(28px, 5vw, 40px);
+  letter-spacing: -0.02em;
+}
+
+.legal h2 {
+  margin: 32px 0 10px;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.legal p,
+.legal li {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.legal ul {
+  margin: 0 0 14px;
+  padding-left: 20px;
+}
+
+.legal li {
+  margin-bottom: 8px;
+}
+
+.legal strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.legal a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.legal code {
+  padding: 1px 5px;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--accent-faint);
+  border-radius: 4px;
+}
+
+.legal-foot {
+  margin-top: 40px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- Cookie banner ---------- */
+
+/* Only ever rendered when analytics are enabled. Sits above the safe area on
+   mobile so it does not collide with a home indicator. */
+.cookie-banner {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 70;
+  max-width: 560px;
+  margin-inline: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 14px 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+}
+
+.cookie-text {
+  flex: 1 1 260px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.cookie-text a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.cookie-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@media (max-width: 560px) {
+  .cookie-banner {
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .cookie-actions {
+    width: 100%;
+  }
+
+  .cookie-actions .btn {
+    flex: 1;
+  }
+}
