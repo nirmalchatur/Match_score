@@ -1099,6 +1099,8 @@ The final system aims to understand a candidate, understand a job, determine whe
 
 | Area | Doc |
 |---|---|
+| **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| **Security policy** | [SECURITY.md](SECURITY.md) |
 | AI setup, Ollama, deployed providers | [docs/AI_SETUP.md](docs/AI_SETUP.md) |
 | AI architecture | [docs/AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md) |
 | Application tracker | [docs/APPLICATIONS.md](docs/APPLICATIONS.md) |

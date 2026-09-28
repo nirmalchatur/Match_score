@@ -545,24 +545,14 @@ h4 {
   color: var(--text-dim);
 }
 
-/* The palette is monochrome, so these no longer gradient to a second
-   hue. They are kept as classes because AuthLayout.tsx still uses
-   .gradient-text, and they now render as a subtle ink fade that
-   keeps the emphasis without introducing colour. */
+/* The palette is monochrome, so this never gradient to a second hue. It is
+   kept only so AuthLayout's emphasis span still has a class to hang off, and
+   it renders as plain ink: a background-clipped gradient on body text is a
+   common way to make copy look generated, and at low contrast it is also a
+   legibility problem. The emphasis is carried by the serif face instead. */
 .gradient-text {
-  background: linear-gradient(125deg, var(--accent-mid) 0%, var(--accent) 55%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-
-.gradient-text-subtle {
-  background: linear-gradient(125deg, var(--accent) 0%, var(--rust-mid) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  font-family: var(--serif);
+  font-style: italic;
 }
 
 .mono {
