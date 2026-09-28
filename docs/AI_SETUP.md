@@ -256,3 +256,148 @@ The validation verdict is the result that matters. The product promise is that
 the AI cannot invent resume facts, and the factual validator raised no
 violations on a real model response rather than a stub.
 
+---
+
+# Running a provider on deployed infrastructure
+
+The obstacle is specific and worth stating plainly. `OLLAMA_BASE_URL` defaults to
+`http://127.0.0.1:11434`. On Render, `127.0.0.1` means *the Render container
+itself*, and no Ollama runs there. Your laptop's daemon is not reachable from
+there, so a deployed TailorUp cannot use the `ollama` provider as configured.
+
+There are two supported ways out. Both are configuration only -- no code
+change is required for either, and that is deliberate. The provider reads its
+settings from the environment, and the Gemini provider takes its credential
+per-request from the user rather than from the server.
+
+## Which to choose
+
+| | Gemini BYOK | Tunnel to local Ollama |
+| --- | --- | --- |
+| Works when your PC is off | yes | **no** |
+| Needs a secret on Render | no (the key is per-user) | no |
+| Cost to you | user's own free tier | free |
+| Data leaves the machine | yes | no |
+| Setup effort | one env var | env var + a tunnel left running |
+
+Use **Gemini BYOK** for a site real users hit. Use the **tunnel** for
+development, or for keeping inference on your own hardware. They are not
+mutually exclusive: set the env var per environment.
+
+## 1. Gemini BYOK (recommended for deployment)
+
+There is deliberately **no server-wide `GEMINI_API_KEY`**. The provider reads
+the key from the caller and sends it as an `x-goog-api-key` header, so nothing
+secret is configured on Render and no shared credential exists to leak.
+
+1. In **Render**, set one environment variable:
+
+   ```
+   AI_PROVIDER=gemini
+   ```
+
+2. Redeploy. Nothing else is required.
+
+3. Each user pastes their own key in **Settings > AI provider**. It is
+   encrypted at rest with Fernet, is never returned by the API, and is removed
+   on sign-out.
+
+The `GEMINI_TIMEOUT` default is 120s, which is appropriate for a hosted
+model. Only `AI_PROVIDER` needs setting -- `OLLAMA_*` are ignored once the
+provider is `gemini`.
+
+Get a key at <https://aistudio.google.com/apikey>.
+
+## 2. Tunnel to a local Ollama
+
+Useful for development, and for keeping inference on your own hardware. The
+catch is unavoidable: **your machine must be awake and running the tunnel**
+whenever anyone tailors, or the request fails.
+
+1. Start the daemon and expose it:
+
+   ```powershell
+   ollama serve
+   cloudflared tunnel --url http://localhost:11434
+   ```
+
+   `cloudflared` prints something like `https://random-words.trycloudflare.com`.
+
+2. Set that URL in **Render** (or a local `.env`):
+
+   ```
+   AI_PROVIDER=ollama
+   OLLAMA_BASE_URL=https://random-words.trycloudflare.com
+   OLLAMA_MODEL=llama3.1
+   OLLAMA_TIMEOUT=600
+   ```
+
+3. Confirm the tunnel works before blaming TailorUp:
+
+   ```powershell
+   curl.exe https://random-words.trycloudflare.com/api/tags
+   ```
+
+The provider builds `{base_url}/api/chat` and its availability check calls
+`{base_url}/api/tags`, so a stock Cloudflare quick tunnel needs no extra
+configuration -- it proxies all paths.
+
+### Two things to know before exposing a tunnel
+
+**Ollama has no authentication.** Anything that can reach the tunnel URL can
+run inference on your machine. A quick tunnel URL is random but not secret, and
+it leaks through logs, clipboard history, and screenshots. Treat it as public
+and do not leave it up. For anything longer-lived than a session, put a
+reverse proxy with auth in front of it, or bind Ollama to an interface the
+tunnel cannot route to.
+
+**Quick tunnels have no uptime guarantee.** The subdomain changes when the
+process restarts, so `OLLAMA_BASE_URL` goes stale and every tailoring call
+starts failing with a connection error until you update it.
+
+**The tunnel URL is not exposed to clients.** `OllamaProvider.describe()`
+deliberately omits the base URL, and `GET /api/resumes/tailor/status/`
+returns only the provider name, model and availability. Your infrastructure
+detail stays server-side.
+
+## Still local end to end
+
+The configuration the real llama3.1 verification ran against, still the
+fastest way to iterate:
+
+```powershell
+# terminal 1
+cd backend; python manage.py runserver
+
+# terminal 2
+cd frontend; npm run dev
+
+# AI_PROVIDER=ollama
+# OLLAMA_BASE_URL=http://127.0.0.1:11434
+# OLLAMA_MODEL=llama3.1
+# OLLAMA_TIMEOUT=600
+```
+
+Expect **364 seconds** for a real CPU run. That is measured, not a hang, and
+the UI gives no progress feedback for it -- which is worth knowing before you
+conclude something has hung.
+
+## Diagnosing a provider that will not answer
+
+Open the Dev console in the app and run:
+
+```
+status
+```
+
+It reports the provider name, the model, availability, and whether a user key
+is stored. The shapes it can take:
+
+| Report | Meaning |
+| --- | --- |
+| `(none configured)` | `AI_PROVIDER` is unset on the server |
+| `available: no` | provider set, but the daemon is unreachable -- wrong host, tunnel down, or Ollama not running |
+| `ai provider 'x' is not available` | name is misspelled, or not registered in the factory |
+| `AI is not configured. Set AI_PROVIDER` | empty; a deliberate error rather than a silent fallback to a stub |
+
+
