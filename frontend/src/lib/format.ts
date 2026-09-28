@@ -115,3 +115,24 @@ export function sourceHost(url: string): string {
     return ''
   }
 }
+
+/**
+ * The display name for an ATS source slug.
+ *
+ * Lives here rather than in the badge component because that file exports only
+ * components: React Fast Refresh stops working on a module that also exports
+ * plain functions, and the project treats that lint rule as worth honouring.
+ */
+const ATS_LABELS: Record<string, string> = {
+  greenhouse: 'Greenhouse',
+  workday: 'Workday',
+  lever: 'Lever',
+  ashby: 'Ashby',
+  linkedin: 'LinkedIn',
+  indeed: 'Indeed',
+}
+
+export function atsLabel(source?: string | null): string {
+  const key = (source ?? '').trim().toLowerCase()
+  return ATS_LABELS[key] ?? (key || 'Other board')
+}

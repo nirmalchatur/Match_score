@@ -64,6 +64,9 @@ class JobProcessor:
                 "title": job_data.title,
                 "location": job_data.location,
                 "description": job_data.description,
+                # Kept in step with the analyse view so a re-analysis through
+                # this path cannot blank a board the user already sees.
+                "source": job_data.source or "generic",
                 "match_score": result["score"],
                 "match_result": result,
                 "decision": result["decision"],

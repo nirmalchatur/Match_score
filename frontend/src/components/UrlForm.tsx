@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { IconLink, IconZap } from './Icons'
 
-const PLACEHOLDER = 'https://boards.greenhouse.io/company/jobs/1234567'
+/**
+ * The placeholder is a real ATS posting rather than a bare pattern.
+ *
+ * It used to be a Greenhouse URL, which read as "this box only accepts
+ * Greenhouse" even though the server never enforced that. Now that any board
+ * is accepted, the example says so.
+ */
+const PLACEHOLDER = 'Paste any job link — Greenhouse, Workday, Lever, or a company careers page'
 
 /** Basic URL sanity check so obviously-bad input never hits the network. */
 function isValidUrl(value: string): boolean {

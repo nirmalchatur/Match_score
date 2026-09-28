@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ViewKey } from '../lib/types'
 import { initials } from '../lib/format'
 import {
@@ -7,6 +8,7 @@ import {
   IconHelp,
   IconKanban,
   IconLogo,
+  IconLogout,
   IconRadar,
   IconSettings,
 } from './Icons'
@@ -37,19 +39,42 @@ export function Sidebar({
   jobCount,
   email,
   displayName,
+  onLogout,
 }: {
   view: ViewKey
   onNavigate: (view: ViewKey) => void
   jobCount: number
   email: string
   displayName: string
+  onLogout: () => void
 }) {
+  /**
+   * Signing out is destructive enough to confirm, but not so much that a
+   * modal is warranted.
+   *
+   * The first click arms the button and the second confirms; navigating or
+   * waiting disarms it. `leaving` guards the case where the click that follows
+   * confirmation is the one that unmounts this component -- without it the
+   * component would try to set state after unmount and React would warn.
+   */
+  const [confirmingLogout, setConfirmingLogout] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+
+  const requestLogout = () => {
+    if (leaving) return
+    if (!confirmingLogout) {
+      setConfirmingLogout(true)
+      return
+    }
+    setLeaving(true)
+    onLogout()
+  }
   const renderItem = ({ key, label, Icon, count }: NavItem) => (
     <button
       key={key}
       type="button"
       className={`nav-item${view === key ? ' active' : ''}`}
-      onClick={() => onNavigate(key)}
+      onClick={() => { setConfirmingLogout(false); onNavigate(key) }}
       aria-current={view === key ? 'page' : undefined}
       title={label}
     >
@@ -91,6 +116,18 @@ export function Sidebar({
             <span className="user-email">{email}</span>
           </span>
         </div>
+
+        <button
+          type="button"
+          className={`nav-item sidebar-logout${confirmingLogout ? ' confirming' : ''}`}
+          onClick={requestLogout}
+          onBlur={() => setConfirmingLogout(false)}
+          aria-label={confirmingLogout ? 'Confirm sign out' : 'Sign out'}
+          title={confirmingLogout ? 'Click again to sign out' : 'Sign out'}
+        >
+          <IconLogout size={17} />
+          <span>{confirmingLogout ? 'Click again to sign out' : 'Sign out'}</span>
+        </button>
       </div>
     </aside>
   )

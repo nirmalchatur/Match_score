@@ -20,6 +20,7 @@ class JobSerializer(serializers.ModelSerializer):
             "title",
             "location",
             "description",
+            "source",
             "match_score",
             "match_result",
             "decision",

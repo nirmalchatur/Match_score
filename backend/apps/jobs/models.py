@@ -38,6 +38,19 @@ class Job(models.Model):
 
     title = models.CharField(max_length=255)
 
+    #: Which job board this posting came from: "greenhouse", "workday",
+    #: "generic", and whatever is added later.
+    #:
+    #: Written by the ATS registry at analyse time and read by the UI to pick a
+    #: badge. Defaults to "generic" rather than blank so a row saved before
+    #: this field existed still renders sensibly, and so the column is never
+    #: NULL -- the UI would otherwise have to special-case it.
+    source = models.CharField(
+        max_length=32,
+        default="generic",
+        help_text="ATS this posting was read from, e.g. 'greenhouse'.",
+    )
+
     location = models.CharField(
         max_length=255,
         blank=True,

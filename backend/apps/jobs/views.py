@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.jobs.services import ats_registry
 from apps.jobs.services.job_collector import JobCollector
 from apps.jobs.services.job_processor import JobProcessor
 from apps.jobs.services.sources.greenhouse import GreenhouseCollector
@@ -20,7 +21,13 @@ from .serializers import (
 
 
 class JobAnalyzeView(APIView):
-    """Dashboard entry point for analyzing a Greenhouse job URL."""
+    """
+    Dashboard entry point for analysing any supported job URL.
+
+    The board is chosen by :mod:`apps.jobs.services.ats_registry` from the URL
+    itself, so the user does not pick a provider and does not get told a
+    Workday link is "not a Greenhouse job board".
+    """
 
     permission_classes = [IsAuthenticated]
 
@@ -36,7 +43,9 @@ class JobAnalyzeView(APIView):
             if not parsed.scheme or not parsed.netloc:
                 raise ValueError("Invalid URL")
 
-            job_data = GreenhouseCollector.collect(url)
+            # Any supported board. The registry always resolves to an adapter,
+            # so there is no "unsupported URL" error any more.
+            job_data = ats_registry.collect(url)
 
             job, created = Job.objects.update_or_create(
                 user=user,
@@ -46,6 +55,7 @@ class JobAnalyzeView(APIView):
                     "title": job_data.title,
                     "location": job_data.location,
                     "description": job_data.description,
+                    "source": job_data.source,
                     "status": "RUNNING",
                     "error_message": "",
                     "pipeline_steps": [

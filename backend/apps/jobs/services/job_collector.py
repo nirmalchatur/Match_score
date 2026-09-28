@@ -12,6 +12,16 @@ class JobData:
     location: str
     description: str
 
+    #: Which board this came from, e.g. "greenhouse", "workday", "generic".
+    #:
+    #: Set by the adapter rather than inferred from the URL afterwards, so the
+    #: value records what actually *read* the posting. A default is given so
+    #: the many existing call sites and tests that build JobData directly keep
+    #: working; an empty value renders as a neutral badge in the UI rather than
+    #: being hidden, because "we do not know where this came from" is worth
+    #: showing once.
+    source: str = ""
+
 
 class JobCollector:
 

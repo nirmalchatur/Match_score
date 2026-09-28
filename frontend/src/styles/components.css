@@ -2061,3 +2061,72 @@
   /* Dashed edge reads as "unconfirmed" without implying a deficiency. */
   border: 1px dashed var(--border-mid);
 }
+
+/* ---------------------------------------------------------------- ATS badges */
+
+/* A monogram rather than a vendor logo: shipping Greenhouse/Workday/Ashby
+   marks would mean redistributing trademarked artwork, and the information
+   carried here is only "which board did this come from". */
+.ats-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex: 0 0 auto;
+  border: 1px solid var(--border, #e2e2e6);
+  background: #f4f4f6;
+  color: #55555f;
+}
+
+.ats-mark-sm {
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+  border-radius: 4px;
+}
+
+/* Distinct hues per vendor so a list of rows is scannable at a glance.
+   Muted on purpose: these are metadata, not the thing being read. */
+.ats-greenhouse { background: #eef7f0; border-color: #cbe6d3; color: #2f6b45; }
+.ats-workday    { background: #eef3fb; border-color: #cfdcf2; color: #2f5382; }
+.ats-lever      { background: #f6f0fa; border-color: #e2d3ee; color: #5a3a75; }
+.ats-ashby      { background: #fdf0f3; border-color: #f3d5de; color: #8a3a55; }
+.ats-linkedin   { background: #eef4f8; border-color: #d3e0ea; color: #2c5670; }
+.ats-indeed      { background: #f2f4f8; border-color: #d9dfe9; color: #3d4a63; }
+.ats-generic    { background: #f4f4f6; border-color: #e2e2e6; color: #6b6b76; }
+
+.ats-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 3px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #e2e2e6);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ats-name { font-weight: 500; }
+
+/* Sign-out sits under the account chip rather than in the nav list: it is an
+   action on the session, not a destination. The `.confirming` state turns it
+   red so the second click reads as "yes, do the thing". */
+.sidebar-logout {
+  width: 100%;
+  margin-top: 4px;
+  justify-content: flex-start;
+  color: #55555f;
+}
+
+.sidebar-logout:hover { background: #f2f2f4; }
+
+.sidebar-logout.confirming {
+  color: var(--danger, #b3261e);
+  background: #fdeeee;
+  font-weight: 600;
+}

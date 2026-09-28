@@ -1,6 +1,7 @@
 import { formatRelative, initials, statusLabel, statusTone } from '../lib/format'
 import type { Job } from '../lib/types'
 import { IconClock, IconMapPin } from './Icons'
+import { AtsMark } from './AtsBadge'
 import { Pill, ScoreRing } from './primitives'
 
 export function JobRow({
@@ -27,6 +28,7 @@ export function JobRow({
           {job.title || 'Untitled role'}
         </div>
         <div className="job-row-meta">
+          <AtsMark source={job.source} />
           <span className="avatar" aria-hidden="true">
             {initials(job.company)}
           </span>
