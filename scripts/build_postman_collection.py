@@ -685,6 +685,76 @@ profile_after_logout = request(
 AI_KEY = "AIzaSyD-PostmanFixture0000000000000000000000000abcd"
 AI_KEY_REPLACEMENT = "AIzaSyD-PostmanFixture000000000000000000000000wxyz"
 
+# ---------------------------------------------------------------------------
+# Qualities
+#
+# Runs after the AI-key folder, which ends signed-in. The assertions are about
+# the server's rules rather than the UI's: the picker disables its save button
+# below the minimum, but a hand-written PUT has to be refused too, and that is
+# what these check.
+#
+# The master resume does not exist for this account, so GET has to degrade to an
+# empty selection rather than 404 -- otherwise a brand new user cannot even see
+# the options. PUT, which would have nothing to attach them to, must 404.
+# ---------------------------------------------------------------------------
+
+qualities_get_without_resume = request(
+    "45 /qualities/ is readable before a master resume exists",
+    "GET",
+    "/api/resumes/qualities/",
+    tests=pm(
+        "the picker can render and explain itself to a new account",
+        "pm.response.to.have.status(200);",
+        "const body = pm.response.json();",
+        "pm.expect(body.selected_count).to.eql(0);",
+        "pm.expect(body.minimum_total).to.eql(7);",
+        "pm.expect(body.kinds).to.eql("
+        "['technical', 'project_management', 'soft_skills']);",
+        "pm.expect(body.catalogue.technical.length).to.be.above(0);",
+        "pm.expect(body.catalogue.soft_skills.length).to.be.above(0);",
+    ),
+)
+
+qualities_put_without_resume = request(
+    "46 /qualities/ refuses to save with no master resume",
+    "PUT",
+    "/api/resumes/qualities/",
+    body={
+        "qualities": {
+            "technical": ["Python", "Java", "Go", "Rust"],
+            "project_management": ["Scrum"],
+            "soft_skills": ["Communication", "Empathy"],
+        }
+    },
+    tests=pm(
+        "there is nothing to attach a selection to",
+        "pm.response.to.have.status(404);",
+    ),
+)
+
+qualities_valid_but_no_resume = request(
+    "47 A valid selection is still refused with no master resume",
+    "PUT",
+    "/api/resumes/qualities/",
+    body={
+        "qualities": {
+            "technical": ["Python", "Java", "Go", "Rust"],
+            "project_management": ["Scrum"],
+            "soft_skills": ["Communication", "Empathy"],
+        }
+    },
+    tests=pm(
+        "the 404 is about the missing resume, not the payload",
+        "pm.response.to.have.status(404);",
+        "pm.expect(pm.response.json().error).to.include('master resume');",
+    ),
+)
+
+
+
+
+
+
 ai_key_relogin = request(
     "30 Log back in to manage the AI key",
     "POST",
@@ -992,6 +1062,24 @@ FOLDERS = [
             ai_key_logout,
             ai_key_relogin_after_logout,
             ai_key_gone_after_logout,
+        ],
+    },
+    {
+        "name": "Qualities",
+        "description": (
+            "The chosen-qualities endpoint, asserted over real HTTP. This "
+            "account has no master resume, which is the interesting case: GET "
+            "must still return the catalogue and the minimum so a brand new "
+            "user can see the options, and PUT must refuse to save a selection "
+            "it has nothing to attach to. The minimum-of-seven rules "
+            "themselves are covered in apps/resumes/tests/test_qualities.py -- "
+            "they cannot be reached over HTTP here, because the missing resume "
+            "is rejected before the payload is ever validated."
+        ),
+        "item": [
+            qualities_get_without_resume,
+            qualities_put_without_resume,
+            qualities_valid_but_no_resume,
         ],
     },
 ]

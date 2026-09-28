@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth'
 import { formatDate } from '../lib/format'
 import type { AiKeyStatus, TailoringStatus, UserProfile } from '../lib/types'
 import { Alert, Pill } from '../components/primitives'
+import { QualitiesPicker } from '../components/QualitiesPicker'
 import { IconCheck, IconFile, IconLayers, IconZap } from '../components/Icons'
 
 const DISCIPLINES = [
@@ -268,6 +269,12 @@ export function SettingsPage() {
         </div>
       </section>
 
+      <section className="card">
+        <div className="card-head">
+          <h2>Your strengths</h2>
+        </div>
+        <QualitiesPicker />
+      </section>
       <section className="card">
         <div className="card-head">
           <h2>AI</h2>

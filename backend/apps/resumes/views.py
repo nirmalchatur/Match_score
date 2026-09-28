@@ -17,6 +17,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from . import qualities
 from .models import Resume, ResumeProfile
 from .serializers import ResumeSerializer
 
@@ -396,7 +397,104 @@ def _stored_profile(resume) -> dict:
         "education": profile.education or "",
         "projects": profile.projects or "",
         "certifications": profile.certifications or "",
+        # Chosen qualities ride along with the parsed profile so the tailoring
+        # prompt and the match analysis can both see them. Normalised on read
+        # as well as on write, because a row written before this field existed
+        # holds {} rather than the canonical three-key shape.
+        "qualities": qualities.normalize(profile.qualities),
     }
+
+
+def _master_profile(user) -> ResumeProfile | None:
+    """
+    The signed-in account's master ``ResumeProfile``, or ``None``.
+
+    Created on demand: an account can have a master resume whose profile row
+    was never written (a profile-less upload predates the profile services),
+    and the qualities endpoint should still work for it rather than 404.
+    """
+    master = (
+        Resume.objects.filter(user=user, is_master=True)
+        .order_by("-created_at")
+        .first()
+    )
+    if master is None:
+        return None
+
+    profile, _ = ResumeProfile.objects.get_or_create(resume=master)
+    return profile
+
+
+class QualitiesView(APIView):
+    """
+    GET/PUT ``/api/resumes/qualities/`` -- the candidate's chosen qualities.
+
+    Split from ``/api/resumes/master/`` because the two answer different
+    questions. That endpoint reports what the *parser* found; this one holds
+    what the *user* claims, and it has a validation rule the other does not:
+    at least :data:`~apps.resumes.qualities.MINIMUM_TOTAL` across all three
+    categories, and at least one in each.
+
+    ``GET`` also returns the catalogue and the minimum, so the picker does not
+    hard-code options that the server would then reject. A client that sends
+    fewer than the minimum is refused -- the UI disables its save button, but
+    that is a courtesy, not the control.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def _payload(self, profile) -> dict:
+        selected = qualities.normalize(profile.qualities)
+        return {
+            "qualities": selected,
+            "selected_count": qualities.count(selected),
+            "catalogue": qualities.CATALOGUE,
+            "labels": qualities.KIND_LABELS,
+            "minimum_total": qualities.MINIMUM_TOTAL,
+            "kinds": list(qualities.KINDS),
+        }
+
+    def get(self, request):
+        profile = _master_profile(request.user)
+        if profile is None:
+            return Response(
+                {
+                    "error": "Upload a master resume before choosing qualities.",
+                    "qualities": qualities.normalize(None),
+                    "selected_count": 0,
+                    "catalogue": qualities.CATALOGUE,
+                    "labels": qualities.KIND_LABELS,
+                    "minimum_total": qualities.MINIMUM_TOTAL,
+                    "kinds": list(qualities.KINDS),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(self._payload(profile), status=status.HTTP_200_OK)
+
+    def put(self, request):
+        profile = _master_profile(request.user)
+        if profile is None:
+            return Response(
+                {"error": "Upload a master resume before choosing qualities."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        raw = request.data.get("qualities", request.data)
+        try:
+            selected = qualities.validate_selection(raw)
+        except qualities.QualityError as exc:
+            # 400 with a human-readable message. The UI shows it as-is, which
+            # is why it is worded as an instruction rather than as a code.
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile.qualities = selected
+        profile.save(update_fields=["qualities", "updated_at"])
+
+        return Response(self._payload(profile), status=status.HTTP_200_OK)
 
 
 def _load_job(user, job_id):

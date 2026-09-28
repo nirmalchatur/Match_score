@@ -160,7 +160,34 @@ def build_source_resume(resume_profile: dict) -> dict:
         "certifications": str(resume_profile.get("certifications") or ""),
         "experience": experience,
         "projects": projects,
+        # The candidate's own chosen qualities, flattened to one list. The model
+        # uses them to decide what to *emphasise* among things it can already
+        # evidence -- they never license a new claim, which is why the
+        # factual-integrity rules above still apply to them unchanged.
+        "qualities": _qualities_list(resume_profile.get("qualities")),
     }
+
+
+def _qualities_list(raw) -> list:
+    """
+    Flatten a stored ``qualities`` value to a plain list of strings.
+
+    Tolerant of the three shapes this field has held over time: the canonical
+    ``{"technical": [...], ...}`` mapping, a bare list, and nothing at all.
+    Normalisation failures are swallowed into an empty list on purpose -- a
+    malformed row must not stop a tailoring run, and the worst case of dropping
+    the list is that the prompt simply omits an optional hint.
+    """
+    from apps.resumes import qualities as qualities_module
+
+    try:
+        return qualities_module.as_list(qualities_module.normalize(raw))
+    except Exception:  # pragma: no cover - defensive, see docstring
+        logger.warning(
+            "ai.qualities_unusable: stored qualities could not be normalised; "
+            "continuing without them"
+        )
+        return []
 
 
 def build_job_context(job: dict, jd_profile: dict | None = None) -> dict:

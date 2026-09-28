@@ -171,6 +171,40 @@ The PDF is text-extracted and profiled on upload. `201` → the created resume.
 
 The caller's master resume, or `404` when none is set.
 
+### `GET /api/resumes/qualities/` — **requires auth**
+
+The candidate's chosen qualities, plus everything the picker needs to render.
+
+```json
+{
+  "qualities": { "technical": ["Python"], "project_management": [], "soft_skills": [] },
+  "selected_count": 1,
+  "catalogue": { "technical": ["Python", "Java"], "project_management": ["Scrum"], "soft_skills": ["Empathy"] },
+  "labels":    { "technical": "Technical skills", "project_management": "Project management", "soft_skills": "Soft skills" },
+  "minimum_total": 7,
+  "kinds": ["technical", "project_management", "soft_skills"]
+}
+```
+
+The catalogue and the minimum are sent on every read so the client never
+hard-codes options the server would reject. With no master resume this still
+returns `200` with an empty selection, so a new account can see the options;
+`PUT` returns `404` in that state, since there is nothing to attach them to.
+
+### `PUT /api/resumes/qualities/` — **requires auth**
+
+Replaces the whole selection. `PUT`, not `PATCH`: the minimum of seven is a
+property of the selection as a whole.
+
+```json
+{ "qualities": { "technical": ["Python"], "project_management": ["Scrum"], "soft_skills": ["Empathy"] } }
+```
+
+`400` with `{"error": "..."}` when the selection is short of
+`minimum_total`, when a category is empty, or when a value is not in the
+catalogue. Those rules are enforced here rather than in the UI: the picker
+disables its save button, but a hand-written request has to fail the same way.
+
 ### `GET /api/resumes/<id>/` · `DELETE /api/resumes/<id>/`
 
 `404` for another account's resume. `DELETE` returns

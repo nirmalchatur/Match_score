@@ -226,6 +226,33 @@ export interface TailoringStatus {
   server_key_configured?: boolean
 }
 
+
+/**
+ * The candidate's chosen qualities, and everything the picker needs to render.
+ *
+ * The catalogue and the minimum come from the server on every GET rather than
+ * being hard-coded here. That is the point: if the two ever disagreed, the
+ * picker would offer options the server rejects, or hide options it accepts.
+ * A hard-coded list in the client is a second source of truth that will drift.
+ */
+export type QualityKind = 'technical' | 'project_management' | 'soft_skills'
+
+export type QualitySelection = Record<QualityKind, string[]>
+
+export interface QualitiesResponse {
+  /** The canonical, saved selection. */
+  qualities: QualitySelection
+  /** How many are selected in total. */
+  selected_count: number
+  /** Every allowed option, by kind. */
+  catalogue: Record<QualityKind, string[]>
+  /** Display labels, by kind. */
+  labels: Record<QualityKind, string>
+  /** Server-enforced minimum across all kinds. */
+  minimum_total: number
+  /** Kinds in presentation order. */
+  kinds: QualityKind[]
+}
 /**
  * The status of the signed-in user's own provider key.
  *

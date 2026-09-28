@@ -10,6 +10,8 @@ import type {
   TailoringResponse,
   TailoringResult,
   TailoringStatus,
+  QualitiesResponse,
+  QualitySelection,
   UserProfile,
   Application,
   ApplicationStatus,
@@ -431,6 +433,29 @@ export const api = {
   /* ---------- AI tailoring ---------- */
 
   /** Is tailoring available at all? Used to disable the button up front. */
+  /**
+   * The candidate's chosen qualities, plus the catalogue to choose from.
+   *
+   * The server owns both the list of valid options and the minimum count, so
+   * both are read from here rather than duplicated in the client.
+   */
+  getQualities(): Promise<QualitiesResponse> {
+    return request<QualitiesResponse>('/resumes/qualities/')
+  },
+
+  /**
+   * Replace the whole selection.
+   *
+   * PUT rather than PATCH: a partial update would leave the client unable to
+   * tell whether the server's stored selection matches what is on screen, and
+   * "the minimum of seven" is a property of the selection as a whole.
+   */
+  saveQualities(qualities: QualitySelection): Promise<QualitiesResponse> {
+    return request<QualitiesResponse>('/resumes/qualities/', {
+      method: 'PUT',
+      body: JSON.stringify({ qualities }),
+    })
+  },
   tailoringStatus(): Promise<TailoringStatus> {
     return request<TailoringStatus>('/resumes/tailor/status/')
   },

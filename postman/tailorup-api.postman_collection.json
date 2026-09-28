@@ -2418,6 +2418,169 @@
           }
         }
       ]
+    },
+    {
+      "name": "Qualities",
+      "description": "The chosen-qualities endpoint, asserted over real HTTP. This account has no master resume, which is the interesting case: GET must still return the catalogue and the minimum so a brand new user can see the options, and PUT must refuse to save a selection it has nothing to attach to. The minimum-of-seven rules themselves are covered in apps/resumes/tests/test_qualities.py -- they cannot be reached over HTTP here, because the missing resume is rejected before the payload is ever validated.",
+      "item": [
+        {
+          "name": "45 /qualities/ is readable before a master resume exists",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the picker can render and explain itself to a new account', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.selected_count).to.eql(0);",
+                  "    pm.expect(body.minimum_total).to.eql(7);",
+                  "    pm.expect(body.kinds).to.eql(['technical', 'project_management', 'soft_skills']);",
+                  "    pm.expect(body.catalogue.technical.length).to.be.above(0);",
+                  "    pm.expect(body.catalogue.soft_skills.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/qualities/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "resumes",
+                "qualities",
+                ""
+              ]
+            },
+            "description": "45 /qualities/ is readable before a master resume exists"
+          }
+        },
+        {
+          "name": "46 /qualities/ refuses to save with no master resume",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('there is nothing to attach a selection to', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/qualities/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "resumes",
+                "qualities",
+                ""
+              ]
+            },
+            "description": "46 /qualities/ refuses to save with no master resume",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qualities\": {\n    \"technical\": [\n      \"Python\",\n      \"Java\",\n      \"Go\",\n      \"Rust\"\n    ],\n    \"project_management\": [\n      \"Scrum\"\n    ],\n    \"soft_skills\": [\n      \"Communication\",\n      \"Empathy\"\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "47 A valid selection is still refused with no master resume",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the 404 is about the missing resume, not the payload', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error).to.include('master resume');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrf}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/qualities/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "resumes",
+                "qualities",
+                ""
+              ]
+            },
+            "description": "47 A valid selection is still refused with no master resume",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qualities\": {\n    \"technical\": [\n      \"Python\",\n      \"Java\",\n      \"Go\",\n      \"Rust\"\n    ],\n    \"project_management\": [\n      \"Scrum\"\n    ],\n    \"soft_skills\": [\n      \"Communication\",\n      \"Empathy\"\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [
