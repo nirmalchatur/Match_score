@@ -55,16 +55,19 @@ jobs:
           # Copyleft and source-available licences are a deliberate choice,
           # not something to inherit by accident from a transitive
           # dependency. Anything not listed here fails the review.
+          #
+          # Only SPDX ids this action actually recognises are listed. An
+          # unrecognised id makes the job error out, which is a confusing way
+          # to find a typo -- Commons-Clause was exactly that, and was removed
+          # rather than worked around.
           license-check: true
           deny-licenses: >
             GPL-1.0, GPL-2.0, GPL-3.0, AGPL-1.0, AGPL-3.0,
             LGPL-2.0, LGPL-2.1, LGPL-3.0, SSPL-1.0, BUSL-1.1,
-            Elastic-2.0, Commons-Clause
+            Elastic-2.0
 
-          # CVEs that have no fix yet. Unfixable advisories are reported in
-          # the job summary but do not block, because refusing every PR
-          # until an upstream patch lands trains people to ignore the gate.
-          allow-vulnerabilities: true
+          # Results are posted back onto the PR only when this job fails, so a
+          # clean run leaves no comment behind.
           comment-summary-in-pr: on-failure
 
   # ---------------------------------------------------------------------

@@ -3,9 +3,12 @@
 
 ### AI-Powered Job Matching & Resume Optimization Platform
 
-> Formerly known as **MatchScore**. The internal Python modules and services keep
-> their original names (`MatchEngine`, `JobProcessor`, `JDProfile`, …) to avoid a
-> risky rename — only the product-facing brand is TailorUp.
+> The repository is named `Match_score` for historical reasons. The product,
+> its UI and its documentation are **TailorUp**. Internal Python modules keep
+> their original names (`MatchEngine`, `JobProcessor`, `JDProfile`, …) rather
+> than be renamed — a mechanical rename would touch every import for no user
+> benefit and would make the history harder to follow. `MatchEngine` is a
+> component name, not a brand.
 
 TailorUp is an intelligent job-matching platform that analyzes a candidate's resume against job descriptions, calculates a transparent compatibility score, identifies skill gaps, evaluates experience and education requirements, and determines whether the candidate should use their master resume or tailor it for a specific job.
 
@@ -182,7 +185,7 @@ Job Description ──► ┌─────────────────
 
 ## Resume Processing
 
-MatchScore can:
+TailorUp can:
 
 * Extract text from PDF resumes
 * Build a structured resume profile
@@ -260,7 +263,7 @@ This prevents simple naming differences from incorrectly lowering match scores.
 
 # 📄 Job Description Analysis
 
-MatchScore extracts structured information from job descriptions.
+TailorUp extracts structured information from job descriptions.
 
 The JD parser currently detects:
 
@@ -311,7 +314,7 @@ Produces a structured profile:
 
 # 📊 Match Engine
 
-The core of MatchScore is the `MatchEngine`.
+The core of TailorUp is the `MatchEngine`.
 
 It evaluates multiple dimensions of a candidate's profile.
 
@@ -419,7 +422,7 @@ The candidate's education section is then evaluated against the requirement.
 
 # 🧩 Requirement Matching
 
-MatchScore goes beyond simple skill matching.
+TailorUp goes beyond simple skill matching.
 
 Each job requirement can be classified as:
 
@@ -602,7 +605,7 @@ GET /api/jobs/2/
 # 🏗️ Project Architecture
 
 ```text
-MatchScore
+TailorUp
 │
 ├── backend/
 │   │
@@ -738,7 +741,7 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-The API will be available at:
+The API is available at:
 
 ```text
 http://127.0.0.1:8000/
@@ -796,118 +799,104 @@ AWS_REGION=
 
 ---
 
-# 📈 Current Development Status
+# 📈 What is built
 
-| Feature                   | Status |
+Everything in this table is implemented, tested, and merged. Test counts come
+from `python manage.py test`.
+
+| Area | Status |
 | ------------------------- | :----: |
-| Django backend            |    ✅   |
-| REST API                  |    ✅   |
-| Resume database model     |    ✅   |
-| Job database model        |    ✅   |
-| PDF resume parsing        |    ✅   |
-| Resume profile extraction |    ✅   |
-| Skill normalization       |    ✅   |
-| JD parsing                |    ✅   |
-| JD profile extraction     |    ✅   |
-| Experience extraction     |    ✅   |
-| Match scoring             |    ✅   |
-| Requirement matching      |    ✅   |
-| Job creation              |    ✅   |
-| Job listing               |    ✅   |
-| Job detail endpoint       |   🚧   |
-| Resume tailoring          |   🚧   |
-| AI integration            |   🔜   |
-| Job scraping              |   🔜   |
-| Automated applications    |   🔜   |
-| Frontend dashboard        |   🔜   |
+| Django backend + DRF API | ✅ |
+| Authentication, user isolation | ✅ |
+| Master resume upload + parsing | ✅ |
+| Job ingestion (Greenhouse, Workday, generic) | ✅ |
+| Job description parsing | ✅ |
+| Skill normalization | ✅ |
+| MatchEngine + requirement matching | ✅ |
+| Skill gap analysis | ✅ |
+| AI tailoring (Ollama + Gemini) | ✅ |
+| AI schema + factual validation | ✅ |
+| Resume versioning | ✅ |
+| DOCX + PDF generation | ✅ |
+| Application tracker | ✅ |
+| API rate limiting | ✅ |
+| React dashboard, jobs, resumes, applications, settings | ✅ |
+| In-app help and developer console | ✅ |
+
+**518 backend tests, all passing.** There is no frontend test runner configured
+— frontend correctness is enforced by `tsc` and the production build only.
 
 ---
 
-# 🗺️ Roadmap
-
-## Phase 1 — Core Matching Engine
-
-* [x] Resume storage
-* [x] Resume PDF parsing
-* [x] Resume profile generation
-* [x] Skill normalization
-* [x] Job description parsing
-* [x] Experience extraction
-* [x] Requirement matching
-* [x] Match scoring
-* [x] Job persistence
-
-## Phase 2 — Resume Intelligence
-
-* [ ] Job-specific resume tailoring
-* [ ] Resume bullet optimization
-* [ ] ATS keyword optimization
-* [ ] Missing skill analysis
-* [ ] AI-generated resume variants
-* [ ] Resume version management
-
-## Phase 3 — AI Layer
-
-Planned integration with local or hosted LLMs.
-
-Potential architecture:
+# 🧩 Architecture
 
 ```text
-Match Engine
-     │
-     ▼
-Tailoring Engine
-     │
-     ▼
-LLM
-     │
-     ├── Analyze JD
-     ├── Identify important keywords
-     ├── Select relevant projects
-     ├── Rewrite bullets
-     └── Generate tailored resume
+                 ┌──────────────────────────────┐
+  Browser ──────▶│  React + TypeScript + Vite   │
+                 │  dashboard · jobs · resumes  │
+                 │  applications · settings     │
+                 └──────────────┬───────────────┘
+                                │  session cookie, JSON over /api
+                 ┌──────────────▼───────────────┐
+                 │  Django + DRF                │
+                 ├──────────────────────────────┤
+                 │  users    auth, encrypted BYOK│
+                 │  jobs     ingest · parse ·    │
+                 │           MatchEngine · gap   │
+                 │  resumes  versions · tailor  │
+                 │           DOCX · PDF         │
+                 │  applications  tracker       │
+                 │  ai       provider factory   │
+                 │           schema · validators │
+                 │  common   throttling         │
+                 └──────────────┬───────────────┘
+                                │
+        ┌───────────────────────┼────────────────────────┐
+        ▼                       ▼                        ▼
+   PostgreSQL          Ollama (local)          Gemini (BYOK, optional)
+   or SQLite           llama3.1                user-supplied key
 ```
 
-A local LLM such as Ollama may be used to keep experimentation inexpensive and privacy-friendly.
+Tailoring runs through `ProviderFactory → AIProvider → parse →
+TailoringResult → factual validation`. The validator refuses output that
+invents experience, so a fabricated result is never presented as a suggestion.
 
-## Phase 4 — Job Discovery
+---
 
-Future integrations may include:
+# 🗺️ What genuinely remains
 
-* Job boards
-* Company career pages
-* LinkedIn job listings
-* Automated job ingestion
-* Duplicate detection
-* Job status tracking
+Everything below is **not** built. It is listed so the gap is visible rather
+than implied.
 
-## Phase 5 — Application Automation
+- [ ] Job boards beyond Greenhouse/Workday/generic. LinkedIn and similar have
+      no integration, and scraping them is a legal question, not just an
+      engineering one.
+- [ ] Duplicate job-posting detection
+- [ ] Scheduled job re-fetching and status-change alerts
+- [ ] Bulk tailoring across many jobs
+- [ ] Notification delivery (email/webhook) for application status changes
+- [ ] Structured in-product feedback collection
+- [ ] Localisation
+- [ ] Frontend test runner — currently absent
+- [ ] Object storage for uploads. `MEDIA_ROOT` is local disk and the
+      persistent-disk block in `render.yaml` is commented out, so **resumes
+      are lost on redeploy** on a default Render deployment. This is the
+      highest-priority item on this list.
+- [ ] Live progress for long runs — implemented in `#39`, not yet merged
 
-The long-term goal is:
+## Deliberate non-goals
 
-```text
-Discover Job
-     ↓
-Parse JD
-     ↓
-Calculate Match
-     ↓
-Decision
-     ↓
-Tailor Resume
-     ↓
-Generate Application
-     ↓
-Submit
-     ↓
-Track Application
-```
+- **No auto-submit.** TailorUp tracks applications; it does not submit them on
+  your behalf. Automated submission is a different product with different
+  consent and terms implications.
+- **No telemetry.** Nothing is sent anywhere except the AI provider you chose.
+
 
 ---
 
 # 🧠 Design Principles
 
-MatchScore is being developed around several principles.
+TailorUp is developed around several principles.
 
 ### 1. Explainability
 
@@ -951,19 +940,25 @@ This makes individual components easier to test and replace.
 
 The project starts with deterministic rule-based matching.
 
-AI capabilities will be introduced where they provide clear value.
+AI capabilities were added where they provide clear value, and nowhere else.
+The deterministic engine remains the source of every number the user sees; the
+model is only ever asked to rewrite text, and its output is fact-checked
+against the original resume before it is shown.
 
 ```text
-Rule-based foundation
+Rule-based foundation          ← match scores, skill gaps
         ↓
 Structured profiles
         ↓
 Deterministic scoring
         ↓
-AI-assisted tailoring
+AI-assisted tailoring          ← rewrites prose only
         ↓
-Automated job workflow
+Factual validation             ← refuses invented experience
 ```
+
+Automated submission is explicitly *not* on this path. See
+[What genuinely remains](#%F0%9F%97%B0%EF%B8%8F-what-genuinely-remains).
 
 ---
 
@@ -971,9 +966,15 @@ Automated job workflow
 
 Personal resumes contain sensitive information.
 
-The architecture therefore keeps resume files and secrets outside version control.
+The architecture therefore keeps resume files and secrets outside version control,
+and the default AI provider runs on your own machine so resume text is not
+shipped to a third party to be scored. See [docs/SECURITY.md](docs/SECURITY.md).
 
-Future AI integrations will also prioritize privacy-aware processing.
+**One caveat worth stating plainly:** if you choose the hosted Gemini provider
+and paste your own key, your resume text *is* sent to Google. That is a
+deliberate, per-user choice, and it is the only path on which resume content
+leaves the machine. The provider in use is always shown in the UI and in the
+Dev console's `status` command.
 
 ---
 
@@ -1054,9 +1055,19 @@ git push origin feature/my-feature
 
 # 📜 License
 
-This project is currently intended as a personal/portfolio project.
+This project is licensed under the **MIT License**. The full text is in
+[LICENSE](LICENSE).
 
-License information will be added as the project approaches public release.
+Copyright (c) 2026 TailorUp contributors
+
+MIT is a permissive licence: you may use, modify and redistribute this software
+including for commercial purposes, provided the copyright notice and the
+licence text are retained. It carries no warranty — see the licence for the
+full terms and disclaimer.
+
+*If you want the copyright line to name an individual or organisation rather
+than "TailorUp contributors", change it in both this file and `LICENSE` so they
+stay in agreement.*
 
 ---
 
@@ -1076,7 +1087,7 @@ LinkedIn:
 
 # ⭐ Project Vision
 
-MatchScore is being built with one simple goal:
+TailorUp is built with one simple goal:
 
 > **Turn job searching from a repetitive manual process into an intelligent, explainable and automated workflow.**
 
@@ -1088,14 +1099,48 @@ The final system aims to understand a candidate, understand a job, determine whe
 
 | Area | Doc |
 |---|---|
-| AI setup & Ollama | [docs/AI_SETUP.md](docs/AI_SETUP.md) |
+| AI setup, Ollama, deployed providers | [docs/AI_SETUP.md](docs/AI_SETUP.md) |
 | AI architecture | [docs/AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md) |
 | Application tracker | [docs/APPLICATIONS.md](docs/APPLICATIONS.md) |
 | Skill gap analysis | [docs/SKILL_GAP.md](docs/SKILL_GAP.md) |
+| API reference | [docs/API.md](docs/API.md) |
+| Security model | [docs/SECURITY.md](docs/SECURITY.md) |
+| Development setup | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
+| Deployment | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
+| System architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Vercel frontend deployment | [docs/VERCEL.md](docs/VERCEL.md) |
 
 ## AI verification status
 
-**Real Ollama verification remains pending.** See the banner at the top of
-[docs/AI_SETUP.md](docs/AI_SETUP.md) for exactly what is and is not verified.
-The test suite never requires Ollama: it runs entirely on `FakeAIProvider`,
-plus a local stub that speaks Ollama's wire format.
+**Verified against a real local model.** Not a stub.
+
+A real end-to-end run completed against `llama3.1` on local hardware, through
+the full production path — no mocks, no test doubles:
+
+```text
+ProviderFactory → OllamaProvider → llama3.1 real weights
+                → extract_json → schema normalisation
+                → TailoringResult → factual validation
+```
+
+| | |
+| --- | --- |
+| Provider | `ollama` |
+| Model | `llama3.1` |
+| Health check | passed |
+| Generation | **364 seconds** |
+| Response | 1,614 characters |
+| Schema | parsed as `TailoringResult` |
+| Factual validation | **valid**, zero violations |
+
+**About that 364 seconds:** it is a measured wall-clock figure for CPU-only
+inference, not a round trip. The machine reported `size_vram: 0` — the model
+ran entirely from system RAM with no GPU. It is not a bug and not an
+interactive experience; it is what local CPU inference costs.
+`OLLAMA_TIMEOUT` defaults to **600s** for exactly this reason, and the previous
+180s default aborted requests mid-generation.
+
+The test suite never requires Ollama: it runs on `FakeProvider`, plus a stub
+that speaks Ollama's wire format. The real run above was a one-off, recorded
+because a stub cannot tell you whether a real model will comply with the
+schema.

@@ -18,6 +18,36 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+# ---------------------------------------------------------------------------
+# Local environment file
+#
+# `.env.example` documents every variable this project reads, and
+# python-dotenv is a dependency, but nothing was actually calling it. A
+# developer who did the obvious thing -- copy the example to `.env` -- got
+# silently ignored settings and a confusing "AI is not configured" while
+# looking at a correctly filled file.
+#
+# Loaded here, immediately after the paths, because the helpers below and
+# every setting in this file read os.environ.
+#
+# `override` is left at its default, False, which is the point: a real
+# environment variable wins over `.env`. On Render the dashboard is the
+# source of truth, so this must never be able to shadow it. Locally, where
+# nothing else sets them, `.env` is the only source.
+#
+# Two locations are tried, in order: the backend directory, and the repository
+# root. The root is where a person working in this repo tends to put it, and
+# `BASE_DIR` is `backend/`, so checking one place alone would miss it.
+# ---------------------------------------------------------------------------
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(BASE_DIR / ".env")
+    load_dotenv(BASE_DIR.parent / ".env")
+except ImportError:  # pragma: no cover - dotenv is a hard requirement
+    pass
+
+
 def env_bool(name: str, default: bool = False) -> bool:
     """Read a boolean from the environment."""
     raw = os.environ.get(name)
@@ -223,6 +253,11 @@ RATE_LIMIT_USER = _rate("USER", "60/min")
 RATE_LIMIT_AI = _rate("AI", "5/min")
 RATE_LIMIT_AI_HOURLY = _rate("AI_HOURLY", "20/hour")
 RATE_LIMIT_DOCUMENT = _rate("DOCUMENT", "10/min")
+# Looser than USER on purpose: the tailoring progress endpoint is polled for the
+# whole length of a run, and a run is minutes on CPU. Charging status polling
+# against the same budget as real work would make the long runs the ones that
+# fail. Still bounded -- see ProgressRateThrottle.
+RATE_LIMIT_PROGRESS = _rate("PROGRESS", "120/min")
 
 # Rate limiting is stateful, so it needs a cache. LocMemCache is per-process
 # and therefore only exact for a single worker; gunicorn runs several. Set
@@ -278,6 +313,7 @@ REST_FRAMEWORK = {
         'ai': RATE_LIMIT_AI,
         'ai_hourly': RATE_LIMIT_AI_HOURLY,
         'document': RATE_LIMIT_DOCUMENT,
+    'progress': RATE_LIMIT_PROGRESS,
     },
 }
 

@@ -28,11 +28,14 @@ class ProviderSelectionTests(TestCase):
         profile.save(update_fields=["ai_setup"])
 
     def _add_gemini_key(self):
-        # Matches how the app itself stores one: set_key() encrypts, save()
-        # persists. Building encrypted_key by hand would test a shape the
-        # application never creates.
+        # The plaintext is irrelevant to every assertion in this file: they all
+        # check that a credential *row exists*, and set_key encrypts whatever
+        # it is given. Deliberately not a Google-shaped string, so this file
+        # does not need an entry in the secret scanner's ALLOWLIST -- that list
+        # exists to stay small, and a fixture that does not have to look real
+        # should not be in it.
         credential = ProviderCredential(user=self.user, provider="gemini")
-        credential.set_key("AIzaSyFAKEFAKEFAKEFAKEFAKEFAKEFAKE")
+        credential.set_key("not-a-real-key-this-test-never-sends")
         credential.save()
 
     # --- no explicit choice ------------------------------------------------

@@ -8,6 +8,7 @@ master resume is a real, profiled document rather than a stored blob.
 
 import logging
 import os
+import time
 
 from django.conf import settings
 from django.http import FileResponse, HttpResponse
@@ -21,7 +22,7 @@ from . import qualities
 from .models import Resume, ResumeProfile
 from .serializers import ResumeSerializer
 
-from apps.ai import factory, selection
+from apps.ai import factory, progress, selection
 from apps.ai.exceptions import (
     AIConfigurationError,
     AIError,
@@ -43,6 +44,7 @@ from apps.common.throttling import (
     AIHourlyRateThrottle,
     AIUserRateThrottle,
     DocumentRateThrottle,
+    ProgressRateThrottle,
 )
 
 logger = logging.getLogger(__name__)
@@ -610,15 +612,38 @@ class TailorResumeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        uid = request.user.pk
+        progress.reset(uid)
+        progress.emit(uid, "start", "Request received.")
+        started = time.monotonic()
+
         try:
             # Resolve this account's provider first. The deployment default is
             # only a default: a user who chose differently gets their choice,
             # and the key lookup below follows whichever provider was resolved
             # rather than assuming Gemini.
             effective, _reason = selection.resolve_provider_name(request.user)
+            provider = factory.get_ai_provider(effective)
+            progress.emit(
+                uid,
+                "provider",
+                f"Provider: {effective or 'unconfigured'}, model "
+                f"{provider.describe().get('model') or 'unknown'}.",
+            )
+            progress.emit(uid, "prompt", "Building the tailoring prompt from your resume and this job.")
+
+            # Emitted immediately before the call. The wording matters: on a CPU
+            # this is minutes, and saying so up front is the difference between
+            # "it is working" and "it has hung".
+            progress.emit(
+                uid,
+                "generating",
+                "Waiting for the model. On CPU this can take several minutes. "
+                "The page may look idle; it is not.",
+            )
 
             outcome = ResumeTailor.tailor_resume(
-                provider=factory.get_ai_provider(effective),
+                provider=provider,
                 resume=_stored_profile(master),
                 job={
                     "title": job.title,
@@ -644,7 +669,23 @@ class TailorResumeView(APIView):
                 status=exc.status_code,
             )
         except AIError as exc:
+            progress.emit(uid, "error", f"Failed after {time.monotonic() - started:.0f}s: {exc.message}", level="error")
             return _ai_error_response(exc)
+
+        progress.emit(
+            uid,
+            "validating",
+            "Checking the result against your original resume for invented facts.",
+        )
+
+        elapsed = time.monotonic() - started
+        verdict = outcome.validation.status if hasattr(outcome.validation, "status") else "unknown"
+        progress.emit(
+            uid,
+            "done",
+            f"Finished in {elapsed:.0f}s. Factual check: {verdict}.",
+            level="done",
+        )
 
         payload = outcome.as_dict()
         payload["job"] = {
@@ -791,6 +832,40 @@ class AIProviderStatusView(APIView):
         ).exists()
 
         return Response(described, status=status.HTTP_200_OK)
+
+
+class TailorProgressView(APIView):
+    """
+    GET /api/resumes/tailor/progress/?since=<elapsed>
+
+    Live progress for this account's most recent tailoring run.
+
+    Polling rather than SSE on purpose. The alternative holds a request open
+    for the length of a run, and a run on CPU is measured in minutes: that
+    pins a worker, and gunicorn has a fixed number of them, so a handful of
+    concurrent users would exhaust the pool. A poll is a few hundred bytes and
+    costs nothing held open.
+
+    ``since`` is the ``elapsed`` of the last event the client saw, so a
+    repeated poll returns only what is new. The server answers with its own
+    ``elapsed`` for the next call to use as the cursor.
+    """
+
+    permission_classes = [IsAuthenticated]
+    # Replaces the default user scope rather than stacking on it: a long run
+    # would otherwise spend the user's whole API budget on status calls.
+    throttle_classes = [ProgressRateThrottle]
+
+    def get(self, request):
+        raw = request.query_params.get("since")
+        try:
+            since = float(raw) if raw not in (None, "") else None
+        except (TypeError, ValueError):
+            # A malformed cursor is the client's problem, not a reason to
+            # return a 500: re-sending the whole buffer is a correct answer.
+            since = None
+
+        return Response(progress.snapshot(request.user.pk, since), status=status.HTTP_200_OK)
 
 
 class ResumeDownloadView(APIView):

@@ -98,6 +98,28 @@ class DocumentRateThrottle(UserRateThrottle):
     scope = "document"
 
 
+class ProgressRateThrottle(UserRateThrottle):
+    """
+    Deliberately looser than the default ``user`` scope.
+
+    The tailoring progress endpoint is polled every couple of seconds for the
+    whole length of a run, and a run is measured in *minutes* on CPU. At the
+    default 60/min a single long tailoring would exhaust the user's own API
+    budget through status polling alone, and the requests that fail would be
+    the status calls rather than the work.
+
+    That is the argument for a separate scope rather than a raised default:
+    polling should not compete with real work for the same allowance. It is
+    still throttled, because an endpoint that any session can call in a loop
+    is still something to bound.
+
+    120/min allows a 2-second poll with headroom without touching the budget
+    for the API calls the user is actually making.
+    """
+
+    scope = "progress"
+
+
 __all__ = [
     "AnonRateThrottle",
     "UserRateThrottle",
@@ -106,4 +128,5 @@ __all__ = [
     "AIUserRateThrottle",
     "AIHourlyRateThrottle",
     "DocumentRateThrottle",
+    "ProgressRateThrottle",
 ]
