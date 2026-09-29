@@ -3040,3 +3040,245 @@ textarea {
     flex: 1;
   }
 }
+
+/* ============================================================
+   Job search panel.
+
+   Uses the existing token set rather than introducing a new
+   scale, so this panel matches the rest of the shell in both
+   themes. The score tones are value-based for the same reason
+   the rest of the palette is monochrome: hue is not available
+   to carry meaning here, so position and weight do the work.
+   ============================================================ */
+
+.js-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: 16px;
+}
+
+.js-form {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.js-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 180px;
+}
+
+.js-field label {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.js-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--r-sm);
+  background: var(--input-bg);
+  color: var(--text-dim);
+}
+
+.js-input-wrap input {
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  padding: 9px 0;
+  width: 100%;
+}
+
+.js-field > input {
+  padding: 9px 10px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--r-sm);
+  background: var(--input-bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.js-field > input:focus-visible,
+.js-input-wrap:focus-within {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: -1px;
+}
+
+.js-summary {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.js-summary-note {
+  color: var(--text-dim);
+}
+
+.js-empty {
+  margin-top: 14px;
+  padding: 20px;
+  border: 1px dashed var(--border-mid);
+  border-radius: var(--r-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.js-empty p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.js-empty-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.js-results {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.js-hit {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.js-hit:hover {
+  background: var(--row-hover);
+}
+
+.js-hit-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.js-hit-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.js-hit-title a {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.js-hit-title a:hover {
+  text-decoration: underline;
+  color: var(--brand-accent-text);
+}
+
+.js-hit-company {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.js-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.js-score strong {
+  font-family: var(--mono);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.js-score span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.js-strong strong { color: var(--ok-fg); }
+.js-good strong { color: var(--text); }
+.js-fair strong { color: var(--text-muted); }
+.js-weak strong { color: var(--text-dim); }
+
+.js-hit-headline {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.js-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.js-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+/* Matched skills are solid; missing ones are outline only. The difference has
+   to survive greyscale, so it is fill vs no-fill rather than two greys. */
+.js-chip-match {
+  background: var(--accent-12);
+  border-color: var(--accent-20);
+  color: var(--text);
+}
+
+.js-chip-missing {
+  background: none;
+  border-style: dashed;
+  color: var(--text-dim);
+}
+
+.js-chip-more {
+  color: var(--text-dim);
+}
+
+.js-hit-meta {
+  display: flex;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}

@@ -477,3 +477,40 @@ export interface NotificationPreferences {
   application_updates: boolean
 }
 
+
+/**
+ * One job from the resume-ranked search.
+ *
+ * `score` is computed against the current master resume at search time, not
+ * read from the job's stored `match_score`, which was produced against whatever
+ * resume was current when the job was analysed. The two can disagree, and the
+ * fresh one is the one this list is ordered by.
+ */
+export interface JobSearchHit {
+  job_id: number
+  title: string
+  company: string
+  location: string
+  url: string
+  source: string
+  score: number
+  /** Never empty: the backend drops hits with no skill overlap. */
+  matched_skills: string[]
+  missing_skills: string[]
+  headline: string
+  analysed_at: string
+}
+
+export interface JobSearchResponse {
+  results: JobSearchHit[]
+  resume: { id: number; name: string; skills: number }
+  /** Candidates actually scored, after the prefilter and the cap. */
+  examined: number
+  /** Searchable jobs this account has, before any filter. */
+  total_jobs: number
+  matched_filter: number
+  /** True when the server capped the candidate set. */
+  truncated: boolean
+  /** `no_skills` when the master resume has not been extracted yet. */
+  reason: string
+}

@@ -21,6 +21,7 @@ import type {
   Notification,
   NotificationListResponse,
   NotificationPreferences,
+  JobSearchResponse,
 } from './types'
 
 /**
@@ -301,6 +302,29 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(patch),
     })
+  },
+
+  /* ---------- Job search ---------- */
+
+  /**
+   * Jobs this account has collected, ranked against the current master resume.
+   *
+   * `skills` is sent as a comma-separated list because that is how people
+   * phrase a search ("python, django") and splitting it server-side is more
+   * predictable than making each caller build the query string.
+   */
+  searchJobs(params: {
+    q?: string
+    skills?: string[]
+    limit?: number
+  } = {}): Promise<JobSearchResponse> {
+    const query = new URLSearchParams()
+    if (params.q) query.set('q', params.q)
+    if (params.skills?.length) query.set('skills', params.skills.join(','))
+    if (params.limit) query.set('limit', String(params.limit))
+
+    const suffix = query.toString() ? `?${query.toString()}` : ''
+    return request<JobSearchResponse>(`/jobs/search/${suffix}`)
   },
 
   /* ---------- Notifications ---------- */

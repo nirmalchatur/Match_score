@@ -5,6 +5,7 @@ from .views import (
     JobMatchView,
     JobListView,
     JobDetailView,
+    JobSearchView,
 )
 
 
@@ -18,6 +19,12 @@ urlpatterns = [
         "match/",
         JobMatchView.as_view(),
         name="job-match",
+    ),
+    # Declared before "<int:pk>/" so "search" is not parsed as a job id.
+    path(
+        "search/",
+        JobSearchView.as_view(),
+        name="job-search",
     ),
     path(
         "",
