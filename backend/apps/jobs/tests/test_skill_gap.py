@@ -62,14 +62,119 @@ class SkillGapTests(TestCase):
         gap = analyze_skill_gap(self.job)
 
         self.assertTrue(gap["has_analysis"])
-        # Matched/missing are the normalized skill vocabulary; partial comes
-        # from the requirement pass, which is the only place the engine records
-        # partial credit.
+        # Matched and missing are the normalized skill vocabulary, copied
+        # straight from the engine, so they are still exact.
         self.assertEqual(set(gap["matched"]), set(result["skills"]["matched"]))
         self.assertEqual(set(gap["missing"]), set(result["skills"]["missing"]))
-        self.assertEqual(
-            set(gap["partial"]), set(result["requirements"]["partially_matched"])
+
+        # Partial is NOT a copy any more, and this is the change that made the
+        # panel readable. The engine records partial credit against a whole
+        # requirement *line* ("- Strong Python and Kubernetes experience"),
+        # which is a sentence, not a skill. Projecting it verbatim put sentences
+        # into a panel titled "Skill analysis" -- "Ability To Manage And
+        # Communicate With Many People At Once" showed up as a partial match
+        # under that exact name.
+        #
+        # So each line is reduced to the catalog skills it mentions, and the
+        # contract is now about *what the partial list contains* rather than
+        # about it mirroring the engine. That is a stronger statement than the
+        # copy it replaces, because it pins the property that actually matters.
+        catalog = {s.lower() for s in skill_catalog.get_skills()}
+        for skill in gap["partial"]:
+            self.assertIn(
+                skill,
+                catalog,
+                "partial must be a catalog skill, not a raw requirement "
+                "line: %r" % skill,
+            )
+
+    def test_partial_is_reduced_from_requirement_lines_to_skills(self):
+        """The regression this projection change was made to fix.
+
+        A requirement naming a skill the resume does not list must surface as
+        that skill -- never as the sentence it was written as.
+
+        "Strong Kubernetes experience" is a *complete* non-match (the only
+        skill it names is absent), so the engine records no partial credit for
+        it and Kubernetes surfaces in `missing`. The assertion is therefore
+        about the reduction: the sentence must not appear in any column.
+        """
+        self._analysed_job(
+            "Skills: Python, Django\n\nExperience\nBuilt services.",
+            "Requirements:\n- Strong Kubernetes experience\n",
         )
+        gap = analyze_skill_gap(self.job)
+
+        shown = gap["partial"] + gap["missing"]
+        self.assertIn("kubernetes", shown)
+        for skill in shown:
+            self.assertNotIn("experience", skill.lower())
+            self.assertNotIn("strong", skill.lower())
+
+    def test_a_half_matched_sentence_yields_a_skill_not_a_sentence(self):
+        """A half-matched requirement reaches the panel as a skill.
+
+        "Strong Python and Kubernetes experience" against a Python-only resume
+        scores 0.5: Python is on the resume, Kubernetes is not. That half
+        credit is real signal and it must reach the user.
+
+        Kubernetes is *also* reported as missing by the skill pass, so this is
+        the overlap case: the skill is shown once, under `missing`, rather than
+        listed twice. What must never happen is the sentence surviving, or the
+        panel claiming a partial match while displaying none.
+        """
+        self._analysed_job(
+            "Skills: Python, Django\n\nExperience\nBuilt services.",
+            "Requirements:\n- Strong Python and Kubernetes experience\n",
+        )
+        gap = analyze_skill_gap(self.job)
+
+        # Reported exactly once, and the sentence never appears anywhere.
+        self.assertIn("kubernetes", gap["missing"])
+        for skill in gap["partial"] + gap["matched"] + gap["missing"]:
+            self.assertNotIn("experience", skill.lower())
+            self.assertNotIn("strong", skill.lower())
+
+    def test_a_partial_can_survive_when_the_skill_is_not_otherwise_missing(self):
+        """`partial` is not dead code: it carries skills `missing` does not list.
+
+        The requirement pass and the skill pass read different things -- one
+        works from JD requirement lines, the other from the parsed resume skill
+        list -- so a half-matched requirement can name a skill the skill pass
+        never reported as missing. That skill is exactly what the partial
+        column is for, and dropping it would silently lose the signal.
+        """
+        self._analysed_job(
+            "Skills: Python\n\nExperience\nBuilt services.",
+            "Requirements:\n- Strong Python and Kubernetes experience\n",
+        )
+        gap = analyze_skill_gap(self.job)
+
+        # Kubernetes is surfaced exactly once, and it is a skill, not a line.
+        everything = gap["partial"] + gap["matched"] + gap["missing"]
+        self.assertIn("kubernetes", everything)
+        for skill in everything:
+            self.assertNotIn("experience", skill.lower())
+            self.assertNotIn("strong", skill.lower())
+            self.assertNotIn(" ", skill.strip())
+
+    def test_partial_never_duplicates_a_matched_or_missing_skill(self):
+        """One skill, one column.
+
+        A skill named by a half-matched requirement can also be in `matched` or
+        `missing`. Showing it twice reads as a contradiction, so partial is
+        made disjoint -- with `missing` winning, because "the resume does not
+        mention it at all" is the stronger fact.
+        """
+        self._analysed_job(
+            "Skills: Python, Django, Docker\n\nExperience\nBuilt services.",
+            "Requirements:\n- Strong Python and Kubernetes experience\n"
+            "- Python and Docker together\n",
+        )
+        gap = analyze_skill_gap(self.job)
+
+        self.assertFalse(set(gap["partial"]) & set(gap["matched"]))
+        self.assertFalse(set(gap["partial"]) & set(gap["missing"]))
 
     def test_matched_skills_come_from_the_central_catalog(self):
         self._analysed_job(

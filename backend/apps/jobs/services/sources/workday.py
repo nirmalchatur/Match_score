@@ -165,14 +165,118 @@ class WorkdayCollector(JobSource):
         if not title:
             raise ValueError("This Workday posting has no job title.")
 
+        description = cls._html_to_text(info.get("jobDescription") or "")
+
+        # Workday splits the structured half of a posting out of the HTML blob:
+        # the CXS payload carries `jobDescription` (the prose) alongside separate
+        # fields for the actual requirements, and `jobDescription` is frequently
+        # truncated to a summary. Analysing only that produced jobs with almost
+        # no extractable skills, because the lists where the skills live were
+        # not in the text at all.
+        #
+        # So the structured fields are appended to the description. They are
+        # added rather than replacing it, because the prose still carries the
+        # responsibilities and the seniority context that the match engine
+        # reads for the experience component.
+        structured = cls._structured_sections(info)
+        if structured:
+            description = (
+                f"{description}\n\n{structured}" if description else structured
+            )
+
+        if not description.strip():
+            raise ValueError(
+                "This Workday posting has no job description. It may be an "
+                "external posting whose full text lives on another site."
+            )
+
         return JobData(
             url=url,
             company=(info.get("company") or "").strip(),
             title=title,
             location=cls._location(info),
-            description=cls._html_to_text(info.get("jobDescription") or ""),
+            description=description,
             source=cls.name,
         )
+
+    @staticmethod
+    def _structured_sections(info: dict) -> str:
+        """
+        Rebuild requirement-ish sections from the CXS structured fields.
+
+        Rendered as a ``Requirements:``-headed block because that is what
+        :class:`~apps.jobs.services.jd_profile.JDProfile` looks for when it
+        splits a description into sections. Emitting bare lines would leave them
+        in the unstructured part of the text, where no section parser sees them
+        and they are scored only by the weak word-overlap fallback.
+        """
+        # Field name variants seen across tenants and versions. Listed rather
+        # than guessed one at a time, because a tenant using an unlisted name
+        # silently contributes no skills -- the failure mode this whole change
+        # exists to remove.
+        field_groups: tuple[tuple[str, tuple[str, ...]], ...] = (
+            (
+                "Requirements",
+                (
+                    "jobRequirements",
+                    "requirements",
+                    "requiredQualifications",
+                    "requiredSkills",
+                    "qualifications",
+                ),
+            ),
+            (
+                "Responsibilities",
+                (
+                    "jobResponsibilities",
+                    "responsibilities",
+                    "duties",
+                    "jobDuties",
+                ),
+            ),
+            (
+                "Education",
+                ("educationRequirements", "education", "qualificationsEducation"),
+            ),
+        )
+
+        lines: list[str] = []
+
+        for heading, candidates in field_groups:
+            values: list[str] = []
+            for name in candidates:
+                raw = info.get(name)
+                if not raw:
+                    continue
+
+                # These fields are either a list of strings or a single block of
+                # HTML, depending on the tenant.
+                items = raw if isinstance(raw, list) else [raw]
+                for item in items:
+                    if not isinstance(item, str):
+                        continue
+                    text = WorkdayCollector._html_to_text(item).strip()
+                    if text:
+                        # Multi-line values become separate bullets so the
+                        # section parser keeps one requirement per line.
+                        for line in text.splitlines():
+                            line = line.strip(" \t-*•")
+                            if line:
+                                values.append(line)
+
+            if values:
+                lines.append(f"{heading}:")
+                # De-duplicated while preserving order: tenants frequently repeat
+                # the same requirement between two fields.
+                seen: set[str] = set()
+                for value in values:
+                    key = value.lower()
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    lines.append(f"- {value}")
+
+        return "\n".join(lines)
 
     @staticmethod
     def _location(info: dict) -> str:

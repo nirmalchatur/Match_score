@@ -2258,9 +2258,13 @@
 .brand-mark {
   border-radius: var(--r-md);
   box-shadow: none;
-  background: var(--accent);
-  color: var(--paper);
-  /* The bolt is filled with currentColor, so the tile provides the contrast. */
+  /* Light tile, not a dark one. The mark is now a stroked outline rather than a
+     filled bolt, so a near-black tile behind it swallows the glyph completely:
+     a 1.6px light stroke on dark reads as nothing at 18px. The teal now comes
+     from the glyph and the inset ring instead of from the tile behind it. */
+  background: var(--brand-accent-soft);
+  color: var(--brand-accent);
+  box-shadow: inset 0 0 0 1px var(--brand-accent-line);
   line-height: 0;
 }
 
@@ -2995,4 +2999,44 @@ textarea {
   }
 }
 
+}
+
+/* ---------- Bulk review bar ----------
+   The whole-tailoring "Accept all" control. Placed above the entries because
+   it applies to all of them, and given its own raised surface so it reads as a
+   single object rather than as part of the first entry it happens to sit
+   above. */
+.ba-bulk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+}
+
+.ba-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .ba-bulk {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ba-bulk-actions {
+    width: 100%;
+  }
+
+  .ba-bulk-actions .btn {
+    flex: 1;
+  }
 }

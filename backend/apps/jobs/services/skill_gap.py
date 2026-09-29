@@ -17,10 +17,37 @@ and the copy says so.
 
 from __future__ import annotations
 
+from apps.resumes.services import skill_catalog
+
 
 def _clean(values) -> list:
     """Sorted, de-duplicated, display-ready list."""
     return sorted({str(v).strip() for v in (values or []) if str(v).strip()})
+
+
+def _skills_in(lines) -> list:
+    """
+    Reduce raw JD requirement *lines* to the catalog skills they mention.
+
+    This is the fix for a bug that made the "Partial match" panel unreadable.
+    It used to show the requirement sentences verbatim, so a job whose JD said
+    "Ability to manage and communicate with many people at once" produced a
+    partial match *called* "Ability To Manage And Communicate With Many People
+    At Once". That is not a skill, it is a sentence, and the panel was titled
+    "Skill analysis" -- so it looked like the tool was telling the candidate it
+    did not have the ability to talk to people.
+
+    Reducing to catalog skills makes every row a real, nameable technology, and
+    makes the three columns homogeneous: all three are drawn from one vocabulary.
+    """
+    vocabulary = skill_catalog.get_skills()
+
+    found: set[str] = set()
+    for line in lines or []:
+        for skill in skill_catalog.extract_skills(str(line), vocabulary):
+            found.add(skill.lower())
+
+    return sorted(found)
 
 
 def analyze_skill_gap(job) -> dict:
@@ -42,8 +69,9 @@ def analyze_skill_gap(job) -> dict:
     #
     #   requirements.partially_matched
     #       Raw requirement *lines* from the JD ("- 3+ years with Docker").
-    #       Requirements are not skills, but they are the only place the engine
-    #       records a partial credit, so they supply the "partial" list.
+    #       The engine records partial credit against the sentence, not the
+    #       skill, so the line is reduced to its skills here. Showing the raw
+    #       sentence is what put non-skills in this panel.
     requirements = match_result.get("requirements") or {}
     skills = match_result.get("skills") or {}
 
@@ -60,9 +88,35 @@ def analyze_skill_gap(job) -> dict:
             "summary": "No job analysis available.",
         }
 
-    matched = _clean(skills.get("matched"))
-    partial = _clean(requirements.get("partially_matched"))
-    missing = _clean(skills.get("missing"))
+    matched = set(_clean(skills.get("matched")))
+    missing = set(_clean(skills.get("missing")))
+
+    partial = set(_skills_in(requirements.get("partially_matched")))
+
+    # Disjointness, and it is a *reassignment*, not a plain subtraction.
+    #
+    # A skill can be named by a half-matched requirement and also be reported
+    # as missing by the skill pass. "Strong Python and Kubernetes experience"
+    # against a Python-only resume is exactly that: Python matches, Kubernetes
+    # does not, so the sentence earns partial credit AND Kubernetes appears in
+    # `missing`.
+    #
+    # Two earlier versions of this were both wrong:
+    #
+    #   - subtracting only `matched` left the skill in `partial` and `missing`
+    #     at once, which reads as the tool contradicting itself in one row;
+    #   - giving `missing` priority by *removing* the overlap deleted the
+    #     partial entirely, so a genuine half-matched signal vanished.
+    #
+    # The resolution is that a partial naming a missing skill is *redundant*
+    # rather than wrong: `missing` is the headline fact and already shows it,
+    # so the skill is not repeated under `partial`. Nothing is lost -- the
+    # panel still reports it, once -- and only `matched` is removed outright,
+    # because a skill the resume demonstrably has is never a gap.
+    partial -= matched
+    partial -= missing
+
+    matched, partial, missing = sorted(matched), sorted(partial), sorted(missing)
 
     return {
         "has_analysis": True,

@@ -2,6 +2,33 @@
    Layout — shell, sidebar, topbar, page grids
    ============================================================ */
 
+/* ---------- Brand lockup ----------
+   The mark is the product's main identity, and it was rendering as a 28px
+   glyph barely larger than the nav icons beside it — easy to miss, and it
+   made the sidebar read as a list with a decoration in the corner rather than
+   as a branded product. The tile and the wordmark are sized together here so
+   the mark holds its own next to the navigation.
+
+   `.brand-mark` sizes are set with an explicit width/height rather than only a
+   font-size so the grid cell stays square at every size the lockup is used
+   at (18px in the marketing header, 26px in the boot screen, 32px here). */
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brand-lockup .brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-md);
+}
+
+.brand-lockup .brand-name {
+  font-size: 24px;
+  letter-spacing: -0.015em;
+}
+
 /* ---------- Decorative background layer ----------
    Rendered by App.tsx, AuthLayout.tsx and OnboardingPage.tsx.
    It MUST be taken out of flow. .auth-shell is a two-column grid,
