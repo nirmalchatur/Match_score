@@ -23,54 +23,126 @@ function Svg({ size = 18, children, ...rest }: IconProps) {
 }
 
 /**
- * The TailorUp mark: a resume sheet being fitted to a target.
+ * The TailorUp mark: a resume sheet being fitted to a role.
  *
- * The previous mark was a lightning bolt. It was replaced once already (a
- * four-pointed sparkle before it) and it was still the wrong idea: a bolt is
- * the universal "AI/fast" glyph, so it said nothing about this product and
- * competed with every other AI tool's favicon in a tab bar.
+ * History, because it explains the constraints
+ * ---------------------------------------------
+ * Three previous marks: a lightning bolt, a four-pointed sparkle, and a plain
+ * document with a cut corner. The bolt and the sparkle were the universal
+ * "AI product" glyphs and said nothing about what this tool does. The document
+ * was better but too generic -- it read as "file viewer", and with a high-
+ * contrast serif wordmark beside it the whole lockup drifted toward editorial
+ * or lifestyle branding rather than a hiring tool.
  *
- * What this actually needs to say is "your document, made to fit this role".
- * So the mark is two parts:
+ * What the mark has to do
+ * -----------------------
+ * Name the product's actual subject in one shape: a resume, checked against a
+ * role. So the mark is a sheet on the left and a crosshair on the right, and
+ * the crosshair's centre dot sits on the sheet's edge -- the sheet is what is
+ * being aimed at, which is the entire product in one image.
  *
- *   - a document, the thing the user owns and uploads
- *   - a fitted corner, the tailoring: the sheet is cut to the shape of a
- *     posting, which is literally what the product does
+ * Why a crosshair and not a checkmark
+ * ----------------------------------
+ * A tick says "approved". A crosshair says "matched against something", which
+ * is what actually happens: the resume is compared to a posting and scored, and
+ * the honest answer is usually a range, not a verdict. It also avoids the
+ * checkmark that half the applicant-tracking tools on the market already use.
  *
- * The cut corner is the only place a diagonal appears, which is what stops it
- * reading as generic stationery. Everything else is a straight rule, so at
- * 16px the silhouette is still a document and the detail reads as texture
- * rather than as noise.
- *
- * Drawn stroked rather than filled, unlike the bolt: the mark is now made of
- * separate parts that must not merge, and a filled path would weld the corner
- * cut to the text rules at small sizes.
+ * Geometric, not ornamental
+ * -------------------------
+ * Every element is axis-aligned or a true circle, and the only diagonal in the
+ * mark is the crosshair. That is what separates it from the "beauty brand"
+ * register -- soft curves, thin scripts, high-contrast serif -- that this mark
+ * was previously reading as. Stroke weight is 1.9 rather than 1.5 so the
+ * silhouette survives at favicon size, where a thinner line greys out.
  */
 export const IconLogo = (p: IconProps) => (
-  <Svg {...p} strokeWidth={1.6}>
-    {/* Document outline, with the top-right corner cut away. */}
-    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z" />
-    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-    {/* The two text rules, shortened to stop short of the fitted corner. */}
-    <path d="M8.5 12.5h7" />
-    <path d="M8.5 16h5" />
+  <Svg {...p} strokeWidth={1.9}>
+    {/* The resume sheet. A rect rather than a cut-corner path: the dog-ear was
+        the old mark's only distinguishing feature and it read as stationery.
+        A plain rect is what a resume looks like to anyone who has ever made
+        one. */}
+    <rect x="2.75" y="4.75" width="12" height="14.5" rx="1.5" />
+    {/* Three rules at decreasing width: the shape of a filled-in document
+        rather than a rectangle of nothing. The third is the shortest, which
+        reads as a closing line and keeps the block from looking like a
+        table. */}
+    <path d="M5.75 9h6" />
+    <path d="M5.75 12.25h6" />
+    <path d="M5.75 15.5h3.5" />
+    {/* The crosshair. Two short rules and a closed circle, centred on the
+        sheet's right edge so the two halves visibly relate. */}
+    <circle cx="18" cy="12" r="3.25" />
+    <path d="M18 6.5v2.25" />
+    <path d="M18 15.25v2.25" />
   </Svg>
 )
 
 /**
  * A matching "job posting" sheet, used beside the logo where the pairing is
- * the point -- the tailoring view's before/after header. The asymmetric rule
- * lengths mirror IconLogo so the two read as a set rather than as one icon
- * twice.
+ * the point -- the tailoring view's before/after header.
+ *
+ * Built on the same geometry as IconLogo (rect, decreasing rules, one circle)
+ * so the two read as a set rather than as the same icon twice. The difference
+ * is the target: the posting is what the resume gets measured against, and
+ * this is the posting's own view of itself.
  */
 export const IconLogoTarget = (p: IconProps) => (
-  <Svg {...p} strokeWidth={1.6}>
-    <path d="M6 3h4l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
-    <path d="M10 3v4a1 1 0 0 0 1 1h4" />
-    <path d="M7.5 13.5h4" />
-    <path d="M7.5 17h6" />
+  <Svg {...p} strokeWidth={1.9}>
+    <rect x="4" y="6.5" width="12" height="13" rx="1.5" />
+    <path d="M7 11.5h4.5" />
+    <path d="M7 14.75h6" />
+    <circle cx="17.25" cy="8.75" r="2" />
   </Svg>
 )
+
+/**
+ * The mark on its rounded tile.
+ *
+ * The bare `IconLogo` is a stroked glyph that inherits `currentColor`, which is
+ * right inside a text run but wrong as a standalone brand object: at 17px in a
+ * sidebar it disappears into whatever it sits next to, and there is no shape to
+ * recognise before the wordmark resolves.
+ *
+ * This wraps it in the tile treatment used across the marketing pages and the
+ * footer, so the same mark is the same object everywhere it appears. The tile
+ * is sized by the same `size` prop as the glyph and the glyph is inset, so a
+ * caller does not have to know the ratio.
+ *
+ * The `tone` prop exists for one reason: on the dark marketing sections the
+ * brand tile has to invert with them, and a fixed dark tile on a dark
+ * background reads as a hole.
+ */
+export function BrandTile({
+  size = 40,
+  tone = 'light',
+  className,
+}: {
+  size?: number
+  tone?: 'light' | 'dark'
+  className?: string
+}) {
+  // The glyph is inset to roughly 62% of the tile, which leaves the padding the
+  // marketing pages already use by hand. BrandMark draws on a 64 grid, so it is
+  // the right primitive to wrap rather than the 24-grid IconLogo.
+  const glyph = Math.round(size * 0.62)
+
+  return (
+    <span
+      className={[
+        'brand-tile',
+        tone === 'dark' ? 'brand-tile-dark' : 'brand-tile-light',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+    >
+      <BrandMark size={glyph} />
+    </span>
+  )
+}
 
 export const IconDashboard = (p: IconProps) => (
   <Svg {...p}>
@@ -156,6 +228,14 @@ export const IconCheck = (p: IconProps) => (
  * Rendered on a 64 grid with generous padding rather than 24, so the strokes
  * land on whole pixels at the sizes it is actually used at (22px sidebar,
  * 26px boot, favicon).
+ *
+ * The geometry below is the same sheet-plus-crosshair as `IconLogo`, lifted to
+ * a 64-unit grid. The previous version of this component still drew the old
+ * cut-corner document with a dashed edge, which is why the sidebar, the 404 and
+ * the thank-you page were showing a different mark from the one on the
+ * marketing pages and the favicon: the rebrand updated `IconLogo` and left this
+ * one behind. The stroke width is scaled to the 64 grid so it reads at the
+ * same weight as the 24-grid glyph.
  */
 export const BrandMark = ({
   size = 28,
@@ -172,36 +252,36 @@ export const BrandMark = ({
     aria-label="TailorUp"
     {...rest}
   >
-    {/* The sheet, top-right corner cut. */}
-    <path
-      d="M14 10h24l14 14v30a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2z"
+    {/* The resume sheet, as a rect. */}
+    <rect
+      x="7.5"
+      y="12.5"
+      width="32"
+      height="39"
+      rx="4"
       stroke="var(--brand-accent, #245F73)"
-      strokeWidth="3.5"
-      strokeLinejoin="round"
+      strokeWidth="4.5"
     />
-    {/* The fold that shows the corner was cut. */}
+    {/* The three rules, decreasing in width. */}
     <path
-      d="M38 10v11a3 3 0 0 0 3 3h11"
+      d="M15 25h16M15 36h16M15 47h9.5"
       stroke="var(--brand-accent, #245F73)"
-      strokeWidth="3.5"
-      strokeLinejoin="round"
-    />
-    {/* The resume's own lines, stopping short of the cut corner. */}
-    <path
-      d="M20 32h24M20 41h15"
-      stroke="var(--brand-accent, #245F73)"
-      strokeWidth="3.5"
+      strokeWidth="4.5"
       strokeLinecap="round"
     />
-    {/* The posting it is fitted to: a dashed edge, deliberately lighter, so the
-        two documents read as a pair without competing. */}
+    {/* The crosshair, centred on the sheet's right edge. */}
+    <circle
+      cx="48"
+      cy="32"
+      r="9"
+      stroke="var(--brand-accent, #245F73)"
+      strokeWidth="4.5"
+    />
     <path
-      d="M56 22v28"
-      stroke="var(--brand-warm, #733E24)"
-      strokeWidth="3"
+      d="M48 16v7M48 41v7"
+      stroke="var(--brand-accent, #245F73)"
+      strokeWidth="4.5"
       strokeLinecap="round"
-      strokeDasharray="1 7"
-      opacity="0.75"
     />
   </svg>
 )

@@ -18,6 +18,11 @@ import type {
   ApplicationStatus,
   ApplicationSummary,
   DashboardStats,
+  Notification,
+  NotificationListResponse,
+  NotificationPreferences,
+  JobSearchResponse,
+  SecurityOverview,
 } from './types'
 
 /**
@@ -147,6 +152,20 @@ async function attempt<T>(
   init: RequestInit | undefined,
   allowTokenRetry: boolean,
 ): Promise<T> {
+  // Fail before touching the network, and before fetching a CSRF token.
+  //
+  // A relative BASE_URL in production can only ever reach the CDN, so the round
+  // trip could only ever return a 404/405 that misattributes the problem to
+  // the API. This check used to sit below the CSRF fetch, which is precisely
+  // the request that can fail: an unsafe call spent a round trip on
+  // `/auth/csrf/` against the static host, got a 404, and reported
+  // "Could not obtain a CSRF token (HTTP 404)" -- a message that points at the
+  // backend, when the real cause was a missing VITE_API_URL and the backend was
+  // never involved. Every retry repeated it.
+  if (API_URL_MISSING) {
+    throw new ApiError(API_URL_MISSING_MESSAGE, 0)
+  }
+
   const method = (init?.method || 'GET').toUpperCase()
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -170,13 +189,6 @@ async function attempt<T>(
   }
 
   let response: Response
-
-  // Fail before touching the network. A relative BASE_URL in production can
-  // only ever reach the CDN, so the round trip could only ever return a
-  // 404/405 that misattributes the problem to the API.
-  if (API_URL_MISSING) {
-    throw new ApiError(API_URL_MISSING_MESSAGE, 0)
-  }
 
   try {
     response = await fetch(`${BASE_URL}${path}`, {
@@ -295,6 +307,110 @@ export const api = {
 
   updateProfile(patch: Partial<UserProfile>): Promise<UserProfile> {
     return request<UserProfile>('/auth/profile/', {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    })
+  },
+
+  /* ---------- Job search ---------- */
+
+  /**
+   * Jobs this account has collected, ranked against the current master resume.
+   *
+   * `skills` is sent as a comma-separated list because that is how people
+   * phrase a search ("python, django") and splitting it server-side is more
+   * predictable than making each caller build the query string.
+   */
+  searchJobs(params: {
+    q?: string
+    skills?: string[]
+    limit?: number
+  } = {}): Promise<JobSearchResponse> {
+    const query = new URLSearchParams()
+    if (params.q) query.set('q', params.q)
+    if (params.skills?.length) query.set('skills', params.skills.join(','))
+    if (params.limit) query.set('limit', String(params.limit))
+
+    const suffix = query.toString() ? `?${query.toString()}` : ''
+    return request<JobSearchResponse>(`/jobs/search/${suffix}`)
+  },
+
+  /* ---------- Security ---------- */
+
+  /** Live sessions and recent security events for the signed-in account. */
+  getSecurityOverview(): Promise<SecurityOverview> {
+    return request<SecurityOverview>('/auth/security/')
+  },
+
+  /**
+   * Sign out every session except this one.
+   *
+   * Named for what it does rather than "revoke all": the caller stays signed in
+   * on the tab that pressed the button, which is the behaviour that makes it
+   * safe to offer as a one-click remedy.
+   */
+  revokeOtherSessions(): Promise<{ revoked: number }> {
+    return request<{ revoked: number }>('/auth/security/revoke-others/', {
+      method: 'POST',
+    })
+  },
+
+  /**
+   * Change the password. Requires the current one, which is what stops a
+   * stolen session from becoming a permanent takeover.
+   */
+  changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>('/auth/security/password/', {
+      method: 'POST',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    })
+  },
+
+  /* ---------- Notifications ---------- */
+
+  /**
+   * This account's notifications and the unread count.
+   *
+   * `unread` is passed by the bell's popover so opening it does not require
+   * scrolling past a long read history; the count comes back either way
+   * because the badge needs the total, not the filtered length.
+   */
+  listNotifications(unreadOnly = false): Promise<NotificationListResponse> {
+    const suffix = unreadOnly ? '?unread=true' : ''
+    return request<NotificationListResponse>(`/notifications/${suffix}`)
+  },
+
+  /** Mark one read. Resolves to the updated row so the caller can drop the dot. */
+  markNotificationRead(id: number): Promise<Notification> {
+    return request<Notification>(`/notifications/${id}/read/`, { method: 'POST' })
+  },
+
+  /**
+   * Mark everything read.
+   *
+   * Returns the number the server changed rather than assuming the count it
+   * sent was accurate: the two tabs case, or a poll that landed mid-request,
+   * means the local list and the server can legitimately disagree.
+   */
+  markAllNotificationsRead(): Promise<{ updated: number }> {
+    return request<{ updated: number }>('/notifications/read-all/', { method: 'POST' })
+  },
+
+  /** Which notifications this account has opted into. */
+  getNotificationPreferences(): Promise<NotificationPreferences> {
+    return request<NotificationPreferences>('/notifications/preferences/')
+  },
+
+  updateNotificationPreferences(
+    patch: Partial<NotificationPreferences>,
+  ): Promise<NotificationPreferences> {
+    return request<NotificationPreferences>('/notifications/preferences/', {
       method: 'PATCH',
       body: JSON.stringify(patch),
     })

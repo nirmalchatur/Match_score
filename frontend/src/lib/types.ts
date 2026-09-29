@@ -441,3 +441,107 @@ export interface DashboardStats {
     job: { id: number; title: string; company: string; location: string; match_score: number | null }
   }>
 }
+
+/**
+ * One in-app notification.
+ *
+ * `kind` is a closed set matching the backend's `KIND_CHOICES`; the UI maps it
+ * to an icon and a tone, so an unrecognised value would render unstyled rather
+ * than fall back to a default. `link` is an in-app path, never a full URL.
+ */
+export type NotificationKind = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
+
+export interface Notification {
+  id: number
+  kind: NotificationKind
+  title: string
+  body: string
+  link: string
+  is_read: boolean
+  created_at: string
+  read_at: string | null
+}
+
+export interface NotificationListResponse {
+  results: Notification[]
+  /**
+   * Total unread, not the length of `results`. The list is capped server-side,
+   * so a large backlog and this number diverge by design.
+   */
+  unread_count: number
+}
+
+export interface NotificationPreferences {
+  job_updates: boolean
+  job_matches: boolean
+  application_updates: boolean
+}
+
+
+/**
+ * One job from the resume-ranked search.
+ *
+ * `score` is computed against the current master resume at search time, not
+ * read from the job's stored `match_score`, which was produced against whatever
+ * resume was current when the job was analysed. The two can disagree, and the
+ * fresh one is the one this list is ordered by.
+ */
+export interface JobSearchHit {
+  job_id: number
+  title: string
+  company: string
+  location: string
+  url: string
+  source: string
+  score: number
+  /** Never empty: the backend drops hits with no skill overlap. */
+  matched_skills: string[]
+  missing_skills: string[]
+  headline: string
+  analysed_at: string
+}
+
+export interface JobSearchResponse {
+  results: JobSearchHit[]
+  resume: { id: number; name: string; skills: number }
+  /** Candidates actually scored, after the prefilter and the cap. */
+  examined: number
+  /** Searchable jobs this account has, before any filter. */
+  total_jobs: number
+  matched_filter: number
+  /** True when the server capped the candidate set. */
+  truncated: boolean
+  /** `no_skills` when the master resume has not been extracted yet. */
+  reason: string
+}
+
+/* ---------- Security ---------- */
+
+/**
+ * Sessions and recent security events for the signed-in account.
+ *
+ * The current session is marked in the payload by the server, so the UI never
+ * has to guess which row is "this tab" -- a guess would be wrong on any machine
+ * with two tabs open, which is exactly the case the page exists to explain.
+ */
+export interface SecuritySession {
+  key: string
+  login_at: string | null
+  expires_at: string
+  user_agent: string
+  is_current: boolean
+}
+
+export interface SecurityEventRow {
+  id: number
+  event: string
+  label: string
+  user_agent: string
+  is_current_session: boolean
+  created_at: string
+}
+
+export interface SecurityOverview {
+  sessions: SecuritySession[]
+  events: SecurityEventRow[]
+}

@@ -13,6 +13,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.automation.tasks import application_status_changed
+
 from .dashboard import dashboard_stats
 from .models import Application
 from .serializers import ApplicationSerializer
@@ -208,6 +210,9 @@ class ApplicationStatusView(APIView):
             return ApplicationDetailView._not_found()
 
         new_status = (request.data.get("status") or "").strip().upper()
+        # Captured before the assignment below; the notification needs to name
+        # the stage the application came from, not the one it is already in.
+        previous_status = application.status
 
         valid = {value for value, _label in Application.STATUS_CHOICES}
         if new_status not in valid:
@@ -222,6 +227,14 @@ class ApplicationStatusView(APIView):
         application.status = new_status
         application.mark_applied()
         application.save(update_fields=["status", "applied_at", "updated_at"])
+
+        # Emitted after the save, and only on an actual transition. Repeating
+        # the same status is a no-op from the tracker's point of view and
+        # should not produce a second identical notification.
+        if previous_status != new_status:
+            application_status_changed(
+                request.user, application, previous_status, new_status
+            )
 
         return Response(
             ApplicationSerializer(application).data,

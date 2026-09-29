@@ -7,6 +7,7 @@ import {
   IconBriefcase,
   IconCheck,
   IconFile,
+  BrandTile,
   IconGitHub,
   IconLogo,
   IconRadar,
@@ -114,6 +115,119 @@ const LOCAL_CONFIG = [
   { key: 'AI_PROVIDER', value: 'ollama' },
   { key: 'OLLAMA_BASE_URL', value: 'http://localhost:11434' },
   { key: 'OLLAMA_MODEL', value: 'llama3.1' },
+]
+
+/**
+ * The stack, grouped by role.
+ *
+ * Every version here is the one this repository actually pins in
+ * `backend/requirements.txt` or `frontend/package.json`, not an approximation.
+ * That is the point of showing versions: a stack section listing "React" and
+ * "Django" without them is decoration, and it goes stale the first time a
+ * dependency moves. If you bump a dependency, this table is now wrong, and
+ * that is a deliberate tripwire rather than an accident.
+ *
+ * The "why" is the part that earns the section its space. A reader who could
+ * guess the stack from the repository gains nothing from a grid of logos; a
+ * reader who cannot guess it learns that there is no state library, no
+ * data-fetching cache, and no build step beyond tsc and Vite.
+ */
+const STACK = [
+  {
+    title: 'Backend',
+    items: [
+      {
+        name: 'Django',
+        version: '6.1',
+        why: 'Sessions, the admin and the ORM ship with it, so no code is spent on auth plumbing.',
+      },
+      {
+        name: 'Django REST Framework',
+        version: '3.18',
+        why: 'APIViews with per-class throttling, which is how the auth endpoints are rate limited.',
+      },
+      {
+        name: 'PostgreSQL',
+        version: 'psycopg 3',
+        why: 'Partial unique constraints and JSONField. Both are load-bearing for correctness.',
+      },
+      {
+        name: 'cryptography',
+        version: '50.0',
+        why: 'Fernet, for provider keys at rest. Pinned hard because it guards every stored credential.',
+      },
+      {
+        name: 'gunicorn',
+        version: '26.2',
+        why: 'WSGI server for Render. Whitenoise serves static files from the same process.',
+      },
+    ],
+  },
+  {
+    title: 'Frontend',
+    items: [
+      {
+        name: 'React',
+        version: '19.2',
+        why: 'The shell owns its data and passes it down. No state library, no fetching cache.',
+      },
+      {
+        name: 'TypeScript',
+        version: '7.0',
+        why: 'Strict, and the build fails on an unused import. Types are the only check on the API contract.',
+      },
+      {
+        name: 'Vite',
+        version: '8.3',
+        why: 'The dev proxy removes CORS locally, and a build guard refuses to ship a bundle with no API URL.',
+      },
+      {
+        name: 'React Router',
+        version: '7.18',
+        why: 'Client-side routing only. No router data loading, because the API is session-authenticated.',
+      },
+    ],
+  },
+  {
+    title: 'Analysis',
+    items: [
+      {
+        name: 'Ollama',
+        version: 'local',
+        why: 'The default provider, so a resume can be scored without it leaving the machine.',
+      },
+      {
+        name: 'Gemini / Groq',
+        version: 'optional',
+        why: 'Hosted alternatives. A user key is stored encrypted and never returned by any endpoint.',
+      },
+      {
+        name: 'python-docx / reportlab',
+        version: '1.2 / 5.0',
+        why: 'Resume export in both formats. Reportlab is pure Python, so no headless browser is needed.',
+      },
+    ],
+  },
+  {
+    title: 'Operations',
+    items: [
+      {
+        name: 'GitHub Actions',
+        version: 'CI',
+        why: 'Tests, a dependency audit and CodeQL on every push. Branch protection requires both checks.',
+      },
+      {
+        name: 'Render',
+        version: 'API',
+        why: 'Runs Django. Sessions live in PostgreSQL, so a sleeping instance signs nobody out.',
+      },
+      {
+        name: 'Vercel',
+        version: 'SPA',
+        why: 'Serves the built frontend. Separate from the API, which is why the API URL is build-time.',
+      },
+    ],
+  },
 ]
 
 /** One shared section header, so the vertical rhythm never drifts. */
@@ -311,6 +425,44 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/*
+         * Tech stack, placed after the capabilities grid and before privacy.
+
+         * Ordering argument: capabilities says what the product does, this says
+         * what it is built from, and privacy says what happens to your data.
+         * Putting the stack last would make it an afterthought; putting it first
+         * would open a marketing page with implementation detail before the
+         * reader knows what the thing does.
+         *
+         * Every version below is the one actually pinned in requirements.txt or
+         * package.json. A stack section that lists "React" without a version is
+         * decoration, and it goes stale the first time a dependency moves.
+         */}
+        <section className="mk-section is-soft" id="stack">
+          <SectionHead
+            eyebrow="Built with"
+            title="The stack, and why each piece is here."
+            lede="No abstraction layer nobody asked for. Each dependency below is load-bearing, and the version is the one this repository pins."
+          />
+
+          <div className="mk-stack">
+            {STACK.map((group) => (
+              <div className="mk-stack-group" key={group.title}>
+                <h3 className="mk-stack-group-title">{group.title}</h3>
+                <ul className="mk-stack-list">
+                  {group.items.map((item) => (
+                    <li className="mk-stack-item" key={item.name}>
+                      <span className="mk-stack-name">{item.name}</span>
+                      <span className="mk-stack-version">{item.version}</span>
+                      <span className="mk-stack-why">{item.why}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* ---------- Privacy ---------- */}
         <section className="mk-section is-soft" id="privacy">
           <div className="mk-split">
@@ -370,9 +522,7 @@ export function LandingPage() {
         <div className="mk-footer-inner">
           <div className="mk-footer-brand">
             <Link to="/" className="brand">
-              <span className="brand-mark">
-                <IconLogo size={17} />
-              </span>
+              <BrandTile size={34} tone="dark" />
               <span className="brand-name">TailorUp</span>
             </Link>
             <p className="mk-footer-tagline">

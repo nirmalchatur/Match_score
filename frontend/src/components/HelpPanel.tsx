@@ -230,24 +230,38 @@ export function HelpPanel({ open, onClose }: { open: boolean; onClose: () => voi
       }}
     >
       <div className="help-panel">
+        {/*
+         * The header is a file tab rather than a plain title bar, because that
+         * is the mental model the panel is now serving: this is a document the
+         * user is reading, not a settings dialog they are dismissing. The
+         * "Preview" affordance on the right is a live region label, not a
+         * button, so it cannot be clicked into a state that does nothing --
+         * the content is already the rendered preview.
+         */}
         <header className="help-head">
           <span className="help-title-wrap">
             <IconHelp size={17} />
-            <h2 className="help-title" id="help-title">Help</h2>
+            <h2 className="help-title" id="help-title">
+              <span className="help-file">HELP.md</span>
+            </h2>
           </span>
-          <button
-            type="button"
-            className="btn btn-ghost btn-icon"
-            onClick={onClose}
-            aria-label="Close help"
-          >
-            <IconClose size={16} />
-          </button>
+
+          <div className="help-head-actions">
+            <span className="help-preview-tag">Preview</span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon"
+              onClick={onClose}
+              aria-label="Close help"
+            >
+              <IconClose size={16} />
+            </button>
+          </div>
         </header>
 
         <div className="help-body">
           <nav className="help-nav" aria-label="Help sections">
-            {SECTIONS.map((s) => (
+            {SECTIONS.map((s, index) => (
               <button
                 key={s.id}
                 type="button"
@@ -255,13 +269,23 @@ export function HelpPanel({ open, onClose }: { open: boolean; onClose: () => voi
                 onClick={() => setActive(s.id)}
                 aria-current={s.id === active ? 'true' : undefined}
               >
+                {/* The number is part of the label rather than a pseudo-element
+                    so it is announced with the tab name. */}
+                <span className="help-tab-num">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
                 {s.title}
               </button>
             ))}
           </nav>
 
           <div className="help-content" role="region" aria-label={section.title}>
-            <h3 className="help-heading">{section.title}</h3>
+            <h3 className="help-heading">
+              <span className="help-heading-num">
+                {String(SECTIONS.findIndex((s) => s.id === active) + 1).padStart(2, '0')}
+              </span>
+              {section.title}
+            </h3>
             {section.body}
           </div>
         </div>

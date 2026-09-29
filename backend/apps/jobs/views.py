@@ -6,7 +6,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.automation.tasks import job_analysed
 from apps.jobs.services import ats_registry
+from apps.jobs.services import job_search
 from apps.jobs.services.job_collector import JobCollector
 from apps.jobs.services.job_processor import JobProcessor
 from apps.jobs.services.sources.greenhouse import GreenhouseCollector
@@ -83,6 +85,11 @@ class JobAnalyzeView(APIView):
                 {"name": "Match score calculated", "status": "complete"},
             ]
             job.save(update_fields=["status", "error_message", "pipeline_steps", "match_score", "match_result", "decision"])
+
+            # Tell the user the analysis landed. Emitted only on the completed
+            # branch, and keyed on (id, status) so a re-analysis is a new event
+            # while a repeated observation of the same one is not.
+            job_analysed(request.user, job)
 
             return Response(
                 {
@@ -194,6 +201,74 @@ class JobMatchView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+class JobSearchView(APIView):
+    """
+    GET /api/jobs/search/ -- this account's jobs ranked against the resume.
+
+    Three query parameters, all optional:
+
+    ``q``          free text, matched against title, company and description.
+    ``skills``     comma-separated skill names, OR'd with ``q`` and with each
+                   other. Accepted separately because "python, django" is how
+                   people think about a search, and splitting that on commas
+                   server-side is more predictable than making the client build
+                   a query string.
+    ``limit``      capped server-side. A client asking for 10000 gets
+                   MAX_RESULTS, not a database-sized response.
+
+    Requires a master resume. A 409 with an explanatory body rather than an
+    empty list, because "upload a resume first" and "nothing matched" are
+    different situations and the UI has to say which one it is.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        terms = []
+
+        free_text = (request.query_params.get("q") or "").strip()
+        if free_text:
+            terms.append(free_text)
+
+        skills = (request.query_params.get("skills") or "").strip()
+        if skills:
+            # split() rather than a manual parse: a stray empty segment from a
+            # trailing comma is harmless, and the prefilter drops it anyway.
+            terms.extend(part for part in skills.split(",") if part.strip())
+
+        try:
+            raw_limit = int(request.query_params.get("limit") or 0)
+        except (TypeError, ValueError):
+            # A non-numeric limit is ignored rather than a 400: it is a
+            # cosmetic parameter and failing the whole search over it would be
+            # a poor trade.
+            raw_limit = 0
+
+        try:
+            payload = job_search.search_jobs(
+                user=request.user,
+                terms=terms,
+                limit=raw_limit or job_search.MAX_RESULTS,
+            )
+        except job_search.NoMasterResume:
+            # The class constants, not str(exc). Two reasons, one practical and
+            # one about the build: the text of a live exception is an internal
+            # detail that has no business in a response body, and returning it
+            # is exactly the "information exposure through an exception" shape
+            # that static analysis flags on a diff. The code is what the client
+            # branches on; the message is written to be read by a person.
+            return Response(
+                {
+                    "error": job_search.NoMasterResume.MESSAGE,
+                    "code": job_search.NoMasterResume.CODE,
+                    "results": [],
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class JobListView(APIView):

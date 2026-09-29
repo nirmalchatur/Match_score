@@ -161,6 +161,11 @@ function AppShell() {
           searchValue={shellSearch}
           onSearchChange={setShellSearch}
           avatarLabel={displayName || user?.email}
+          // Notification links are in-app paths from the backend, not view
+          // keys, so they go straight to the router. Passing handleNavigate
+          // here would be a type error and, at runtime, would look the path up
+          // in PATHS and silently land on the dashboard for every link.
+          onNavigate={(path) => { navigate(path) }}
           actions={
             <>
               <ApiKeyButton />

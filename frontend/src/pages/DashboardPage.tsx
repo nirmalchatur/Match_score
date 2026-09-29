@@ -11,6 +11,7 @@ import {
 import { JobRow } from '../components/JobRow'
 import { ApplicationTracker } from '../components/ApplicationTracker'
 import { JobDetail } from '../components/JobDetail'
+import { JobSearch } from '../components/JobSearch'
 import { STATUS_LABELS } from '../lib/types'
 import { UrlForm } from '../components/UrlForm'
 import { Alert, EmptyState, JobRowSkeleton, Pill, Skeleton, StatCard } from '../components/primitives'
@@ -119,6 +120,20 @@ export function DashboardPage({
         <div className="card-body">
           <div className="section-title">Analyze a new job</div>
           <UrlForm onSubmit={onAnalyze} busy={analyzing} />
+        </div>
+      </section>
+
+      {/*
+       * Job search sits directly under "analyze a new job" on purpose: the
+       * two are consecutive steps in the same question. Analyse a posting, then
+       * see how the growing set ranks against the resume. Putting it above the
+       * URL form would show a ranked list of jobs the user has not collected
+       * yet, which reads as though the feature is broken on first load.
+       */}
+      <section className="card">
+        <div className="card-body">
+          <div className="section-title">Find jobs matching your resume</div>
+          <JobSearch />
         </div>
       </section>
 

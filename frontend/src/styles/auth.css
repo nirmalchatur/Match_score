@@ -15,6 +15,10 @@
   background: var(--bg);
 }
 
+/* The glyph sits on an accent gradient, so its colour has to be the inverse
+   of the accent. --paper rather than a literal #fff: the accent inverts with
+   the theme, and the white-on-near-white pairing made the "Restoring your
+   session" mark disappear in dark mode. */
 .boot-mark {
   display: grid;
   place-items: center;
@@ -23,7 +27,7 @@
   border-radius: var(--r-lg);
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-mid) 100%);
   box-shadow: var(--glow-violet), inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  color: #fff;
+  color: var(--paper);
   animation: pulse-glow 1.8s var(--ease) infinite;
 }
 
@@ -66,10 +70,10 @@
   gap: 10px;
   margin-bottom: 56px;
   width: fit-content;
-  font-family: var(--serif);
-  font-size: 23px;
-  font-weight: 400;
-  letter-spacing: -0.01em;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   color: var(--text);
 }
 
@@ -167,9 +171,9 @@
 
 .auth-recap-score {
   margin-left: auto;
-  font-family: var(--serif);
-  font-size: 26px;
-  font-weight: 400;
+  font-family: var(--display);
+  font-size: 25px;
+  font-weight: 700;
   color: var(--success-strong);
 }
 
@@ -224,16 +228,16 @@
   align-items: center;
   gap: 9px;
   margin-bottom: 26px;
-  font-family: var(--serif);
-  font-size: 21px;
-  font-weight: 400;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 600;
 }
 
 .auth-title {
-  font-family: var(--serif);
-  font-size: 32px;
-  font-weight: 400;
-  letter-spacing: -0.015em;
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.028em;
 }
 
 .auth-sub {
@@ -335,7 +339,7 @@
 }
 
 .auth-oauth:hover {
-  background: rgba(10, 10, 10, 0.04);
+  background: var(--hover);
   border-color: var(--border-strong);
 }
 
@@ -394,10 +398,10 @@
 
 .setup-title {
   margin: 10px 0 0;
-  font-family: var(--serif);
-  font-size: 38px;
-  font-weight: 400;
-  letter-spacing: -0.015em;
+  font-family: var(--display);
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .setup-sub {

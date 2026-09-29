@@ -1,6 +1,7 @@
-from django.urls import path
+﻿from django.urls import path
 
 from .views import (
+    ChangePasswordView,
     CsrfTokenView,
     LoginView,
     LogoutView,
@@ -8,6 +9,8 @@ from .views import (
     ProfileView,
     ProviderCredentialView,
     RegisterView,
+    RevokeOtherSessionsView,
+    SecurityOverviewView,
 )
 
 
@@ -48,5 +51,22 @@ urlpatterns = [
         "ai-key/",
         ProviderCredentialView.as_view(),
         name="auth-ai-key",
+    ),
+    # Security page: active sessions, recent security events, and the two
+    # actions a user takes when they suspect a credential is compromised.
+    path(
+        "security/",
+        SecurityOverviewView.as_view(),
+        name="auth-security",
+    ),
+    path(
+        "security/revoke-others/",
+        RevokeOtherSessionsView.as_view(),
+        name="auth-security-revoke",
+    ),
+    path(
+        "security/password/",
+        ChangePasswordView.as_view(),
+        name="auth-security-password",
     ),
 ]

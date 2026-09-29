@@ -31,6 +31,14 @@ urlpatterns = [
         include("apps.resumes.urls"),
     ),
 
+    # In-app notifications. Declared last so the literal paths inside
+    # apps.automation.urls ("read-all/", "preferences/") resolve before any
+    # sibling pattern could treat them as an id.
+    path(
+        "api/notifications/",
+        include("apps.automation.urls"),
+    ),
+
 ]
 
 

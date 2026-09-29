@@ -21,6 +21,8 @@ which is the arrangement DRF's SessionAuthentication expects.
 """
 
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -30,6 +32,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import ProviderCredential, UserProfile
+from .security import (
+    SecurityEvent,
+    change_password,
+    list_sessions,
+    revoke_other_sessions,
+)
 from .serializers import (
     LoginSerializer,
     ProviderCredentialSerializer,
@@ -114,6 +122,16 @@ class LoginView(APIView):
 
         login(request._request, user)
 
+        # Recorded after the session exists, so the event can be marked as
+        # belonging to the session that was just created. A failure here is
+        # swallowed by record() and must not fail the sign-in.
+        SecurityEvent.record(
+            user,
+            SecurityEvent.LOGIN_SUCCESS,
+            request=request,
+            is_current_session=True,
+        )
+
         return Response(
             {"user": UserSerializer(user).data},
             status=status.HTTP_200_OK,
@@ -141,6 +159,15 @@ class LogoutView(APIView):
             # Scoped to this user's rows only. Deliberately not a table-wide
             # clear, and it does not touch any other account's key.
             ProviderCredential.objects.filter(user=user).delete()
+
+            # Recorded before logout() flushes the session, which would
+            # otherwise make request.user anonymous. Swallowed on failure.
+            SecurityEvent.record(
+                user,
+                SecurityEvent.LOGOUT,
+                request=request,
+                is_current_session=True,
+            )
 
         logout(request._request)
 
@@ -310,3 +337,126 @@ class ProfileView(APIView):
             UserProfileSerializer(profile).data,
             status=status.HTTP_200_OK,
         )
+
+
+class SecurityOverviewView(APIView):
+    """
+    GET /api/auth/security/ -- sessions and recent security events.
+
+    Everything here is scoped to the requesting account. There is no parameter
+    that can widen that scope, which is the point: this endpoint is the one a
+    user opens when they suspect something is wrong, so it must not be a place
+    where a crafted request reads someone else.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        session_key = request.session.session_key or ""
+
+        events = SecurityEvent.objects.filter(user=user)[:25]
+
+        return Response(
+            {
+                "sessions": list_sessions(user, current_session_key=session_key),
+                "events": [
+                    {
+                        "id": row.id,
+                        "event": row.event,
+                        "label": row.label,
+                        "user_agent": row.user_agent,
+                        "is_current_session": row.is_current_session,
+                        "created_at": row.created_at,
+                    }
+                    for row in events
+                ],
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class RevokeOtherSessionsView(APIView):
+    """
+    POST /api/auth/security/revoke-others/ -- sign out every other session.
+
+    The current session is identified by its own key and is always kept, so
+    pressing this button cannot sign the user out of the tab they pressed it
+    in. The alternative -- revoking everything and re-authenticating -- is
+    correct for a compromised account but is a worse default, because it
+    punishes the common case where nothing is wrong.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        keep = request.session.session_key or ""
+        removed = revoke_other_sessions(request.user, keep_session_key=keep)
+
+        SecurityEvent.record(
+            request.user,
+            SecurityEvent.SESSIONS_REVOKED,
+            request=request,
+            is_current_session=True,
+        )
+
+        return Response({"revoked": removed}, status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(APIView):
+    """
+    POST /api/auth/security/password/ -- change the account password.
+
+    Requires the current password. Without that check, anyone who finds an
+    unlocked browser session could set a new password and lock the real owner
+    out permanently -- the session would be enough to take the account over.
+    Requiring the password turns "stolen session" into "stolen session until the
+    next sign-in" rather than "account takeover".
+
+    The new password is validated with the project's configured validators
+    rather than a bespoke strength check, so the rules the user is told about
+    at sign-up are the rules enforced here.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        current = (request.data.get("current_password") or "").strip()
+        new = (request.data.get("new_password") or "").strip()
+
+        if not current or not new:
+            return Response(
+                {"error": "Both current_password and new_password are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not request.user.check_password(current):
+            # Deliberately the same message as a wrong current password on a
+            # signed-in request. Do not add rate limiting here specifically:
+            # the endpoint is authenticated, and an attacker who reaches it
+            # already holds a valid session.
+            return Response(
+                {"error": "Current password is incorrect."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            validate_password(new, request.user)
+        except ValidationError as exc:
+            return Response(
+                {"error": "Password does not meet the requirements.", "detail": exc.messages},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if new == current:
+            return Response(
+                {"error": "New password must be different from the current one."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # change_password() re-hashes the session auth hash, so this session
+        # survives the change. Without that, the user is signed out of the tab
+        # they are standing in and reasonably concludes it failed.
+        change_password(request.user, new, request=request)
+
+        return Response({"ok": True}, status=status.HTTP_200_OK)

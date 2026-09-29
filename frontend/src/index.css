@@ -14,9 +14,24 @@
 
 /* ------------------------------------------------------------
    Typefaces are loaded from Google Fonts via index.html:
-   Instrument Serif, Archivo, Inter Tight, JetBrains Mono.
+   Archivo, Inter Tight, JetBrains Mono, Instrument Serif.
    Every stack below ends in a real system face, so a blocked or
    offline CDN degrades cleanly instead of rendering invisible text.
+
+   On --serif
+   ----------
+   Instrument Serif is still loaded and --serif still resolves, but
+   it is no longer used for the wordmark or for marketing headlines.
+   A high-contrast didone-adjacent serif next to a thin geometric
+   mark is the exact pairing that made the product read as a
+   lifestyle or beauty brand: that register signals "editorial"
+   and "premium", which is the wrong promise for a hiring tool. The
+   serif is kept for pull quotes and the footer, where an editorial
+   voice is wanted rather than avoided.
+
+   Headlines now use --display (Archivo), a grotesque with real
+   400-700 weights, so hierarchy is carried by weight and size
+   instead of by stroke contrast.
    ------------------------------------------------------------ */
 
 :root {
@@ -46,11 +61,17 @@
   --border-input: rgba(10, 10, 10, 0.28);
 
   /* --- Text ---
-     --text-dim is #6e6e6e (4.9:1 on white) so small labels still
-     clear WCAG AA for normal text. */
+     --text-dim is #666666 so small labels still clear WCAG AA (4.5:1) for
+     normal text. It used to be #6e6e6e, which is 4.9:1 on white -- fine on
+     paper, not fine on the surfaces the app actually renders on. The
+     neumorphic base is #eef1f6 and --surface-2 is #e7ebf2, and against those
+     #6e6e6e falls to 4.1-4.3:1: under AA for every 10-13px label that used
+     it, which is most of the secondary text in the product. #666666 is
+     4.8:1 on the worst of them and 5.7:1 on white, so the hierarchy against
+     --text-muted is unchanged and the legibility is not. */
   --text: #0a0a0a;
   --text-muted: #4a4a4a;
-  --text-dim: #6e6e6e;
+  --text-dim: #666666;
 
   /* --- Primary (ink) --- */
   --accent: #0a0a0a;
@@ -151,7 +172,12 @@
                heavier value would trigger ugly synthetic faux-bold.
      --display Archivo: a slightly condensed grotesque with real 400
                to 700 weights, so headings and numerals stay sharp.
+               This is the wordmark and headline face. It replaced a
+               high-contrast serif here, which made the product read
+               as editorial/lifestyle rather than as a hiring tool.
      --sans    Inter Tight: dense, neutral UI and body copy.
+     --serif   Instrument Serif. Retained for pull quotes and the
+               footer only -- see the note at the top of this file.
      --mono    JetBrains Mono: labels, scores, config values. */
   --serif: 'Instrument Serif', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
   --display: 'Archivo', 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif;

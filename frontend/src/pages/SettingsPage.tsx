@@ -6,6 +6,7 @@ import { formatDate } from '../lib/format'
 import type { AiKeyStatus, TailoringStatus, UserProfile } from '../lib/types'
 import { Alert, Pill } from '../components/primitives'
 import { QualitiesPicker } from '../components/QualitiesPicker'
+import { SecurityPanel } from '../components/SecurityPanel'
 import { IconCheck, IconFile, IconLayers, IconZap } from '../components/Icons'
 
 const DISCIPLINES = [
@@ -190,6 +191,23 @@ export function SettingsPage() {
 
   return (
     <div className="page stack">
+      {/*
+       * Security sits directly under Account rather than at the bottom of the
+       * page. The two are the same concern seen from different angles -- who
+       * you are and who else can be you -- and burying the session list under
+       * API keys and preferences means the person opening Settings because
+       * they think something is wrong has to scroll past everything else to
+       * find the thing that fixes it.
+       */}
+      <section className="card">
+        <div className="card-head">
+          <h2>Security</h2>
+        </div>
+        <div className="card-body">
+          <SecurityPanel />
+        </div>
+      </section>
+
       <section className="card">
         <div className="card-head">
           <h2>Account</h2>

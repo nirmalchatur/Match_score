@@ -193,3 +193,10 @@ class ProviderCredential(models.Model):
             "updated_at": self.updated_at,
         }
 
+
+# ``SecurityEvent`` is defined in ``security.py`` next to the session helpers
+# that read it, rather than here, so the model and the code that owns its
+# lifetime sit together. It is re-exported through this module because Django
+# discovers app models by importing ``<app>.models``; without this line the
+# table would never be created by a migration.
+from .security import SecurityEvent  # noqa: E402,F401

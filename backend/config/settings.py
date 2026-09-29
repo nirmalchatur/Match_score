@@ -159,6 +159,10 @@ INSTALLED_APPS = [
     'apps.jobs',
     'apps.resumes',
     'apps.users',
+    # In-app notifications. This app existed as a directory of three empty
+    # files and was never installed, so the topbar's bell icon had no endpoint
+    # behind it -- a static span with no click handler.
+    'apps.automation',
 ]
 
 MIDDLEWARE = [
