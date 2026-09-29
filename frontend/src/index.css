@@ -61,11 +61,17 @@
   --border-input: rgba(10, 10, 10, 0.28);
 
   /* --- Text ---
-     --text-dim is #6e6e6e (4.9:1 on white) so small labels still
-     clear WCAG AA for normal text. */
+     --text-dim is #666666 so small labels still clear WCAG AA (4.5:1) for
+     normal text. It used to be #6e6e6e, which is 4.9:1 on white -- fine on
+     paper, not fine on the surfaces the app actually renders on. The
+     neumorphic base is #eef1f6 and --surface-2 is #e7ebf2, and against those
+     #6e6e6e falls to 4.1-4.3:1: under AA for every 10-13px label that used
+     it, which is most of the secondary text in the product. #666666 is
+     4.8:1 on the worst of them and 5.7:1 on white, so the hierarchy against
+     --text-muted is unchanged and the legibility is not. */
   --text: #0a0a0a;
   --text-muted: #4a4a4a;
-  --text-dim: #6e6e6e;
+  --text-dim: #666666;
 
   /* --- Primary (ink) --- */
   --accent: #0a0a0a;

@@ -148,7 +148,10 @@
   margin-left: auto;
   padding: 1px 7px;
   border-radius: var(--r-pill);
-  background: rgba(10, 10, 10, 0.06);
+  /* A token rather than a literal black wash. rgba(10, 10, 10, 0.06) on a
+     dark surface is a wash of near-black on near-black: the chip stopped
+     reading as a chip the moment the theme was dark. */
+  background: var(--accent-faint);
   color: var(--text-dim);
   font-family: var(--mono);
   font-size: 10px;
@@ -179,9 +182,12 @@
 }
 
 .user-chip:hover {
-  background: rgba(10, 10, 10, 0.04);
+  background: var(--hover);
 }
 
+/* Initials on an accent fill. --paper rather than #fff, so the label stays
+   the inverse of the fill when the theme inverts; a literal white label was
+   invisible in dark mode, where the accent is near-white. */
 .user-avatar {
   display: grid;
   place-items: center;
@@ -190,7 +196,7 @@
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--paper);
   font-size: 13px;
   font-weight: 700;
 }
@@ -318,7 +324,7 @@
 
 .bell:hover {
   color: var(--text);
-  background: rgba(10, 10, 10, 0.05);
+  background: var(--hover);
 }
 
 /*
@@ -349,6 +355,8 @@
   outline-offset: 2px;
 }
 
+/* --paper for the same reason as .nav-count: the brand accent is lightened
+   in dark mode, and a white count on it is unreadable. */
 .bell-dot {
   position: absolute;
   top: 2px;
@@ -360,7 +368,7 @@
   place-items: center;
   border-radius: var(--r-pill);
   background: var(--brand-accent);
-  color: #fff;
+  color: var(--paper);
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 700;
@@ -513,6 +521,7 @@
   flex-shrink: 0;
 }
 
+/* --paper, not #fff: see .user-avatar above. */
 .topbar-avatar {
   display: grid;
   place-items: center;
@@ -521,7 +530,7 @@
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--paper);
   font-size: 13px;
   font-weight: 700;
 }

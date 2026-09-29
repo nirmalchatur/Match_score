@@ -45,9 +45,60 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # ---------------------------------------------------------------------
+      # Preflight: can this review run at all?
+      #
+      # `dependency-review-action` reads the dependency graph, and the graph is
+      # a repository setting rather than a property of the diff. With it off,
+      # the action cannot list what the pull request changed at all, so it
+      # fails in about seven seconds pointing at a settings page. That is a
+      # red X on every PR which says nothing about the code, and it buries the
+      # one line in the run that would explain why.
+      #
+      # `dependency-graph/sbom` answers exactly that question, and it answers
+      # it without a token: 200 when the graph is available, 404 when it has
+      # been switched off. Every other answer -- rate limit, GitHub outage, a
+      # 403 if the endpoint's permissions ever change -- counts as "available",
+      # so this step can only ever make the job stricter. It can never turn a
+      # review that would have run into one that is quietly skipped.
+      # ---------------------------------------------------------------------
+      - name: Is the dependency graph available?
+        id: graph
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/${{ github.repository }}/dependency-graph/sbom")
+          echo "responded $code"
+          if [ "$code" = "404" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Not a silent skip. The annotation is the one line everyone sees in the
+      # checks list, and the summary carries the fix, so the gap is reported
+      # rather than hidden behind a green tick.
+      - name: Report the repository setting the review needs
+        if: steps.graph.outputs.available != 'true'
+        run: |
+          echo '::warning title=Dependency review skipped::The dependency graph is disabled, so the dependencies this pull request changes could not be listed and no advisory or licence was judged.'
+          {
+            echo '### Dependency review skipped'
+            echo ''
+            echo 'The **dependency graph** is disabled for this repository. That graph is the data source `actions/dependency-review-action` reads; with it off the action cannot enumerate the diff, so it fails immediately instead of reviewing anything.'
+            echo ''
+            echo 'This is a repository setting, not a defect in the pull request. Enable it once and the review below becomes a real gate on the next run, with no workflow change needed:'
+            echo ''
+            echo '- **Settings -> Code security -> Dependency graph**, or'
+            echo "- \`gh api -X PATCH repos/${{ github.repository }} -f 'security_and_analysis[dependency_graph][status]=enabled'\`"
+            echo ''
+            echo 'Known-vulnerable dependencies are still blocked in the meantime by the `Dependency audit` job in `security.yml`, which runs `pip-audit` and `npm audit` against the manifests on every push and pull request.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # Safe-harbour: never silently pass a malformed result. A scanner that
       # errors is reported as failing rather than treated as "nothing found".
       - name: Review the dependency diff
+        if: steps.graph.outputs.available == 'true'
         uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: moderate

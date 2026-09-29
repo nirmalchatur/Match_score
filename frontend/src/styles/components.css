@@ -69,9 +69,16 @@
   transform: translateY(1px);
 }
 
-/* Primary — solid violet, subtle inner light */
+/* Primary — a solid fill of the accent.
+   The label is --paper rather than a literal #fff, and that is the whole
+   point. --accent inverts with the theme (near-black in light, near-white in
+   dark), so a hard-coded white label became white text on a near-white
+   button in dark mode: the primary action on every screen rendered as an
+   empty pill, including "Create account" and "Sign in". --paper is defined
+   as the inverse of --accent in both themes, which is the pairing
+   .brand-mark, .nav-item.active and .auth-check already use. */
 .btn-primary {
-  color: #fff;
+  color: var(--paper);
   background: var(--accent);
   border: 1px solid var(--accent-line);
 }
@@ -101,7 +108,7 @@
 }
 
 .btn-danger:not(:disabled):hover {
-  background: rgba(10, 10, 10, 0.12);
+  background: var(--accent-12);
 }
 
 .btn-sm {
@@ -123,13 +130,22 @@
   height: 40px;
 }
 
+/* Tokens, not a literal white ring.
+
+   This spinner sits on a solid accent fill (a primary button) on most
+   screens and on a plain panel on the rest, and the accent inverts with the
+   theme. A fixed white arc was therefore invisible in dark mode, where it
+   lands on a near-white button -- the busiest state of a form was the one
+   state that showed no progress at all. `currentColor` is whatever label
+   colour it is sitting inside, so it is the inverse of a filled button and
+   the text colour on a panel. Same convention as .ba-spinner further down. */
 .spinner {
   width: 13px;
   height: 13px;
   flex-shrink: 0;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  border-top-color: #fff;
+  border: 2px solid var(--border-mid);
+  border-top-color: currentColor;
   animation: spin 700ms linear infinite;
 }
 
@@ -320,7 +336,7 @@
 .badge-violet,
 .pill-accent {
   color: var(--accent-soft-text);
-  background: rgba(10, 10, 10, 0.15);
+  background: var(--accent-15);
   border: 1px solid var(--accent-20);
 }
 
@@ -940,7 +956,7 @@
 
 .skill-chip.more {
   color: var(--text-dim);
-  background: rgba(10, 10, 10, 0.04);
+  background: var(--accent-faint);
   border-color: var(--border-soft);
   font-family: var(--mono);
   font-size: 10.5px;
@@ -974,7 +990,7 @@
 
 .filter-chip:hover {
   color: var(--text);
-  background: rgba(10, 10, 10, 0.04);
+  background: var(--hover);
 }
 
 .filter-chip.active {
@@ -1090,6 +1106,8 @@
   border-radius: var(--r-lg);
 }
 
+/* Initials on an accent fill, so the label has to be the inverse of the
+   fill. --paper, not #fff: see the note on .btn-primary above. */
 .profile-avatar {
   display: grid;
   place-items: center;
@@ -1098,7 +1116,7 @@
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--paper);
   font-size: 21px;
   font-weight: 700;
 }
@@ -1154,11 +1172,15 @@
   text-transform: uppercase;
 }
 
+/* A count of cards, so the number inside inherits --text. --accent-20 rather
+   than a heavier wash: the token is white at 20% in dark mode, and at 35% the
+   chip got light enough that the near-white number on it fell to 4.3:1. The
+   old rgba(10, 10, 10, 0.3) was worse still -- invisible on a dark board. */
 .kanban-count {
   margin-left: auto;
   padding: 1px 7px;
   border-radius: var(--r-pill);
-  background: rgba(10, 10, 10, 0.3);
+  background: var(--accent-20);
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0;
@@ -1901,8 +1923,10 @@
   color: var(--text-dim);
 }
 
+/* --danger, not a literal red. #b3261e is 2.3:1 on the dark surface, so a
+   failed download reported its failure in a colour nobody could read. */
 .dl-err {
-  color: #b3261e;
+  color: var(--danger);
 }
 
 @media (max-width: 640px) {
@@ -2102,9 +2126,12 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   flex: 0 0 auto;
-  border: 1px solid var(--border, #e2e2e6);
+  border: 1px solid var(--border);
   background: var(--hover);
-  color: #55555f;
+  /* --text-dim, not a literal grey. The fill is --hover, which inverts with
+     the theme, so a fixed mid grey was 1.8:1 against the dark theme's fill:
+     a monogram you could not read at 10px. */
+  color: var(--text-dim);
 }
 
 .ats-mark-sm {
@@ -2130,7 +2157,7 @@
   gap: 6px;
   padding: 2px 8px 2px 3px;
   border-radius: 999px;
-  border: 1px solid var(--border, #e2e2e6);
+  border: 1px solid var(--border);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -2144,14 +2171,20 @@
   width: 100%;
   margin-top: 4px;
   justify-content: flex-start;
-  color: #55555f;
+  /* --text-dim, not #55555f. A literal grey cannot follow the theme: on the
+     dark sidebar it sat at 1.8:1, so "Sign out" was effectively invisible. */
+  color: var(--text-dim);
 }
 
 .sidebar-logout:hover { background: var(--hover); }
 
+/* --danger-bg, not a fixed #fdeeee. The theme lightens --danger for dark
+   surfaces (#ff8f85), so a pale pink fill put that salmon text on a near-white
+   block at 2:1 -- the "press again to sign out" confirmation, the one moment
+   this control must be unambiguous. */
 .sidebar-logout.confirming {
-  color: var(--danger, #b3261e);
-  background: #fdeeee;
+  color: var(--danger);
+  background: var(--danger-bg);
   font-weight: 600;
 }
 
@@ -2164,7 +2197,7 @@
    selected state is a border and a tint rather than a colour change alone, so
    it still reads without colour vision. */
 .choice-card {
-  border: 1px solid var(--border, #e2e2e6);
+  border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--input-bg);
   transition: border-color 120ms ease, background 120ms ease;
@@ -2172,23 +2205,32 @@
 
 .choice-card:hover { border-color: var(--border-mid); }
 
+/* Tokens, not a fixed near-white: the card inherits --text, which is near-white
+   in dark mode, so a #f7f7f9 fill rendered the selected option's own label
+   invisible. */
 .choice-card.selected {
-  border-color: #1f1f24;
-  background: #f7f7f9;
+  border-color: var(--accent);
+  background: var(--accent-faint);
 }
 
 .choice-card:focus-visible {
-  outline: 2px solid #1f1f24;
+  /* The focus ring has to follow the theme too: a fixed #1f1f24 outline is
+     near-black on a near-black card in dark mode, so a keyboard user had no
+     visible focus target at all. */
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* The inline command list in the AI-setup cards. */
+/* The inline command list in the AI-setup cards. Tokens rather than a fixed
+   light panel: this is code, and a hard-coded #f1f1f4 slab stayed glaringly
+   light inside a dark screen while the rest of the sheet moved with the
+   theme. --surface-2 over --text is the same inset-well reading in both. */
 .choice-card pre {
   font-size: 12px;
   line-height: 1.7;
-  color: #3c3c46;
-  background: #f1f1f4;
-  border: 1px solid #e6e6ea;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px 12px;
   overflow-x: auto;
@@ -2236,14 +2278,14 @@
 }
 
 .card {
-  border: 1px solid var(--line, #e3e3e6);
+  border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: none;
   background: var(--paper, #fff);
 }
 
 .card-head {
-  border-bottom: 1px solid var(--line, #e3e3e6);
+  border-bottom: 1px solid var(--border);
   background: transparent;
   padding: 10px 14px;
 }
@@ -2314,7 +2356,7 @@
 
 /* -- sidebar: a tool rail -------------------------------------------- */
 
-.sidebar { border-right: 1px solid var(--line, #e3e3e6); }
+.sidebar { border-right: 1px solid var(--border); }
 
 .nav-item {
   border-radius: var(--r-sm);
@@ -2326,7 +2368,7 @@
   color: var(--paper);
 }
 
-.nav-divider { border-color: var(--line, #e3e3e6); }
+.nav-divider { border-color: var(--border); }
 
 /* -- forms: labelled, boxed, dense ------------------------------------ */
 
@@ -2341,7 +2383,7 @@ input,
 select,
 textarea {
   border-radius: var(--r-sm);
-  border-color: var(--line, #d8d8dc);
+  border-color: var(--border);
 }
 
 /* -- the application status table ------------------------------------- */
@@ -2363,13 +2405,13 @@ textarea {
   font-weight: 650;
   color: var(--text-dim);
   padding: 8px 10px;
-  border-bottom: 1px solid var(--line, #d8d8dc);
+  border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 
 .apps-table td {
   padding: 9px 10px;
-  border-bottom: 1px solid var(--line, #ececef);
+  border-bottom: 1px solid var(--border-soft);
   vertical-align: middle;
 }
 
@@ -2392,7 +2434,7 @@ textarea {
   font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace);
   font-size: 12px;
   border-radius: var(--r-xs);
-  border: 1px solid var(--line, #d8d8dc);
+  border: 1px solid var(--border);
   background: var(--input-bg);
   padding: 4px 6px;
   min-width: 150px;
@@ -2439,7 +2481,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--line, #d8d8dc);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--input-bg);
   font-size: 12px;
@@ -2470,7 +2512,7 @@ textarea {
   z-index: 41;
   width: 330px;
   padding: 14px;
-  border: 1px solid var(--line, #d8d8dc);
+  border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--input-bg);
   box-shadow: 0 8px 28px rgba(10, 10, 10, 0.14);
@@ -2488,15 +2530,19 @@ textarea {
   align-items: flex-start;
   margin: 14px 0 0;
   padding-top: 12px;
-  border-top: 1px solid var(--line, #ececef);
+  border-top: 1px solid var(--border);
   font-size: 11.5px;
   line-height: 1.55;
-  color: #5a5a63;
+  /* --text-dim: #5a5a63 is 2.2:1 on the dark surface, so the security claim
+     under the key field was unreadable in dark mode. */
+  color: var(--text-dim);
 }
 
 .key-trust strong { color: var(--accent); }
 
-.key-fine { margin: 8px 0 0; font-size: 11.5px; color: #6b6b73; }
+/* --text-dim, not a literal grey: this is 11.5px fine print, and #6b6b73
+   against the dark surface is 2.8:1, which is not readable at that size. */
+.key-fine { margin: 8px 0 0; font-size: 11.5px; color: var(--text-dim); }
 
 /* ---------------------------------------------------------- dev console */
 

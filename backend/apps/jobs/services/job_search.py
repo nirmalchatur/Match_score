@@ -57,7 +57,21 @@ class NoMasterResume(Exception):
     resume" and "you have a resume but nothing matches" call for different UI,
     and collapsing them into an empty list produces a blank page that tells
     the user nothing.
+
+    The two class attributes are the whole public contract. A view must
+    return :attr:`MESSAGE`, never ``str(exc)``: the text of a live exception
+    is an internal detail, and handing it to a response body is how stack and
+    internals escape to a browser. Keeping the string here also means the
+    wording is reviewed once, next to the condition that produces it.
     """
+
+    #: Discriminator the client switches on. Stable: it is in the API, not in
+    #: a sentence a translator may reword.
+    CODE = "no_master_resume"
+
+    #: Written to be read by a person, so it says what to do next rather than
+    #: what went wrong internally.
+    MESSAGE = "Upload a master resume before searching for matching jobs."
 
 
 @dataclass
@@ -135,9 +149,7 @@ def get_master_resume(user) -> Resume:
     """
     resume = Resume.objects.filter(user=user, is_master=True).first()
     if resume is None:
-        raise NoMasterResume(
-            "Upload a master resume before searching for matching jobs."
-        )
+        raise NoMasterResume(NoMasterResume.MESSAGE)
     return resume
 
 

@@ -252,11 +252,17 @@ class JobSearchView(APIView):
                 terms=terms,
                 limit=raw_limit or job_search.MAX_RESULTS,
             )
-        except job_search.NoMasterResume as exc:
+        except job_search.NoMasterResume:
+            # The class constants, not str(exc). Two reasons, one practical and
+            # one about the build: the text of a live exception is an internal
+            # detail that has no business in a response body, and returning it
+            # is exactly the "information exposure through an exception" shape
+            # that static analysis flags on a diff. The code is what the client
+            # branches on; the message is written to be read by a person.
             return Response(
                 {
-                    "error": str(exc),
-                    "code": "no_master_resume",
+                    "error": job_search.NoMasterResume.MESSAGE,
+                    "code": job_search.NoMasterResume.CODE,
                     "results": [],
                 },
                 status=status.HTTP_409_CONFLICT,

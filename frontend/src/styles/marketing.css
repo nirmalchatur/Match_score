@@ -34,17 +34,80 @@
 
    Re-declaring the light token set on `.landing` re-scopes those
    variables to this subtree only, so the app theme toggle cannot
-   repaint the landing page while the rest of the app still follows it. */
+   repaint the landing page while the rest of the app still follows it.
+
+   The set has to be COMPLETE, and the part that was missing is the
+   interesting bug. Scoping the text ramp alone still lets every token
+   the shared component rules read resolve from the app theme, so with
+   the app on dark this white page was painted with dark-theme values:
+
+     - `.btn-primary` (the nav's "Get started" and the hero's "Analyse
+       your first job") fills with `var(--accent)`, which is near-white
+       in dark. It rendered as a blank pill on a white page.
+     - `.mk-stack-group` fills with `var(--bg-elevated)` while its text
+       stayed the scoped near-black: dark card, dark text.
+     - `.mk-bar-track` and the brand mark took the dark ramp too.
+
+   So the accent ramp, the remaining surfaces, the brand layer and the
+   neumorphic shadow base are pinned here as well. Custom properties
+   inherit, so a value set on `.landing` beats the one `:root` resolves
+   to for every rule below -- specificity does not enter into it.
+
+   The neumorphic five are worth a note: `--neu-raised` and friends are
+   written in terms of `var(--neu-light)` / `var(--neu-dark)`, and a
+   `var()` inside a custom property is substituted where the property is
+   used. Pinning the base therefore re-derives every shadow in the
+   subtree, which is what stops a white hero from being ringed with the
+   dark theme's dark-on-dark shadow pair. */
 .landing {
+  /* Paper and text, as before. */
   --ink: #0a0a0a;
   --paper: #ffffff;
   --bg: #ffffff;
   --bg-panel: #fafafa;
   --text: #0a0a0a;
   --text-muted: #4a4a4a;
-  --text-dim: #6e6e6e;
+  --text-dim: #666666;
   --border: rgba(10, 10, 10, 0.13);
   --border-mid: rgba(10, 10, 10, 0.22);
+
+  /* Surfaces the shared rules reach for. */
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f5f5f5;
+  --surface-3: #ebebeb;
+
+  /* The accent ramp. A solid fill of --accent is what every primary
+     button on this page is, so this is the token that has to be pinned
+     for the page to keep its art direction. */
+  --accent: #0a0a0a;
+  --accent-soft-text: #0a0a0a;
+  --accent-mid: #3d3d3d;
+  --accent-faint: rgba(10, 10, 10, 0.04);
+  --accent-12: rgba(10, 10, 10, 0.12);
+  --accent-15: rgba(10, 10, 10, 0.15);
+  --accent-20: rgba(10, 10, 10, 0.2);
+  --accent-35: rgba(10, 10, 10, 0.35);
+  --accent-line: rgba(10, 10, 10, 0.85);
+
+  /* Brand layer, light values, for the wordmark tile and focus rings. */
+  --brand-accent: #245f73;
+  --brand-accent-hover: #1c4a5b;
+  --brand-accent-soft: rgba(36, 95, 115, 0.09);
+  --brand-accent-line: rgba(36, 95, 115, 0.32);
+  --brand-accent-text: #245f73;
+  --brand-warm: #733e24;
+  --brand-warm-hover: #5c301d;
+  --brand-warm-soft: rgba(115, 62, 36, 0.08);
+  --brand-paper: #f2f0ef;
+  --brand-muted: #bbbdbc;
+
+  /* Neumorphic surface base, light values: see the note above. */
+  --neu-base: #eef1f6;
+  --neu-base-2: #e7ebf2;
+  --neu-dark: #c3c9d4;
+  --neu-dark-soft: #d4d9e2;
+  --neu-light: #ffffff;
 }
 
 /* The Help entry in the landing nav is a <button>, not an <a>, because it

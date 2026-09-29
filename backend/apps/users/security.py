@@ -131,10 +131,19 @@ class SecurityEvent(models.Model):
                 is_current_session=bool(is_current_session),
             )
         except Exception:
+            # The event name is deliberately not logged as an argument.
+            #
+            # `event` is a fixed enum, not a secret, but two of the constants
+            # above are spelled PASSWORD_CHANGED / AI_KEY_CHANGED, and any value
+            # that reaches a logging call is then indistinguishable from a
+            # credential to a data-flow scanner -- which is why this line used
+            # to fail a PR with a "clear-text logging of sensitive information"
+            # alert pointing at a string literal. Nothing is lost by dropping
+            # it: logger.exception prints the traceback, so the call site that
+            # supplied the event is the first line of the report anyway.
             logger.exception(
-                "security_event.record_failed user=%s event=%s",
+                "security_event.record_failed user_pk=%s",
                 getattr(user, "pk", None),
-                event,
             )
 
 

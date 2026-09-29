@@ -219,9 +219,14 @@ body::before {
 .btn-primary {
   /* Kept solid. A neumorphic primary that is the same colour as everything
      else has no hierarchy, and this is the one action a screen is usually
-     asking for. */
+     asking for.
+
+     --paper, not #fff. --accent inverts with the theme, so under dark mode a
+     literal white label was white text on a near-white button: the primary
+     action disappeared on every screen this sheet covers. The rule above
+     (.btn) has the same reason to use tokens throughout. */
   background: var(--accent);
-  color: #fff;
+  color: var(--paper);
   box-shadow: var(--neu-raised-sm);
 }
 
