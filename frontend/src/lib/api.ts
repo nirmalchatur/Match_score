@@ -152,6 +152,20 @@ async function attempt<T>(
   init: RequestInit | undefined,
   allowTokenRetry: boolean,
 ): Promise<T> {
+  // Fail before touching the network, and before fetching a CSRF token.
+  //
+  // A relative BASE_URL in production can only ever reach the CDN, so the round
+  // trip could only ever return a 404/405 that misattributes the problem to
+  // the API. This check used to sit below the CSRF fetch, which is precisely
+  // the request that can fail: an unsafe call spent a round trip on
+  // `/auth/csrf/` against the static host, got a 404, and reported
+  // "Could not obtain a CSRF token (HTTP 404)" -- a message that points at the
+  // backend, when the real cause was a missing VITE_API_URL and the backend was
+  // never involved. Every retry repeated it.
+  if (API_URL_MISSING) {
+    throw new ApiError(API_URL_MISSING_MESSAGE, 0)
+  }
+
   const method = (init?.method || 'GET').toUpperCase()
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -175,13 +189,6 @@ async function attempt<T>(
   }
 
   let response: Response
-
-  // Fail before touching the network. A relative BASE_URL in production can
-  // only ever reach the CDN, so the round trip could only ever return a
-  // 404/405 that misattributes the problem to the API.
-  if (API_URL_MISSING) {
-    throw new ApiError(API_URL_MISSING_MESSAGE, 0)
-  }
 
   try {
     response = await fetch(`${BASE_URL}${path}`, {
