@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AIProviderDoctorView,
     AIProviderStatusView,
     QualitiesView,
     ResumeFileView,
@@ -53,6 +54,11 @@ urlpatterns = [
         "tailor/progress/",
         TailorProgressView.as_view(),
         name="resume-tailor-progress",
+    ),
+    path(
+        "tailor/doctor/",
+        AIProviderDoctorView.as_view(),
+        name="resume-tailor-doctor",
     ),
     path(
         "tailor/status/",

@@ -8,7 +8,9 @@ master resume is a real, profiled document rather than a stored blob.
 
 import logging
 import os
+import re
 import time
+import types
 
 from django.conf import settings
 from django.http import FileResponse, HttpResponse
@@ -779,6 +781,116 @@ class SaveTailoredResumeView(APIView):
             ResumeSerializer(tailored).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class AIProviderDoctorView(APIView):
+    """
+    GET /api/resumes/tailor/doctor/ -- why is tailoring failing, from a browser.
+
+    A tailoring failure reports a *category* ("the AI provider returned an
+    error") because the user-facing message must not leak the provider's base
+    URL, model name or raw response body -- ``_ai_error_response`` strips
+    ``detail`` for exactly that reason. So the information needed to fix a
+    broken deployment lives only in the server logs, which means answering
+    "why is it 503?" requires shell access to a Render instance.
+
+    This moves that one diagnostic behind the same authentication as the rest
+    of the workspace, and returns the classification *without* the secrets:
+    which provider resolved, which model, whether a key was found and from
+    where, and the provider's own HTTP status. No key material, no base URL,
+    no response body.
+
+    It performs a real, minimal call against the provider, so it costs one
+    tiny generation. That is the point: a check that only reads configuration
+    cannot tell a valid key from an invalid one.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        effective, reason = selection.resolve_provider_name(request.user)
+
+        payload: dict = {
+            "provider": effective,
+            "model": None,
+            "selection_reason": reason,
+            "has_user_key": False,
+            "has_deployment_key": selection.has_deployment_key(effective),
+            "reachable": False,
+            "provider_status": None,
+            "verdict": "",
+            "remedy": "",
+        }
+
+        try:
+            provider = factory.get_ai_provider(effective)
+        except AIConfigurationError as exc:
+            payload["verdict"] = "not_configured"
+            payload["remedy"] = exc.message
+            return Response(payload, status=status.HTTP_200_OK)
+
+        described = provider.describe()
+        payload["model"] = described.get("model")
+        payload["requires_user_key"] = described.get("requires_user_key", False)
+
+        try:
+            key = selection.resolve_api_key(request.user, effective)
+        except Exception as exc:  # pragma: no cover - defensive
+            payload["verdict"] = "credential_unreadable"
+            payload["remedy"] = f"The stored credential could not be read: {exc}"
+            return Response(payload, status=status.HTTP_200_OK)
+
+        payload["has_user_key"] = bool(key)
+
+        if not key:
+            payload["verdict"] = "no_key"
+            payload["remedy"] = (
+                "Neither this account nor the deployment has a key for "
+                f"{effective}. Set {effective.upper()}_API_KEY on the host, "
+                "or add one in Settings."
+            )
+            return Response(payload, status=status.HTTP_200_OK)
+
+        # A real call, with the smallest payload that still exercises auth,
+        # routing and the response shape. The key rides on this object only,
+        # exactly as it does in the tailoring path, and is never returned.
+        probe = types.SimpleNamespace(api_key=key, resume={}, job={}, match={})
+
+        try:
+            provider.tailor_resume(probe)
+            payload["reachable"] = True
+            payload["provider_status"] = 200
+            payload["verdict"] = "ok"
+            payload["remedy"] = (
+                "The provider answered. If tailoring still fails, the problem "
+                "is the prompt or the model output, not connectivity."
+            )
+        except AIError as exc:
+            payload["reachable"] = False
+            payload["verdict"] = exc.code
+            # The detail carries the provider's own status code, which is the
+            # one fact that separates "bad key" from "retired model" from
+            # "rate limited". It is an operator string written by this
+            # codebase, not a raw response body, so the status alone is safe
+            # to surface even though the surrounding text is not.
+            payload["detail_hint"] = _status_from_detail(exc.detail)
+            payload["remedy"] = exc.message
+        except Exception as exc:  # pragma: no cover - defensive
+            payload["verdict"] = "unexpected"
+            payload["remedy"] = f"{type(exc).__name__}: {exc}"[:300]
+
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+def _status_from_detail(detail: str) -> str:
+    """Pull the provider's HTTP status out of an error detail.
+
+    The detail strings are written by this project and all contain
+    "returned <status>"; matching on that keeps the full text -- which may
+    name a base URL or quote a response body -- out of the response.
+    """
+    match = re.search(r"returned\s+(\d{3})", detail or "")
+    return match.group(1) if match else ""
 
 
 class AIProviderStatusView(APIView):
