@@ -68,6 +68,18 @@ DEFAULT_SKILL_CATALOG: tuple[str, ...] = (
     "Spring Boot",
     "Node.js",
     "REST API",
+    # The plural is a separate entry, not just an alias, because
+    # extract_skills() scans the *vocabulary* and only folds through the alias
+    # table afterwards -- it is the scan that has to notice the word at all.
+    # "REST APIs" is how the term is written far more often than "REST API" in
+    # a requirements list.
+    #
+    # This gap was invisible while matching was plain substring, because "REST"
+    # was found inside "REST APIs" by accident. Making matching word-boundary
+    # correct therefore *broke* the plural, which is the uncomfortable part of
+    # the change worth recording: a stricter matcher exposed a catalog entry
+    # that had been passing for the wrong reason.
+    "REST APIs",
     # Frontend
     "React",
     # Databases
@@ -116,6 +128,15 @@ DEFAULT_SKILL_ALIASES: dict[str, str] = {
     "rest": "rest api",
     "restful api": "rest api",
     "restful apis": "rest api",
+    # Plurals, and the bare noun. "REST APIs" is written far more often than
+    # "REST API" in a requirements list, and word-boundary matching is what
+    # exposed the gap: the old substring search matched "REST" inside
+    # "REST APIs" by accident, so a catalog with no plural silently lost the
+    # skill. An entry that cannot match a common spelling is a bug that *reads*
+    # as a missing skill, which is the worst way for it to show up.
+    "rest apis": "rest api",
+    "apis": "rest api",
+    "api": "rest api",
     "c/c++": "c++",
     "scikit-learn": "sklearn",
     "scikit learn": "sklearn",
