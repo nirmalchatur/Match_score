@@ -358,9 +358,17 @@ OLLAMA_TEMPERATURE = float(os.environ.get("OLLAMA_TEMPERATURE", "0.2"))
 # The hosted provider. A hosted service cannot run an Ollama daemon, so this is
 # what makes tailoring work on Render.
 #
-# There is deliberately **no** GEMINI_API_KEY. Users bring their own key from
-# the UI and it is stored encrypted (see apps.users.crypto), so a deployment
-# can never spend the owner's quota on someone else's behalf.
+# GEMINI_API_KEY is an **optional deployment-owned fallback**. It is used only
+# when the signed-in user has saved no key of their own (resolution order lives
+# in apps.ai.credentials.resolve_api_key). Leave it empty and the deployment is
+# strictly bring-your-own-key, which is what the tests assert; set it and a
+# visitor can use tailoring without pasting anything.
+#
+# Setting it means the owner's quota can be spent on the owner's behalf, so it
+# is a deliberate choice rather than a default.
+
+#: Optional. Empty string means "no deployment key; users must bring their own".
+GEMINI_API_KEY = (os.environ.get("GEMINI_API_KEY") or "").strip()
 
 #: Defaults to gemini-3.8-flash in the provider. Overridable for anyone who
 #: wants a different model or a newer one when it lands.
@@ -370,11 +378,37 @@ GEMINI_TIMEOUT = int(os.environ.get("GEMINI_TIMEOUT", "120"))
 
 GEMINI_TEMPERATURE = float(os.environ.get("GEMINI_TEMPERATURE", "0.2"))
 
+# --- Groq ----------------------------------------------------------------
+#
+# A second hosted provider, OpenAI-compatible at /openai/v1/chat/completions.
+# Added because Groq is dramatically faster than a free Gemini tier for the
+# same rewrite-shaped work, and because the two are independent: one being rate
+# limited or retired does not take the other down with it.
+#
+# Same contract as Gemini: GROQ_API_KEY is an optional deployment-owned
+# fallback, used only when the user has saved no key of their own.
+GROQ_API_KEY = (os.environ.get("GROQ_API_KEY") or "").strip()
+
+GROQ_MODEL = (os.environ.get("GROQ_MODEL") or "").strip()
+
+GROQ_TIMEOUT = int(os.environ.get("GROQ_TIMEOUT", "120"))
+
+GROQ_TEMPERATURE = float(os.environ.get("GROQ_TEMPERATURE", "0.2"))
+
 # Default to ollama only when it is actually pointed at something, so local
 # development works out of the box while a misconfigured deployment can never
 # pretend an AI backend exists.
 if not AI_PROVIDER and OLLAMA_BASE_URL and OLLAMA_MODEL:
     AI_PROVIDER = "ollama"
+
+# A hosted deployment that set a key but no explicit AI_PROVIDER should still
+# work: pick one. Gemini is the tie-break only because it is the older of the
+# two, so behaviour for an existing GEMINI_API_KEY-only deployment is unchanged.
+if not AI_PROVIDER:
+    if GEMINI_API_KEY:
+        AI_PROVIDER = "gemini"
+    elif GROQ_API_KEY:
+        AI_PROVIDER = "groq"
 
 
 # CORS — credentials must be allowed for the session cookie to cross origins.

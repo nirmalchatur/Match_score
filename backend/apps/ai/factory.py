@@ -10,12 +10,14 @@ Configuration
 -------------
     AI_PROVIDER=ollama     # local development: a local Ollama daemon
     AI_PROVIDER=gemini     # hosted deployment: Google AI Studio
+    AI_PROVIDER=groq       # hosted deployment: Groq (OpenAI-compatible)
     AI_PROVIDER=fake        # tests / CI: deterministic, no network
 
 Ollama is the local default because it needs no key. Render and similar hosts
-cannot run a daemon, so a hosted deployment sets ``gemini``, and each user
-brings their own key through the UI (stored encrypted in
-``apps.users.models.ProviderCredential``).
+cannot run a daemon, so a hosted deployment sets ``gemini`` or ``groq``; the
+key for those may be the user's own (stored encrypted in
+``apps.users.models.ProviderCredential``) or the deployment's env fallback,
+resolved by :func:`apps.ai.selection.resolve_api_key`.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ from .exceptions import AIConfigurationError
 from .providers.base import AIProvider
 from .providers.fake import FakeAIProvider
 from .providers.gemini import GeminiProvider
+from .providers.groq import GroqProvider
 from .providers.ollama import OllamaProvider
 
 logger = logging.getLogger(__name__)
@@ -36,6 +39,7 @@ logger = logging.getLogger(__name__)
 _BUILTIN: dict[str, Callable[[], AIProvider]] = {
     "ollama": OllamaProvider,
     "gemini": GeminiProvider,
+    "groq": GroqProvider,
     "fake": FakeAIProvider,
 }
 

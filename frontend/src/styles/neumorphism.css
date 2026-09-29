@@ -1,0 +1,544 @@
+﻿/* ============================================================
+   Neumorphism
+
+   The visual language: one continuous surface, with controls
+   appearing to be pressed into it or raised out of it by a pair
+   of opposing shadows -- a light one from the top-left and a dark
+   one from the bottom-right.
+
+   How it is applied here
+   ----------------------
+   This file is imported LAST in main.tsx and layers over the
+   existing stylesheets rather than replacing them. That is a
+   deliberate structural choice:
+
+   - The design tokens in index.css stay the source of truth for
+     colour and spacing. Nothing below hardcodes a hex value.
+   - The existing component rules in components.css / layout.css /
+     auth.css / marketing.css keep working; they are refined here
+     instead of being rewritten, which keeps this change
+     reviewable and reversible.
+   - Every rule below overrides an existing class, so removing this
+     one import restores the previous appearance exactly.
+
+   The two things neumorphism is genuinely bad at
+   ------------------------------------------------
+   1. Contrast. Soft grey-on-grey fails WCAG where a hard border
+      would pass. So shadows here carry form, never meaning, and
+      text colours stay on the dark end of the ramp. Status is
+      still encoded by the badges, the one place a solid fill is
+      kept.
+   2. Borders. A 1px hairline is what made the old design legible
+      at low contrast. These rules replace borders with inset and
+      raised shadows, but keep a faint one on inputs, where the
+      shadow alone was too quiet to see.
+   ============================================================ */
+
+:root {
+  /* --- Neumorphic surface -------------------------------------------
+     A slightly cool light grey rather than pure white. Pure white
+     is what makes extruded shadows look like dirt; the tint is what
+     makes them look like light. */
+  --neu-base: #eef1f6;
+  --neu-base-2: #e7ebf2;
+  --neu-dark: #c3c9d4;
+  --neu-dark-soft: #d4d9e2;
+  --neu-light: #ffffff;
+
+  /* The two shadows that make up every raised and inset surface. */
+  --neu-raised:
+    -6px -6px 14px var(--neu-light),
+    6px 6px 14px var(--neu-dark);
+  --neu-raised-sm:
+    -3px -3px 7px var(--neu-light),
+    3px 3px 7px var(--neu-dark);
+  --neu-raised-lg:
+    -10px -10px 26px var(--neu-light),
+    10px 10px 26px var(--neu-dark);
+
+  --neu-inset:
+    inset -4px -4px 9px var(--neu-dark),
+    inset 4px 4px 9px var(--neu-light);
+  --neu-inset-sm:
+    inset -2px -2px 5px var(--neu-dark),
+    inset 2px 2px 5px var(--neu-light);
+
+  /* Pressed: the light and dark swap sides, which is what sells
+     the "clicked into the surface" read. */
+  --neu-pressed:
+    inset -3px -3px 7px var(--neu-dark),
+    inset 3px 3px 7px var(--neu-light);
+
+  /* --- Token remapping ---------------------------------------------
+     The existing stylesheets read these, so remapping them here
+     re-skins the whole app without editing one component rule.
+     This is the leverage the layered approach buys. */
+  --bg: var(--neu-base);
+  --bg-panel: var(--neu-base-2);
+  --bg-elevated: var(--neu-base);
+  --surface: var(--neu-base);
+  --surface-2: var(--neu-base-2);
+  --surface-3: #dde2ea;
+
+  --border: rgba(120, 130, 148, 0.16);
+  --border-soft: rgba(120, 130, 148, 0.1);
+  --border-mid: rgba(120, 130, 148, 0.22);
+  --border-input: rgba(120, 130, 148, 0.2);
+
+  --input-bg: var(--neu-base);
+
+  --shadow-sm: var(--neu-raised-sm);
+  --shadow-md: var(--neu-raised);
+  --shadow-lg: var(--neu-raised-lg);
+
+  /* Nav and tab "selected" states were a translucent ink wash. On a
+     raised surface that reads as a smudge, so they become inset
+     wells instead: the pressed state, which is the correct metaphor
+     for "this is the one you are on". */
+  --hover: #e4e8f0;
+  --row-hover: #e2e7ef;
+}
+
+[data-theme='dark'] {
+  /* Dark mode needs its own shadow values, not just darker colours.
+     A light shadow on a dark surface does not read as light, it
+     reads as a halo, so the light shadow becomes a faint white and
+     the dark one deepens, inverting which is which. */
+  --neu-base: #23272f;
+  --neu-base-2: #1e222a;
+  --neu-dark: #15181e;
+  --neu-dark-soft: #1b1f26;
+  --neu-light: #2e343e;
+
+  --neu-raised:
+    -6px -6px 14px var(--neu-light),
+    6px 6px 14px var(--neu-dark);
+  --neu-raised-sm:
+    -3px -3px 7px var(--neu-light),
+    3px 3px 7px var(--neu-dark);
+  --neu-raised-lg:
+    -10px -10px 26px var(--neu-light),
+    10px 10px 26px var(--neu-dark);
+  --neu-inset:
+    inset -4px -4px 9px var(--neu-dark),
+    inset 4px 4px 9px var(--neu-light);
+  --neu-inset-sm:
+    inset -2px -2px 5px var(--neu-dark),
+    inset 2px 2px 5px var(--neu-light);
+  --neu-pressed:
+    inset -3px -3px 7px var(--neu-dark),
+    inset 3px 3px 7px var(--neu-light);
+
+  --bg: var(--neu-base);
+  --bg-panel: var(--neu-base-2);
+  --bg-elevated: var(--neu-base);
+  --surface: var(--neu-base);
+  --surface-2: var(--neu-base-2);
+  --surface-3: #2a2f39;
+
+  --border: rgba(255, 255, 255, 0.09);
+  --border-soft: rgba(255, 255, 255, 0.06);
+  --border-mid: rgba(255, 255, 255, 0.14);
+  --border-input: rgba(255, 255, 255, 0.12);
+
+  --input-bg: var(--neu-base);
+
+  --shadow-sm: var(--neu-raised-sm);
+  --shadow-md: var(--neu-raised);
+  --shadow-lg: var(--neu-raised-lg);
+
+  --hover: #2a2f39;
+  --row-hover: #272c35;
+}
+
+/* ---------- Page canvas ---------- */
+body {
+  background: var(--neu-base);
+}
+
+/* A very soft radial wash. Neumorphism depends on a single continuous
+   surface, and a flat fill makes the extruded shadows the only depth cue
+   in the layout, which reads as heavy. This keeps the surface continuous
+   while giving the eye somewhere to rest. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 620px at 12% -8%, rgba(255, 255, 255, 0.75), transparent 62%),
+    radial-gradient(900px 560px at 96% 108%, rgba(163, 173, 191, 0.28), transparent 60%);
+}
+
+[data-theme='dark'] body::before {
+  background:
+    radial-gradient(1100px 620px at 12% -8%, rgba(255, 255, 255, 0.05), transparent 62%),
+    radial-gradient(900px 560px at 96% 108%, rgba(0, 0, 0, 0.4), transparent 60%);
+}
+/* ---------- Cards ---------- */
+.card {
+  background: var(--neu-base);
+  border: none;
+  box-shadow: var(--neu-raised);
+}
+
+/* The head used to be separated by a rule. An inset well separates it more
+   softly and is the idiom the rest of the system now uses. */
+.card-head {
+  border-bottom: none;
+  box-shadow: var(--neu-inset-sm);
+}
+
+/* ---------- Buttons ----------
+   Raised at rest, pressed on press. The inset on :active is the single
+   detail that makes the control feel physical. */
+.btn {
+  background: var(--neu-base);
+  border: none;
+  color: var(--text);
+  box-shadow: var(--neu-raised-sm);
+  transition:
+    box-shadow var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease),
+    opacity var(--t-fast) var(--ease);
+}
+
+.btn:not(:disabled):hover {
+  box-shadow:
+    -4px -4px 9px var(--neu-light),
+    4px 4px 9px var(--neu-dark);
+}
+
+.btn:not(:disabled):active {
+  transform: none;
+  box-shadow: var(--neu-pressed);
+}
+
+.btn-primary {
+  /* Kept solid. A neumorphic primary that is the same colour as everything
+     else has no hierarchy, and this is the one action a screen is usually
+     asking for. */
+  background: var(--accent);
+  color: #fff;
+  box-shadow: var(--neu-raised-sm);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: var(--accent-mid);
+  box-shadow:
+    -4px -4px 9px var(--neu-light),
+    4px 4px 9px var(--neu-dark);
+}
+
+.btn-primary:not(:disabled):active {
+  box-shadow: var(--neu-pressed);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  box-shadow: var(--neu-raised-sm);
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--text);
+  background: transparent;
+  border: none;
+  box-shadow: var(--neu-pressed);
+}
+
+.btn-danger {
+  background: var(--neu-base);
+  color: var(--danger);
+  border: none;
+  box-shadow: var(--neu-raised-sm);
+}
+
+.btn-danger:not(:disabled):active {
+  box-shadow: var(--neu-pressed);
+}
+
+/* ---------- Inputs ----------
+   Inset, because a field is a well cut into the surface. These keep a faint
+   border: at low contrast the shadow alone is too quiet to find with a
+   mouse, and a missing focus target is an accessibility failure, not a
+   stylistic one. */
+.input-field,
+.auth-input,
+.field input,
+.select {
+  background: var(--neu-base);
+  border: 1px solid var(--border-input);
+  border-radius: var(--r-md);
+  box-shadow: var(--neu-inset-sm);
+  transition:
+    box-shadow var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease);
+}
+
+.input-field:focus,
+.auth-input:focus,
+.field input:focus,
+.select:focus {
+  border-color: var(--accent-line);
+  /* Inset plus a ring: the ring is what a keyboard user actually navigates
+     by, and a shadow change alone would be invisible to them at this
+     contrast. */
+  box-shadow: var(--neu-inset-sm), 0 0 0 3px var(--accent-12);
+}
+
+.input-field:disabled,
+.auth-input:disabled,
+.field input:disabled {
+  box-shadow: var(--neu-inset-sm);
+  opacity: 0.6;
+}
+
+/* ---------- Stat tiles ---------- */
+.stat {
+  background: var(--neu-base);
+  border: none;
+  box-shadow: var(--neu-raised);
+  transition:
+    box-shadow var(--t-base) var(--ease),
+    transform var(--t-base) var(--ease);
+}
+
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--neu-raised-lg);
+}
+
+/* ---------- Sidebar and topbar ----------
+   These were flat white with a hairline divider. A single raised plane
+   reading as a separate object is the clearest statement of the style, so
+   they get the strongest surface in the app. */
+.sidebar,
+.topbar {
+  background: var(--neu-base);
+  border-color: var(--border-soft);
+}
+
+.sidebar-brand,
+.sidebar-footer {
+  border-color: var(--border-soft);
+}
+
+.nav-item.active,
+.settings-tab.active {
+  color: var(--accent-soft-text);
+  background: var(--neu-base);
+  border-color: transparent;
+  box-shadow: var(--neu-pressed);
+}
+
+.nav-item:hover,
+.settings-tab:hover {
+  background: transparent;
+  box-shadow: var(--neu-raised-sm);
+}
+
+.nav-divider {
+  background: var(--border-soft);
+  box-shadow: var(--neu-inset-sm);
+  height: 2px;
+  border-radius: var(--r-pill);
+}
+/* ---------- Rows, chips, badges ---------- */
+.job-row,
+.kanban-card,
+.resume-card,
+.table tbody tr,
+.user-chip {
+  border-color: transparent;
+  transition:
+    box-shadow var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+
+.job-row:hover,
+.resume-card:hover,
+.kanban-card:hover,
+.table tbody tr:hover {
+  background: var(--neu-base);
+  box-shadow: var(--neu-raised-sm);
+}
+
+.job-row.selected {
+  background: var(--neu-base);
+  box-shadow: var(--neu-pressed);
+}
+
+/* Badges and pills keep a solid fill. They are the one place colour is
+   carrying meaning rather than form, and a shadow would make them
+   unreadable at 10px. */
+.pill,
+.badge {
+  border: none;
+  box-shadow: var(--neu-raised-sm);
+}
+
+.filter-chip {
+  background: var(--neu-base);
+  border: none;
+  box-shadow: var(--neu-raised-sm);
+  transition:
+    box-shadow var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
+}
+
+.filter-chip.active {
+  color: var(--accent-soft-text);
+  background: var(--neu-base);
+  border: none;
+  box-shadow: var(--neu-pressed);
+}
+
+/* ---------- Overlays ---------- */
+.key-pop,
+.terminal {
+  background: var(--neu-base-2);
+}
+
+.key-pop {
+  border: none;
+  box-shadow: var(--neu-raised-lg);
+}
+
+.alert {
+  background: var(--neu-base);
+  border: none;
+  box-shadow: var(--neu-raised-sm);
+}
+
+/* ---------- Auth split ---------- */
+.auth-aside {
+  background: var(--neu-base);
+  border-right: none;
+  box-shadow: var(--neu-raised-lg);
+}
+
+.auth-recap {
+  background: var(--neu-base);
+  border: none;
+  box-shadow: var(--neu-raised-sm);
+}
+
+/* ---------- Brand mark ----------
+   Raised like a physical badge rather than a flat dark square. */
+.brand-mark,
+.boot-mark {
+  background: var(--accent);
+  box-shadow: var(--neu-raised-sm);
+}
+
+/* ---------- Boot screen ----------
+   The "Restoring your session" state. Given the neumorphic treatment it
+   reads as the app's own surface waiting for content, which is a better
+   answer to an anxious user than a spinner on a blank page. */
+.boot {
+  background: var(--neu-base);
+}
+
+.boot-mark {
+  animation: neu-breathe 2.4s var(--ease) infinite;
+}
+
+.boot-label {
+  color: var(--text);
+  font-weight: 500;
+}
+
+@keyframes neu-breathe {
+  0%,
+  100% {
+    box-shadow: var(--neu-raised);
+  }
+  50% {
+    box-shadow: var(--neu-raised-lg);
+  }
+}
+
+/* ---------- Onboarding choice cards ---------- */
+.choice-card {
+  background: var(--neu-base);
+  border: none;
+  box-shadow: var(--neu-raised);
+  transition:
+    box-shadow var(--t-base) var(--ease),
+    transform var(--t-base) var(--ease);
+}
+
+.choice-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--neu-raised-lg);
+}
+
+.choice-card.selected {
+  background: var(--neu-base);
+  border: none;
+  box-shadow: var(--neu-pressed);
+}
+
+/* ---------- Skeletons ----------
+   The shimmer gradient is built for flat fills. On an inset well it reads
+   as a smear, so the fill is a soft pulse instead. */
+.skeleton {
+  background: var(--neu-base);
+  box-shadow: var(--neu-inset-sm);
+  animation: neu-pulse 1.6s var(--ease) infinite;
+}
+
+@keyframes neu-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+/* ---------- Progress bars and meters ---------- */
+.match-bar {
+  background: var(--neu-base);
+  border: none;
+  box-shadow: var(--neu-inset-sm);
+}
+
+.match-bar span {
+  border-radius: var(--r-pill);
+}
+
+/* ---------- Scrollbars ----------
+   Neumorphism applied to the one element that is not a surface still works,
+   as long as the thumb reads as a raised handle. */
+*::-webkit-scrollbar-thumb {
+  background: var(--neu-dark);
+  border-radius: var(--r-pill);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--neu-dark-soft);
+}
+
+/* ---------- Reduced motion ----------
+   The breathe and pulse loops are decorative, but they are also the only
+   thing telling a user the page is alive. Honouring the preference means
+   stopping them; the static shadow still reads as a surface, so nothing is
+   lost. The global reduced-motion rule in index.css already collapses
+   durations, so these only need to not animate at all. */
+@media (prefers-reduced-motion: reduce) {
+  .boot-mark,
+  .skeleton {
+    animation: none;
+  }
+
+  .stat:hover,
+  .choice-card:hover {
+    transform: none;
+  }
+}
