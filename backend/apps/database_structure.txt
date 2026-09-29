@@ -1,39 +1,1889 @@
-                    ┌───────────────┐
-                    │     JOBS      │
-                    ├───────────────┤
-                    │ id            │
-                    │ url           │
-                    │ company       │
-                    │ title         │
-                    │ location      │
-                    │ description   │
-                    │ match_score   │
-                    │ decision      │
-                    │ status        │
-                    └───────┬───────┘
-                            │
-                            │ 1
-                            │
-                            │
-                            │ 1
-                    ┌───────▼────────┐
-                    │ APPLICATIONS   │
-                    ├────────────────┤
-                    │ id             │
-                    │ job_id         │
-                    │ resume_id      │
-                    │ status         │
-                    │ applied_at     │
-                    └───────┬────────┘
-                            │
-                            │ many
-                            │
-                    ┌───────▼────────┐
-                    │    RESUMES     │
-                    ├────────────────┤
-                    │ id             │
-                    │ name           │
-                    │ file           │
-                    │ resume_type    │
-                    │ is_master      │
-                    └────────────────┘
+================================================================================
+TAILORUP  --  DATABASE STRUCTURE
+================================================================================
+Project       : ai-job-agent  ("TailorUp" -- AI resume tailoring & job tracking)
+Backend       : Django 6.1.1 + Django REST Framework 3.18.1
+Location      : ai-job-agent/backend/
+Authoritative : the Django models in backend/apps/*/models.py together with the
+                migration files in backend/apps/*/migrations/
+Scope         : every table the application creates -- columns, keys, indexes,
+                constraints, cascade behaviour, and JSON payload shapes.
+
+--------------------------------------------------------------------------------
+0.  HOW TO READ THIS DOCUMENT
+--------------------------------------------------------------------------------
+  Section 1   Engine, configuration, how the database is selected.
+  Section 2   App registry and full table inventory.
+  Section 3   Entity-relationship diagram.
+  Section 4   Table-by-table reference (project tables, then framework tables).
+  Section 5   Index catalogue.
+  Section 6   Constraint catalogue.
+  Section 7   Cascade / deletion matrix and the tenant-isolation rule.
+  Section 8   JSON payload schemas stored inside JSONField columns.
+  Section 9   Migration history and how to evolve the schema safely.
+  Section 10  Security posture enforced in the data model.
+  Section 11  Operational notes, known drift, common queries.
+
+Field-type notation used throughout:
+  "Django type" = what the model declares.
+  "SQLite" / "PostgreSQL" = what that renders to on each backend. The project
+  runs SQLite in development and PostgreSQL in production, and the two are NOT
+  identical -- so both are given rather than guessed.
+
+Notation for keys:
+  PK  primary key          FK  foreign key        UQ  unique constraint
+  IDX index                O2O one-to-one         FKC foreign key constraint
+
+
+================================================================================
+1.  DATABASE ENGINE AND CONFIGURATION
+================================================================================
+
+Defined in: backend/config/settings.py (lines 423-446)
+
+    if os.environ.get("DATABASE_URL"):
+        import dj_database_url
+        DATABASES = {
+            "default": dj_database_url.parse(
+                os.environ["DATABASE_URL"],
+                conn_max_age=600,
+                ssl_require=not DEBUG,
+            )
+        }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+
+  Backend      Engine                                Notes
+  -----------  ------------------------------------  --------------------------
+  Development  django.db.backends.sqlite3           File: backend/db.sqlite3
+  Production   PostgreSQL via DATABASE_URL           Render / Railway
+               (psycopg 3.3.6, dj-database-url)      conn_max_age=600s,
+                                                     ssl_require=not DEBUG
+
+  BASE_DIR is the parent of config/, i.e. backend/. The development database
+  file is therefore ai-job-agent/backend/db.sqlite3.
+
+  Test database (backend/config/settings_test.py)
+    A throwaway SQLite file in the OS temp directory:
+        tailorup_apitest.sqlite3   (database + MEDIA_ROOT)
+    settings_test.py explicitly refuses a path inside BASE_DIR, so a test run
+    can never open the developer's real db.sqlite3.
+
+  Primary key type
+    DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField" (settings.py line 83).
+    Every project table uses a 64-bit surrogate primary key. Deliberate: an
+    AutoField tops out at ~2.1 billion rows, and CI runs `makemigrations
+    --check`, which fails while the models.W042 warning is outstanding.
+
+  Time handling
+    TIME_ZONE = "UTC", USE_TZ = True. Every DateTimeField is stored in UTC.
+
+================================================================================
+2.  APPLICATION REGISTRY AND TABLE INVENTORY
+================================================================================
+
+INSTALLED_APPS (backend/config/settings.py, lines 148-166)
+
+    django.contrib.admin         -> django_admin_log
+    django.contrib.auth          -> auth_user, auth_group, auth_permission,
+                                    auth_group_permissions, auth_user_groups,
+                                    auth_user_user_permissions
+    django.contrib.contenttypes  -> django_content_type
+    django.contrib.sessions      -> django_session  (DB-backed session engine)
+    django.contrib.messages      -> (no tables)
+    django.contrib.staticfiles   -> (no tables)
+    corsheaders                  -> (no tables)
+    rest_framework               -> (no tables)
+    apps.applications            -> applications_application
+    apps.jobs                    -> jobs_job
+    apps.resumes                 -> resumes_resume, resumes_resumeprofile
+    apps.users                   -> users_userprofile, users_providercredential,
+                                    users_securityevent
+    apps.automation              -> automation_notification,
+                                    automation_notificationpreference
+
+Apps on disk that are NOT installed and own NO tables
+    apps.ai        -- provider adapters, prompts, validators, schemas
+    apps.common    -- shared helpers and tests
+    apps.sheets    -- three zero-byte placeholder files
+  Listed because their absence from INSTALLED_APPS is deliberate, and because
+  "is there a sheets table?" is otherwise a fair question.
+
+TOTAL: 19 tables  --  9 project tables + 10 Django framework tables.
+
+   #  Table                                   App           Kind
+  --  --------------------------------------  ------------  -----------
+   1  users_userprofile                       users         project
+   2  users_providercredential                users         project
+   3  users_securityevent                     users         project
+   4  jobs_job                                jobs          project
+   5  resumes_resume                          resumes       project
+   6  resumes_resumeprofile                   resumes       project
+   7  applications_application                applications  project
+   8  automation_notification                 automation    project
+   9  automation_notificationpreference       automation    project
+  10  auth_user                               auth          framework
+  11  auth_group                              auth          framework
+  12  auth_permission                         auth          framework
+  13  auth_group_permissions                  auth          framework
+  14  auth_user_groups                        auth          framework
+  15  auth_user_user_permissions              auth          framework
+  16  django_content_type                     contenttypes  framework
+  17  django_admin_log                        admin         framework
+  18  django_session                          sessions      framework
+  19  django_migrations                       --            framework
+
+  Note on SecurityEvent
+  --------------------
+  The model class is defined in apps/users/security.py, not models.py, and is
+  re-exported at the bottom of apps/users/models.py:
+
+      from .security import SecurityEvent  # noqa: E402,F401
+
+  Django discovers app models by importing <app>.models, so without that
+  re-export the table would never be created by a migration. Load-bearing --
+  do not "tidy" the import away.
+
+  No ModelAdmin is registered anywhere in the project. The admin site is
+  mounted at /admin/ and the tables are created, but no custom admin UI is
+  registered for any project model.
+
+
+================================================================================
+3.  ENTITY RELATIONSHIP DIAGRAM
+================================================================================
+
+                             +---------------------------+
+                             |        auth_user          |
+                             |  (django.contrib.auth)    |
+                             +-------------+-------------+
+                                           |
+      +-------------+-------------+---------+---------+-------------+---------+
+      |             |             |                   |             |         |
+    1:1           1:N           1:N                 1:N          1:1       1:N
+      |             |             |                   |             |         |
++-----------+ +-------------+ +-----------+   +------------+ +--------+ +---------+
+| users_    | | users_      | | jobs_job  |   | resumes_   | |automation| | users_  |
+|userprofile| |providercred| |           |   | resume     | |notificatn| |security |
++-----------+ +-------------+ +-----+-----+   +-----+------+ |preference| +---------+
+                                |                 |          +--------+
+                                |                 |
+                                | 1:N             | 1:N
+                                +---------------->+  (self FK, SET NULL)
+                                |                 |
+                                | 1:N             | 1:1
+                                +---------+       +----------------------+
+                                |         |
+                  +-------------+-----+  +----+-----------------+
+                  | applications_     |  | resumes_             |
+                  | application       |  | resumeprofile        |
+                  +-------------+-----+  +----------------------+
+                                |
+                                | 1:N (tailored_resume_id, SET NULL)
+                                +-------------------------------------->
+
+  Reading the diagram
+  -------------------
+  * auth_user is the single tenant root. Every project table hangs off it and
+    every one of those links is ON DELETE CASCADE: deleting an account removes
+    its jobs, resumes, applications, notifications, preferences, credentials
+    and security events in one statement. There is no orphan-by-design.
+  * jobs_job <-> resumes_resume is a two-way provenance link:
+      - resumes_resume.source_job_id     (which job this was tailored for)
+      - resumes_resume.source_resume_id  (which master it was derived from)
+  * resumes_resume -> resumes_resumeprofile is 1:1 with CASCADE, so deleting a
+    resume always takes its parsed profile with it.
+  * applications_application sits at the junction of a user, a job and an
+    optional tailored resume. Its own (user_id, job_id) unique constraint is
+    what makes the tracker one-row-per-job-per-account.
+  * Notifications are leaves apart from their owner; nothing references them.
+
+================================================================================
+4.  TABLE-BY-TABLE REFERENCE
+================================================================================
+
+--------------------------------------------------------------------------------
+4.1  auth_user                              (framework: django.contrib.auth)
+--------------------------------------------------------------------------------
+The identity root. TailorUp deliberately REUSES the built-in User model rather
+than swapping in a custom one, and keeps TailorUp-specific preferences in a 1:1
+profile (4.2) so a future model swap stays a contained change.
+
+Important: the app's public API is email-based, not username-based. The
+register serializer creates the user with `username=email` and `email=email`,
+so the two always hold the same value in practice, and sign-in filters on
+email. There is NO UNIQUE constraint on email at the database level --
+uniqueness is enforced case-insensitively in the serializer only.
+
+  Column          Django type        SQLite        PostgreSQL     Null  Key
+  ---------------  -----------------  ------------  -------------  ----  ---
+  id              AutoField          integer       integer        no    PK
+  password        CharField(128)     varchar(128)  varchar(128)   no
+  last_login      DateTimeField      datetime      timestamptz    yes
+  is_superuser    BooleanField       bool          boolean        no
+  username        CharField(150)     varchar(150)  varchar(150)   no    UQ
+  first_name      CharField(150)     varchar(150)  varchar(150)   no
+  last_name       CharField(150)     varchar(150)  varchar(150)   no
+  email           CharField(254)     varchar(254)  varchar(254)   no
+  is_staff        BooleanField       bool          boolean        no
+  is_active       BooleanField       bool          boolean        no
+  date_joined     DateTimeField      datetime      timestamptz    no
+
+  Constraints
+    auth_user_username_key   UNIQUE (username)
+
+  Notes
+    * `password` stores a Django password hash, never a plaintext password.
+      Hashers in use: PBKDF2 (default) in normal operation; the test settings
+      swap in MD5PasswordHasher for speed and must never reach production.
+    * `last_login` is NULL until the first successful sign-in.
+    * The "legacy" account created by the data migrations (Section 9) is
+      username/email "legacy@tailorup.local" with password
+      "!unusable-legacy-account". A leading "!" marks the hash unusable in
+      Django, so that account can never be signed into until claimed.
+    * No role/permission model is used by the application itself. The Group
+      and Permission tables exist (admin site) but no code assigns them.
+
+--------------------------------------------------------------------------------
+4.2  users_userprofile                      (apps/users/models.py)
+--------------------------------------------------------------------------------
+Workspace-level settings for one account. 1:1 with auth_user, created on demand
+rather than at signup -- an absent row simply means "not onboarded yet".
+
+  Column            Django type                  SQLite          PostgreSQL   Null  Key
+  -----------------  ---------------------------  --------------  -----------  ----  ---
+  id                BigAutoField                 integer         bigint       no    PK
+  user_id           OneToOneField                integer         bigint       no    FK,UQ
+  headline          CharField(150)               varchar(150)    varchar(150) no
+  discipline        CharField(32)                varchar(32)     varchar(32)  no
+  target_locations  CharField(255)               varchar(255)    varchar(255) no
+  career_stage      CharField(20)                varchar(20)     varchar(20)  no
+  years_experience  PositiveSmallIntegerField    smallint uint   smallint     no
+  ai_setup          CharField(20)                varchar(20)     varchar(20)  no
+  created_at        DateTimeField(auto_now_add)  datetime        timestamptz  no
+  updated_at        DateTimeField(auto_now)      datetime        timestamptz  no
+
+  user_id
+    FK  -> auth_user(id)   ON DELETE CASCADE    related_name="profile"
+    UNIQUE -- enforced by the OneToOneField: exactly one profile per user.
+
+  Choices (closed sets; Django validates, no DB CHECK is emitted)
+    discipline     ENGINEER | DESIGNER | PRODUCT | DATA | MARKETING | OTHER
+                   plus "" (blank), which is the default
+    career_stage   student | fresher | professional | ""   (lowercase slugs)
+    ai_setup       "ollama" (local) | "gemini" (hosted) | ""
+                   Free-form varchar(20) with no `choices` tuple, deliberately,
+                   so a future provider slug cannot be rejected by the DB layer.
+
+  Defaults
+    headline, discipline, target_locations, career_stage, ai_setup = ""
+    years_experience = 0    (validators: MinValue 0, MaxValue 60)
+
+  Notes
+    * `career_stage` is stored LOWERCASE ("student") while `discipline` is
+      stored UPPERCASE ("ENGINEER"). The mismatch is intentional: career
+      stage's wire format is the lowercase slug the frontend sends, while
+      discipline uses Django's choice keys verbatim. The model exposes
+      UserProfile.CAREER_STAGES = ("student", "fresher", "professional").
+    * "fresher" is kept separate from "student" on purpose: a final-year
+      student has not entered the market, a fresher has and is looking.
+    * `years_experience` is an integer, not free text like "5+", so it can be
+      compared numerically against the resume parser's output. Stored as 0 for
+      students and freshers rather than NULL, so the API always has one shape.
+    * `target_locations` is a comma-separated string, not a table: small set,
+      always read and written whole, never queried relationally.
+
+  DDL as created by migration (SQLite)
+    CREATE TABLE "users_userprofile" (
+      "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "headline" varchar(150) NOT NULL,
+      "discipline" varchar(32) NOT NULL,
+      "target_locations" varchar(255) NOT NULL,
+      "created_at" datetime NOT NULL,
+      "updated_at" datetime NOT NULL,
+      "user_id" integer NOT NULL UNIQUE
+        REFERENCES "auth_user" ("id") DEFERRABLE INITIALLY DEFERRED,
+      "ai_setup" varchar(20) NOT NULL,
+      "career_stage" varchar(20) NOT NULL,
+      "years_experience" smallint unsigned NOT NULL
+        CHECK ("years_experience" >= 0)
+    );
+
+  Column provenance
+    0001_initial     id, user_id, headline, discipline, target_locations,
+                     created_at, updated_at
+    0003_...         + ai_setup, career_stage, years_experience
+
+--------------------------------------------------------------------------------
+4.3  users_providercredential                (apps/users/models.py)
+--------------------------------------------------------------------------------
+A user's own third-party AI provider API key, stored ENCRYPTED. One row per
+(user, provider). TailorUp is bring-your-own-key by default: a saved user key
+always takes priority over a deployment-wide fallback key.
+
+  Column           Django type        SQLite        PostgreSQL     Null  Key
+  ----------------  -----------------  ------------  -------------  ----  ---
+  id               BigAutoField       integer       bigint        no    PK
+  user_id          ForeignKey         integer       bigint        no    FK
+  provider         CharField(32)      varchar(32)   varchar(32)    no
+  encrypted_key    TextField          text          text          no
+  key_hint         CharField(16)      varchar(16)   varchar(16)    no
+  created_at       DateTimeField(auto_now_add) datetime timestamptz  no
+  updated_at       DateTimeField(auto_now)     datetime timestamptz  no
+
+  user_id
+    FK -> auth_user(id)   ON DELETE CASCADE   related_name="provider_credentials"
+
+  Constraints
+    uniq_user_provider_credential   UNIQUE (user_id, provider)
+    A user holds at most one key per provider, which lets the save path be an
+    unconditional UPDATE rather than a lookup-then-branch.
+
+  Indexes
+    users_providercredential_user_id_...   (user_id)   [automatic FK index]
+
+  Security notes -- the most sensitive table in the schema
+  ---------------------------------------------------
+    * `encrypted_key` holds a Fernet token produced by apps/users/crypto.py.
+      The PLAINTEXT key is never stored, never returned by any API, and never
+      logged. Uses the Fernet symmetric construction from `cryptography`
+      50.0.1, keyed from SECRET_KEY-derived material.
+    * `key_hint` is a masked 4+4 character prefix/suffix such as
+      "AIza...4f2b", written once at save time. It exists purely so the UI can
+      show WHICH key is stored when a user juggles more than one. It is NOT a
+      secret and cannot be scaled back into the key.
+    * `reveal_key()` decrypts for immediate use only. If decryption fails it
+      DELETES the row and re-raises, because a key that cannot be decrypted
+      looks configured but silently fails at call time; deleting it lets the
+      user re-paste and see an honest "not configured".
+    * `public_dict()` is the only shape any endpoint may return, and it
+      contains no field from which the key could be recovered.
+    * Changes are recorded as a SecurityEvent of type AI_KEY_CHANGED (4.4),
+      never the key itself.
+
+  DDL as created by migration (SQLite)
+    CREATE TABLE "users_providercredential" (
+      "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "provider" varchar(32) NOT NULL,
+      "encrypted_key" text NOT NULL,
+      "key_hint" varchar(16) NOT NULL,
+      "created_at" datetime NOT NULL,
+      "updated_at" datetime NOT NULL,
+      "user_id" integer NOT NULL
+        REFERENCES "auth_user" ("id") DEFERRABLE INITIALLY DEFERRED,
+      CONSTRAINT "uniq_user_provider_credential" UNIQUE ("user_id","provider")
+    );
+
+  `provider` values in use: "gemini", "groq". "ollama" needs no key and so
+  never produces a row here.
+  Column provenance: 0002_providercredential -- all columns.
+
+--------------------------------------------------------------------------------
+4.4  users_securityevent                     (apps/users/security.py)
+--------------------------------------------------------------------------------
+A short, append-only record of authentication-relevant things that happened to
+one account: sign-ins, sign-outs, password changes, session revocations, and AI
+key changes. This is NOT a general audit log -- it is scoped to the owner and
+never records another account's IP, a token value, or a key.
+
+  Column               Django type        SQLite        PostgreSQL     Null  Key
+  --------------------  -----------------  ------------  -------------  ----  ---
+  id                   BigAutoField       integer       bigint        no    PK
+  user_id              ForeignKey         integer       bigint        no    FK
+  event                CharField(32)      varchar(32)   varchar(32)    no
+  user_agent           CharField(300)     varchar(300)  varchar(300)   no
+  is_current_session   BooleanField       bool          boolean        no
+  created_at           DateTimeField(auto_now_add) datetime timestamptz  no
+
+  user_id
+    FK -> auth_user(id)   ON DELETE CASCADE   related_name="security_events"
+
+  event (closed choices)
+    LOGIN_SUCCESS     Signed in
+    LOGOUT            Signed out
+    PASSWORD_CHANGED  Password changed
+    SESSIONS_REVOKED  Other sessions signed out
+    AI_KEY_CHANGED    API key updated
+
+  Meta
+    ordering = ["-created_at", "-id"]
+
+  Indexes
+    secevent_user_time_idx   (user_id, created_at DESC)
+    Supports the "recent security activity" list, newest first.
+
+  Notes
+    * `user_agent` is coarse client context, HARD TRUNCATED to 300 characters.
+      It comes from a request header an attacker controls, so it is untrusted
+      input: never rendered back as markup, never used to build a link.
+    * `is_current_session` is computed at WRITE time from the session key, so
+      a later "sign out other devices" cannot retroactively change what the
+      owner was shown.
+    * Recording never raises. It is called from inside the login and logout
+      paths, and a failure to write a log line must not turn a successful
+      sign-in into a 500.
+    * A FAILED sign-in produces NO row, because there is no user to attach it
+      to; attaching it to a guessed account would leak that the account exists
+      and fill a stranger's log with someone else's attempts. Failed attempts
+      are handled by the auth throttle instead.
+
+  Sessions -- no separate table
+  -----------------------------
+  There is no "active sessions" table. The security page reads Django's own
+  `django_session` table (4.18) and decodes each row's session_data to find
+  `_auth_user_id`, so the list always reflects REAL, live sessions and
+  "sign out everywhere else" revokes exactly the rows the auth middleware
+  consults. A parallel table would drift from reality the first time a session
+  expired or was cleared.
+
+  Column provenance: 0004_securityevent -- all columns.
+
+--------------------------------------------------------------------------------
+4.5  jobs_job                               (apps/jobs/models.py)
+--------------------------------------------------------------------------------
+One job posting the user has saved and/or analysed against their master resume.
+Every job belongs to exactly one account: `user_id` is the tenant boundary and
+API queries must ALWAYS be scoped by it.
+
+  Column           Django type        SQLite        PostgreSQL      Null  Key
+  ----------------  -----------------  ------------  --------------  ----  ---
+  id               BigAutoField       integer       bigint         no    PK
+  user_id          ForeignKey         integer       bigint         no    FK
+  url              URLField           varchar(200)  varchar(200)   no
+  company          CharField(255)     varchar(255)  varchar(255)   no
+  title            CharField(255)     varchar(255)  varchar(255)   no
+  source           CharField(32)      varchar(32)   varchar(32)    no
+  location         CharField(255)     varchar(255)  varchar(255)   no
+  description      TextField          text          text           no
+  match_score      FloatField         real          double precision yes
+  match_result     JSONField          text (JSON)   jsonb          yes
+  decision         CharField(50)      varchar(50)   varchar(50)    no
+  status           CharField(50)      varchar(50)   varchar(50)    no
+  error_message    TextField          text          text           no
+  pipeline_steps   JSONField          text (JSON)   jsonb          no
+  created_at       DateTimeField(auto_now_add) datetime timestamptz  no
+  updated_at       DateTimeField(auto_now)     datetime timestamptz  no
+
+  user_id
+    FK -> auth_user(id)   ON DELETE CASCADE   related_name="jobs"
+    THE tenant boundary. Scoped per owner so two different users can analyse
+    the same posting independently.
+
+  url
+    URLField, max_length defaults to 200. Stored WITHOUT a unique constraint
+    of its own; uniqueness is the composite below. Migration 0004 changed this
+    from a global UNIQUE url to a per-account UNIQUE (user_id, url).
+
+  Constraints
+    unique_job_url_per_user   UNIQUE (user_id, url)
+    Prevents duplicate job postings per account, while still allowing the same
+    URL to be analysed independently by different users.
+
+  Indexes
+    jobs_job_user_id_...   (user_id)   [automatic FK index]
+    Meta ordering = ["-created_at"]
+
+  status (8 values -- a superset spanning two generations)
+    PENDING     Pending     -- default; queued, not started
+    RUNNING     Running     -- analysis in progress
+    COMPLETED   Completed   -- analysis finished WITH a match score
+    READY       Ready       -- analysis finished but no score produced
+    FAILED      Failed      -- analysis errored; see error_message
+    NEW / PROCESSING / READY / SKIPPED  -- legacy values retained so historical
+    rows keep rendering. Django does NOT emit a database CHECK for `choices`;
+    the constraint is application-level.
+
+  decision (closed set, blank = not yet decided)
+    USE_MASTER   Use Master Resume
+    TAILOR       Tailor Resume
+    SKIP         Skip
+    REVIEW       Review
+
+  source
+    Which ATS the posting was read from: "greenhouse", "workday", "lever",
+    "generic", and whatever is added later. Written by the ATS registry at
+    analyse time and read by the UI to pick a badge. Defaults to "generic"
+    rather than blank so a row saved before this field existed still renders
+    sensibly, and so the column is never NULL -- the UI would otherwise have
+    to special-case it.
+
+  JSON columns
+    match_result    nullable. The full MatchEngine output. See Section 8.1.
+    pipeline_steps  NOT NULL, default []. A list of
+                    {"name": str, "status": "complete"|"running"|"pending"}
+                    dicts showing pipeline progress for the UI. Overwritten
+                    wholesale on each transition; see Section 8.3.
+
+  Notes
+    * `match_score` is a plain float, 0-100, duplicated from
+      match_result["score"]. Kept as a real column so the workspace can sort
+      and filter on it in SQL without parsing JSON on every request.
+    * `error_message` holds a human-readable failure reason, surfaced in the
+      API. It must never contain a stack trace or a provider API key.
+    * `location` and `description` are blank-able at the model level but the
+      columns are NOT NULL with a "" default, so the API always returns a
+      string.
+
+  DDL as created by migration (SQLite)
+    CREATE TABLE "jobs_job" (
+      "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "url" varchar(200) NOT NULL,
+      "company" varchar(255) NOT NULL,
+      "title" varchar(255) NOT NULL,
+      "location" varchar(255) NOT NULL,
+      "description" text NOT NULL,
+      "match_score" real NULL,
+      "decision" varchar(50) NOT NULL,
+      "status" varchar(50) NOT NULL,
+      "created_at" datetime NOT NULL,
+      "updated_at" datetime NOT NULL,
+      "match_result" text NULL
+        CHECK ((JSON_VALID("match_result") OR "match_result" IS NULL)),
+      "error_message" text NOT NULL,
+      "pipeline_steps" text NOT NULL
+        CHECK ((JSON_VALID("pipeline_steps") OR "pipeline_steps" IS NULL)),
+      "user_id" integer NOT NULL
+        REFERENCES "auth_user" ("id") DEFERRABLE INITIALLY DEFERRED,
+      "source" varchar(32) NOT NULL,
+      CONSTRAINT "unique_job_url_per_user" UNIQUE ("user_id","url")
+    );
+    SQLite enforces JSON validity through the JSON_VALID CHECK emitted by
+    Django's JSONField. PostgreSQL gets a native `jsonb` type, which validates
+    natively and could be GIN-indexed if that is ever needed.
+
+  Column provenance
+    0001_initial   id, url (initially globally unique), company, title,
+                   location, description, match_score, decision, status,
+                   created_at, updated_at
+    0002           + match_result
+    0003           + error_message, + pipeline_steps, status choices widened,
+                   default changed to PENDING
+    0004           + user (nullable, backfilled, then made NOT NULL), url
+                   uniqueness relaxed to (user_id, url), ordering added
+    0005           + source
+
+--------------------------------------------------------------------------------
+4.6  resumes_resume                         (apps/resumes/models.py)
+--------------------------------------------------------------------------------
+A resume document. Two kinds share this one table, distinguished by
+`resume_type`: a MASTER resume (the uploaded original) and a TAILORED version
+(an AI-generated rewrite of a master, targeting one job).
+
+A tailored resume is NEVER an edit of the master. It is a NEW row that points
+back at the document it was derived from, so the master can never be
+overwritten and the lineage stays inspectable.
+
+  Column             Django type        SQLite        PostgreSQL     Null  Key
+  -----------------  -----------------  ------------  -------------  ----  ---
+  id                 BigAutoField       integer       bigint        no    PK
+  user_id            ForeignKey         integer       bigint        no    FK
+  name               CharField(255)     varchar(255)  varchar(255)   no
+  file               FileField          varchar(100)  varchar(100)   no
+  resume_type        CharField(20)      varchar(20)   varchar(20)    no
+  is_master          BooleanField       bool          boolean        no
+  profile_data       JSONField          text (JSON)   jsonb          yes
+  source_resume_id   ForeignKey(self)   bigint        bigint         yes   FK
+  source_job_id      FK -> jobs.Job     bigint        bigint         yes   FK
+  tailoring_result   JSONField          text (JSON)   jsonb          yes
+  ai_provider        CharField(50)      varchar(50)   varchar(50)    no
+  created_at         DateTimeField(auto_now_add) datetime timestamptz  no
+  updated_at         DateTimeField(auto_now)     datetime timestamptz  no
+
+  user_id
+    FK -> auth_user(id)   ON DELETE CASCADE   related_name="resumes"
+    Tenant boundary: a resume is only ever visible to its owner.
+
+  source_resume_id   (self-referencing)
+    FK -> resumes_resume(id)   ON DELETE SET NULL
+    related_name="tailored_versions"
+    The master this was tailored from; NULL for master resumes. SET NULL rather
+    than CASCADE: deleting a master clears the provenance pointer but does NOT
+    delete the tailored documents, which the user may still want.
+
+  source_job_id
+    FK -> jobs_job(id)   ON DELETE SET NULL   related_name="tailored_resumes"
+    The job this version targets; NULL for master resumes. SET NULL so deleting
+    a job does not destroy tailored resume content.
+
+  resume_type (closed set)   MASTER | TAILORED
+
+  is_master
+    Boolean, default False. A denormalised flag meaning "this is the resume
+    everything else is tailored FROM". The analysis pipeline locates the user's
+    master via this flag; `resume_type` alone is insufficient because a user may
+    legitimately have several MASTER rows and exactly one flagged as source.
+
+  file
+    FileField(upload_to="resumes/", blank=True). Stored under MEDIA_ROOT
+    (default backend/media/) in a "resumes/" subfolder; served at MEDIA_URL
+    "/media/"; MEDIA_ROOT is overridable by env var. Blank-able because a
+    tailored resume has structured content in profile_data but no uploaded
+    document yet -- blank rather than required so a saved tailoring is still a
+    first-class Resume the existing list/detail endpoints can serve.
+
+  JSON columns
+    profile_data      nullable. The full structured resume content. For a
+                      MASTER this is the parsed profile; for a TAILORED resume
+                      it is the AI payload. See Section 8.2.
+    tailoring_result  nullable. For TAILORED rows only: the validated tailoring
+                      output plus its validation verdict, kept verbatim so a
+                      saved version can always be explained after the fact.
+                      See Section 8.4.
+
+  ai_provider
+    Which provider produced this version ("ollama", "gemini", "groq", "fake").
+    Non-secret identification only; no URL and no credential is ever stored.
+    Free-form varchar(50) with no `choices` tuple, so a new provider needs no
+    migration. Max length 50 is enforced by the writer (str(...)[:50]).
+
+  Meta
+    ordering = ["-created_at"]
+
+  Indexes
+    resumes_resume_user_id_...           (user_id)             [auto FK]
+    resumes_resume_source_resume_id_...  (source_resume_id)    [auto FK]
+    resumes_resume_source_job_id_...     (source_job_id)       [auto FK]
+    No UNIQUE constraint guarantees one master per user. The lookup is
+    `Resume.objects.filter(user=..., is_master=True).first()`, covered by the
+    user_id index.
+
+  DDL as created by migration (SQLite)
+    CREATE TABLE "resumes_resume" (
+      "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "name" varchar(255) NOT NULL,
+      "file" varchar(100) NOT NULL,
+      "resume_type" varchar(20) NOT NULL,
+      "is_master" bool NOT NULL,
+      "created_at" datetime NOT NULL,
+      "profile_data" text NULL
+        CHECK ((JSON_VALID("profile_data") OR "profile_data" IS NULL)),
+      "user_id" integer NOT NULL
+        REFERENCES "auth_user" ("id") DEFERRABLE INITIALLY DEFERRED,
+      "ai_provider" varchar(50) NOT NULL,
+      "source_job_id" bigint NULL
+        REFERENCES "jobs_job" ("id") DEFERRABLE INITIALLY DEFERRED,
+      "tailoring_result" text NULL
+        CHECK ((JSON_VALID("tailoring_result") OR "tailoring_result" IS NULL)),
+      "updated_at" datetime NOT NULL,
+      "source_resume_id" bigint NULL
+        REFERENCES "resumes_resume" ("id") DEFERRABLE INITIALLY DEFERRED
+    );
+
+  Column provenance
+    0001_initial  id, name, file (initially required), resume_type, is_master,
+                  created_at
+    0003          + profile_data
+    0004          + user (nullable, backfilled to legacy, then made NOT NULL)
+    0005          + ai_provider, + source_job, + source_resume,
+                  + tailoring_result; file made blank-able; ordering added
+    0006          + updated_at
+
+--------------------------------------------------------------------------------
+4.7  resumes_resumeprofile                  (apps/resumes/models.py)
+--------------------------------------------------------------------------------
+The structured, parsed content of one resume. Strictly 1:1 with
+resumes_resume, and owned by it: deleting a resume always deletes its profile.
+
+This table exists so the analysis engine and the document generator can read a
+resume as data (skills list, parsed roles, sections) without re-parsing the
+uploaded PDF on every request.
+
+  Column           Django type        SQLite        PostgreSQL     Null  Key
+  ----------------  -----------------  ------------  -------------  ----  ---
+  id               BigAutoField       integer       bigint        no    PK
+  resume_id        OneToOneField      bigint        bigint        no    FK,UQ
+  skills           JSONField          text (JSON)   jsonb          no
+  experience       JSONField          text (JSON)   jsonb          no
+  qualities        JSONField          text (JSON)   jsonb          no
+  education        TextField          text          text           no
+  projects         TextField          text          text           no
+  certifications   TextField          text          text           no
+  created_at       DateTimeField(auto_now_add) datetime timestamptz  no
+  updated_at       DateTimeField(auto_now)     datetime timestamptz  no
+
+  resume_id
+    FK -> resumes_resume(id)   ON DELETE CASCADE   related_name="profile"
+    UNIQUE -- enforced by the OneToOneField. Exactly one profile per resume.
+
+  JSON columns -- all NOT NULL with a default, so an empty profile is a valid
+  row rather than NULL. See Section 8.5 for the full shapes.
+    skills       default []    list[str]   normalized against the shared
+                                         skill catalog
+    experience   default {}    {"roles": [...], ...}  parsed work history
+    qualities    default {}    {group key: [str], ...}  user-chosen claims
+
+  Text columns (free-form extracted sections)
+    education, projects, certifications. Plain text, NOT JSON. They are
+    single-blob sections with no internal structure the app needs to query, so
+    normalising them would buy nothing.
+
+  skills vs qualities -- the important distinction
+  ------------------------------------------------
+  `skills` is PARSED: whatever the extractor found in the uploaded document.
+  `qualities` is CHOSEN: deliberate claims the user makes about themselves.
+  A parsed skill cannot be wrong (it is evidence, taken from the document),
+  whereas a chosen quality is an assertion and must be validated.
+
+  `qualities` is a JSONField rather than a table on purpose: the set is small,
+  always read and written whole, and never queried relationally. A table would
+  buy nothing here and would make the "select up to N" UI awkward.
+  The catalogue is 50 curated options across 7 groups (programming,
+  data_structures, problem_solving, soft_skills, project_management,
+  leadership, hr); the user picks exactly 7, and validate_selection()
+  enforces a minimum server-side.
+
+  Indexes
+    resumes_resumeprofile_resume_id_...   UNIQUE (resume_id)  [the OneToOne]
+
+  DDL as created by migration (SQLite)
+    CREATE TABLE "resumes_resumeprofile" (
+      "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "skills" text NOT NULL
+        CHECK ((JSON_VALID("skills") OR "skills" IS NULL)),
+      "experience" text NOT NULL
+        CHECK ((JSON_VALID("experience") OR "experience" IS NULL)),
+      "education" text NOT NULL,
+      "projects" text NOT NULL,
+      "certifications" text NOT NULL,
+      "created_at" datetime NOT NULL,
+      "updated_at" datetime NOT NULL,
+      "resume_id" bigint NOT NULL UNIQUE
+        REFERENCES "resumes_resume" ("id") DEFERRABLE INITIALLY DEFERRED,
+      "qualities" text NOT NULL
+        CHECK ((JSON_VALID("qualities") OR "qualities" IS NULL))
+    );
+
+  Column provenance
+    0002_resumeprofile  all columns except qualities
+    0007                + qualities  (hand-written migration, see Section 9)
+
+--------------------------------------------------------------------------------
+4.8  applications_application               (apps/applications/models.py)
+--------------------------------------------------------------------------------
+One job the user is ACTIVELY PURSUING. Deliberately a thin, real row rather
+than a status column bolted onto jobs_job: a job can be tracked and never
+applied to, and re-application after a rejection is a distinct event, so the
+data is genuinely many-to-many between a user and a job over time.
+
+  Column             Django type        SQLite        PostgreSQL     Null  Key
+  -----------------  -----------------  ------------  -------------  ----  ---
+  id                 BigAutoField       integer       bigint        no    PK
+  user_id            ForeignKey         integer       bigint        no    FK
+  job_id             FK -> jobs.Job     bigint        bigint        no    FK
+  tailored_resume_id FK -> resumes.Resume bigint      bigint         yes   FK
+  status             CharField(20)      varchar(20)   varchar(20)    no
+  applied_at         DateTimeField      datetime      timestamptz    yes
+  notes              TextField          text          text           no
+  created_at         DateTimeField(auto_now_add) datetime timestamptz  no
+  updated_at         DateTimeField(auto_now)     datetime timestamptz  no
+
+  user_id
+    FK -> auth_user(id)   ON DELETE CASCADE   related_name="applications"
+    Tenant boundary. The model comment calls this "the single most important
+    field on the model".
+
+  job_id
+    FK -> jobs_job(id)   ON DELETE CASCADE   related_name="applications"
+    CASCADE, not SET NULL: an application is meaningless without its job, and
+    jobs_job rows are themselves deleted with their owner. (Note the
+    asymmetry with resumes_resume.source_job_id, which is SET NULL because
+    tailored resume CONTENT outlives the job row.)
+
+  tailored_resume_id
+    FK -> resumes_resume(id)   ON DELETE SET NULL
+    related_name="applications"
+    The tailored version used to apply, if any. OPTIONAL: many applications
+    are made with the master resume or an upload not tracked here. SET NULL
+    because the application record (and its status history) must survive the
+    resume being deleted.
+
+  Constraints
+    unique_application_per_user_job   UNIQUE (user_id, job_id)
+    One live application per job per account. A candidate does not apply to the
+    same posting twice; re-applying after a rejection is out of scope for now
+    and would need an explicit override.
+
+  Indexes
+    app_user_status_idx    (user_id, status)
+        The tracker filters and groups by status on every page load.
+    app_user_updated_idx   (user_id, updated_at DESC)
+        Detail pages and the recent list both follow updated_at.
+    Plus automatic single-column FK indexes on user_id, job_id and
+    tailored_resume_id.
+
+  Meta
+    ordering = ["-updated_at"]
+
+  status (a controlled pipeline, 7 states)
+    SAVED       Saved        -- bookmarked, not yet submitted
+    APPLIED     Applied      -- submitted
+    ASSESSMENT  Assessment   -- employer screening test
+    INTERVIEW   Interview
+    OFFER       Offer
+    REJECTED    Rejected
+    WITHDRAWN   Withdrawn
+    default = SAVED
+
+    CLOSED_STATUSES  = {REJECTED, WITHDRAWN, OFFER}
+        States that mean the application is finished, one way or another.
+    ACTIVE_STATUSES  = {APPLIED, ASSESSMENT, INTERVIEW}
+        States that mean the candidate is waiting on the employer.
+    Exposed as the `is_closed` / `is_active` Python properties. These are
+    Python sets, NOT database constraints -- adding a status means editing
+    the model constants and writing a migration for the `choices` list.
+
+  applied_at
+    NULL until the candidate first submits. Stamped by the model method
+    `mark_applied()`, which is deliberately in the model rather than the view
+    so the rule holds no matter which endpoint caused the change. The stamp is
+    guarded by `and not self.applied_at`, so the ORIGINAL timestamp is never
+    overwritten by a later status edit -- a candidate promoted from APPLIED to
+    INTERVIEW keeps their true submission date.
+
+  notes
+    Free-text candidate notes. NOT NULL with a "" default so the API always has
+    one shape. Must never be rendered as markup without escaping.
+
+  DDL as created by migration (SQLite)
+    CREATE TABLE "applications_application" (
+      "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "status" varchar(20) NOT NULL,
+      "applied_at" datetime NULL,
+      "notes" text NOT NULL,
+      "created_at" datetime NOT NULL,
+      "updated_at" datetime NOT NULL,
+      "job_id" bigint NOT NULL
+        REFERENCES "jobs_job" ("id") DEFERRABLE INITIALLY DEFERRED,
+      "tailored_resume_id" bigint NULL
+        REFERENCES "resumes_resume" ("id") DEFERRABLE INITIALLY DEFERRED,
+      "user_id" integer NOT NULL
+        REFERENCES "auth_user" ("id") DEFERRABLE INITIALLY DEFERRED,
+      CONSTRAINT "unique_application_per_user_job" UNIQUE ("user_id","job_id")
+    );
+
+  Column provenance: applications/0001_initial -- all columns (single migration).
+
+--------------------------------------------------------------------------------
+4.9  automation_notification                 (apps/automation/models.py)
+--------------------------------------------------------------------------------
+One thing that happened, worth telling the user about. A ROW per notification,
+not a counter: a count cannot say "your tailoring finished" and is useless the
+moment a user wants to know what they missed. The list is the feature; the
+unread dot is a convenience derived from it.
+
+Read state lives on the row. An is_read boolean plus an index makes the unread
+count one indexed query rather than a scan, and "mark all read" a single
+UPDATE. A separate read-tracking table would be more normalised and would buy
+nothing at this scale.
+
+  Column         Django type        SQLite        PostgreSQL     Null  Key
+  --------------  -----------------  ------------  -------------  ----  ---
+  id             BigAutoField       integer       bigint        no    PK
+  user_id        ForeignKey         integer       bigint        no    FK
+  kind           CharField(16)      varchar(16)   varchar(16)    no
+  title          CharField(120)     varchar(120)  varchar(120)   no
+  body           TextField          text          text           no
+  link           CharField(255)     varchar(255)  varchar(255)   no
+  is_read        BooleanField       bool          boolean        no
+  dedupe_key     CharField(120)     varchar(120)  varchar(120)   no
+  created_at     DateTimeField(auto_now_add) datetime timestamptz  no
+  read_at        DateTimeField      datetime      timestamptz    yes
+
+  user_id
+    FK -> auth_user(id)   ON DELETE CASCADE   related_name="notifications"
+    A notification records an event about someone's job search and must never
+    be visible to anyone else. Scoped on `user` on every query.
+
+  kind (closed set, default INFO)
+    INFO      Information
+    SUCCESS   Success
+    WARNING   Warning
+    ERROR     Error
+    A closed set rather than free text because the frontend maps these to an
+    icon and a tone; an unknown value would have no presentation and would
+    render as a blank row.
+
+  title
+    One line -- the notification is skimmable from this alone. The writer
+    truncates to 120 chars (title[:120]) because the DB max_length is not a
+    reliable guard on every backend.
+
+  link -- SECURITY-CRITICAL
+    Where the UI should send the user on click, e.g. "/app/jobs?job=12".
+    Stored as a PATH, never a full URL, and rendered through client-side
+    navigation. This is deliberate: an attacker who can write a notification
+    row must not be able to turn it into an off-site (phishing) redirect.
+    Truncated to 255 chars by the writer.
+
+  dedupe_key
+    Natural key for de-duplication. EMPTY ("") for notifications that should
+    never repeat (a one-off warning); SET for ones a poller could emit
+    repeatedly (e.g. "analysis finished", keyed by job id). Truncated to 120.
+
+  read_at
+    NULL while unread. Set alongside is_read by mark_read(). Redundant with
+    is_read by design: is_read is the flag the index serves, read_at is the
+    human-facing timestamp.
+
+  Constraints
+    uniq_notification_dedupe   UNIQUE (user_id, kind, dedupe_key)
+                               WHERE dedupe_key > ''      (partial index)
+    CONDITIONAL, and that condition is the whole point: only rows that opted
+    into de-duplication participate. A plain unique constraint on a blank
+    string would permit exactly ONE empty-key row per (user, kind), which is
+    the precise opposite of what "" is meant to mean.
+    Partial unique constraints are supported by SQLite (since 3.8.0) and
+    PostgreSQL, so this behaves identically on both backends.
+
+  Indexes
+    notif_unread_idx     (user_id, is_read, created_at DESC)
+        Serves the bell's unread count on every page load.
+    notif_user_time_idx  (user_id, created_at DESC)
+        Serves the notification list itself.
+
+  Meta
+    ordering = ["-created_at", "-id"]    (id breaks ties on identical
+                                          timestamps so paging is stable)
+
+  Notes
+    * `Notification.notify()` is the only intended constructor. It returns
+      None on a de-duplicated repeat rather than raising, so a call site
+      inside a request never has to know whether it is the first to see the
+      event. The IntegrityError catch covers the race the pre-check cannot:
+      two requests can both find no row and both try to insert; the
+      constraint makes the second fail, and failing INTO the desired state is
+      a success, not an incident to log.
+    * `mark_read()` is idempotent: it returns False and does NOT touch read_at
+      if the row is already read, so "mark all read" and the per-row path can
+      both reach the same notification without the second overwriting the
+      original read time.
+
+  DDL as created by migration (SQLite)
+    CREATE TABLE "automation_notification" (
+      "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "kind" varchar(16) NOT NULL,
+      "title" varchar(120) NOT NULL,
+      "body" text NOT NULL,
+      "link" varchar(255) NOT NULL,
+      "is_read" bool NOT NULL,
+      "dedupe_key" varchar(120) NOT NULL,
+      "created_at" datetime NOT NULL,
+      "read_at" datetime NULL,
+      "user_id" integer NOT NULL
+        REFERENCES "auth_user" ("id") DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE UNIQUE INDEX "uniq_notification_dedupe"
+      ON "automation_notification" ("user_id","kind","dedupe_key")
+      WHERE "dedupe_key" > '';
+
+  Column provenance: automation/0001_initial -- all columns (single migration).
+
+--------------------------------------------------------------------------------
+4.10 automation_notificationpreference       (apps/automation/models.py)
+--------------------------------------------------------------------------------
+Per-user switches for which notifications get created. A MODEL rather than a
+settings default because the choice is personal and has to travel with the
+account.
+
+An ABSENT row means "all defaults on", so signup does not have to write a row
+for every user. `for_user()` does get_or_create on first access.
+
+  Column                Django type    SQLite        PostgreSQL    Null  Key
+  ---------------------  -------------  ------------  -----------  ----  ---
+  id                    BigAutoField   integer       bigint       no    PK
+  user_id               OneToOneField  integer       bigint       no    FK,UQ
+  job_updates           BooleanField   bool          boolean       no
+  job_matches           BooleanField   bool          boolean       no
+  application_updates   BooleanField   bool          boolean       no
+  updated_at            DateTimeField(auto_now) datetime  timestamptz  no
+
+  user_id
+    FK -> auth_user(id)   ON DELETE CASCADE
+    related_name="notification_preferences"
+    UNIQUE -- exactly one preference row per user.
+
+  Switches (all default True)
+    job_updates           Tell me when a job finishes analysing or tailoring.
+    job_matches           Tell me when a new analysed job scores well against
+                          my resume.
+    application_updates   Tell me when an application changes stage.
+
+  Meta
+    verbose_name_plural = "notification preferences"
+
+  The `allows(kind)` rule -- the interesting logic on this model
+  ------------------------------------------------------------------
+  `allows()` maps a notification KIND onto the switches, and the mapping is
+  not 1:1:
+
+      kind == ERROR   -> job_updates OR application_updates
+      kind == SUCCESS -> job_updates OR job_matches
+      anything else   -> job_updates
+
+  A failure is suppressed only when the user has switched off *every* category
+  that could produce it. Turning off job updates while leaving application
+  updates on should not silence an analysis error: the user still wants to hear
+  that something broke, they just do not want a note every time a job is
+  re-scored.
+
+  UNKNOWN KINDS ARE ALLOWED rather than dropped. A kind added by a later
+  release should reach users, and an absent preference row is a configuration
+  default, not a reason to silently swallow an event.
+
+  Note: this logic lives in Python. Nothing in the database enforces it, so a
+  raw SQL INSERT can create notifications the user has switched off. That is
+  acceptable -- notifications are advisory -- but do not mistake the booleans
+  for an access-control mechanism.
+
+  Column provenance: automation/0001_initial -- all columns (single migration).
+
+================================================================================
+4B. DJANGO FRAMEWORK TABLES
+================================================================================
+These are created and owned by Django itself. They are documented for
+completeness and because two of them (auth_user, django_session) are read
+directly by application code. Do not hand-edit them; change them through
+Django (AUTH_USER_MODEL, SESSION_ENGINE) or not at all.
+
+--------------------------------------------------------------------------------
+4.11  auth_group                            (django.contrib.auth)
+--------------------------------------------------------------------------------
+  id        AutoField      PK
+  name      CharField(150) NOT NULL UNIQUE
+
+  M2M through-tables link groups to users (auth_user_groups) and groups to
+  permissions (auth_group_permissions). No group is ever created or assigned
+  by application code; the table exists to satisfy the admin site.
+
+--------------------------------------------------------------------------------
+4.12  auth_permission                       (django.contrib.auth)
+--------------------------------------------------------------------------------
+  id               AutoField        PK
+  name             CharField(255)   NOT NULL
+  codename         CharField(100)   NOT NULL
+  content_type_id  FK -> django_content_type(id)
+  UQ (content_type_id, codename)
+  One row per (model, action) pair, e.g. add/change/delete/view on jobs.job.
+  Populated by the post_migrate contenttypes machinery.
+
+--------------------------------------------------------------------------------
+4.13  auth_group_permissions                (django.contrib.auth)
+--------------------------------------------------------------------------------
+  id              AutoField  PK
+  group_id        FK -> auth_group(id)
+  permission_id   FK -> auth_permission(id)
+  UQ (group_id, permission_id)
+  Indexes on each FK column, plus the unique index above.
+
+--------------------------------------------------------------------------------
+4.14  auth_user_groups                      (django.contrib.auth)
+--------------------------------------------------------------------------------
+  id        AutoField  PK
+  user_id   FK -> auth_user(id)
+  group_id  FK -> auth_group(id)
+  UQ (user_id, group_id)
+  Always empty in this application. There is no role model.
+
+--------------------------------------------------------------------------------
+4.15  auth_user_user_permissions            (django.contrib.auth)
+--------------------------------------------------------------------------------
+  id             AutoField  PK
+  user_id        FK -> auth_user(id)
+  permission_id  FK -> auth_permission(id)
+  UQ (user_id, permission_id)
+  Always empty in this application. Authorization is ownership-based (the
+  `user_id` tenant boundary), never permission-based.
+
+--------------------------------------------------------------------------------
+4.16  django_content_type                   (django.contrib.contenttypes)
+--------------------------------------------------------------------------------
+  id          AutoField        PK
+  app_label   CharField(100)   NOT NULL
+  model       CharField(100)   NOT NULL
+  UQ (app_label, model)
+  One row per registered model. Used by the admin log and generic relations.
+  After a full migrate it contains rows for all 9 project models as well as
+  the auth/admin models.
+
+--------------------------------------------------------------------------------
+4.17  django_admin_log                      (django.contrib.admin)
+--------------------------------------------------------------------------------
+  id               AutoField      PK
+  action_time      DateTimeField  NOT NULL
+  user_id          FK -> auth_user(id)   (nullable in practice)
+  content_type_id  FK -> django_content_type(id)  (nullable)
+  object_id        TextField      NULL   (the PK as text)
+  object_repr      CharField(200) NOT NULL
+  action_flag      SmallInteger   NOT NULL, CHECK >= 0
+  change_message   TextField      NOT NULL
+  Indexes on user_id and content_type_id.
+  Empty in this project -- no ModelAdmin is registered for any project model
+  (see Section 2), so there is nothing for the admin to log.
+
+--------------------------------------------------------------------------------
+4.18  django_session                        (django.contrib.sessions)
+--------------------------------------------------------------------------------
+READ DIRECTLY BY APPLICATION CODE -- see apps/users/security.py.
+
+  session_key    CharField(40)   PK   (NOT an auto-increment id)
+  session_data   TextField       NOT NULL
+  expire_date    DateTimeField   NOT NULL
+  Index  django_session_expire_date_...  (expire_date)
+        Used to find expired rows to purge and to list live sessions.
+
+  * SESSION_ENGINE is not overridden, so this is Django's default DB-backed
+    engine. Switching to a cache or signed-cookie backend would BREAK the
+    "active sessions" security page, which enumerates real rows.
+  * session_data is a base64-encoded, signed, zlib-compressed pickle. The
+    security page decodes it and reads `_auth_user_id` to attribute a session
+    to an account. A row that fails to decode is SKIPPED, never guessed at:
+    deleting every unidentifiable session would be a denial-of-service lever,
+    and deleting every identifiable one is the correct behaviour.
+  * The session_key IS a secret. It is returned to the account it belongs to,
+    over an authenticated request, only so "sign out this device" has
+    something to name.
+  * "Sign out everywhere else" DELETES the rows. Because Django consults the
+    session store on every authenticated request, this revokes a stolen session
+    IMMEDIATELY rather than at an expiry an attacker could wait out.
+  * `change_password()` calls update_session_auth_hash() so the CURRENT session
+    survives a password change. Django stores a hash of the password inside
+    the session; changing it without re-hashing would sign the account out of
+    the very tab used to make the change, which reads as a bug.
+
+--------------------------------------------------------------------------------
+4.19  django_migrations                     (django.db.migrations)
+--------------------------------------------------------------------------------
+  id        AutoField      PK
+  app       CharField(255) NOT NULL
+  name      CharField(255) NOT NULL
+  applied   DateTimeField  NOT NULL
+  UNIQUE (app, name)
+  The applied-migration ledger. DO NOT hand-edit this table to "skip" a
+  migration -- use `manage.py migrate` or `showmigrations`. Editing it makes
+  the database permanently disagree with the code's expectations.
+
+
+================================================================================
+5.  INDEX CATALOGUE
+================================================================================
+
+5.1  EXPLICITLY DECLARED (from Meta.indexes and Meta.constraints)
+--------------------------------------------------------------------------------
+  Index name                    Table                            Columns
+  ---------------------------  -------------------------------  ------------------
+  app_user_status_idx           applications_application         (user_id, status)
+  app_user_updated_idx          applications_application         (user_id, updated_at DESC)
+  notif_unread_idx              automation_notification          (user_id, is_read,
+                                                                    created_at DESC)
+  notif_user_time_idx           automation_notification          (user_id, created_at DESC)
+  secevent_user_time_idx        users_securityevent              (user_id, created_at DESC)
+  uniq_notification_dedupe      automation_notification          UNIQUE (user_id, kind,
+                                                                    dedupe_key)
+                                                             WHERE dedupe_key > ''
+  unique_job_url_per_user       jobs_job                         UNIQUE (user_id, url)
+  uniq_user_provider_credential users_providercredential         UNIQUE (user_id, provider)
+  unique_application_per_user_job applications_application        UNIQUE (user_id, job_id)
+
+5.2  AUTOMATIC (created by Django for FKs and OneToOne fields)
+--------------------------------------------------------------------------------
+  Index                                              Table                     Columns
+  ------------------------------------------------  ------------------------  ------------
+  users_userprofile_user_id (UNIQUE)                 users_userprofile        (user_id)
+  users_providercredential_user_id_2c161d53           users_providercredential (user_id)
+  jobs_job_user_id_093659ab                           jobs_job                 (user_id)
+  resumes_resume_user_id_0221d0a3                     resumes_resume           (user_id)
+  resumes_resume_source_resume_id_df4f7d8e            resumes_resume           (source_resume_id)
+  resumes_resume_source_job_id_000126df               resumes_resume           (source_job_id)
+  resumes_resumeprofile_resume_id (UNIQUE)            resumes_resumeprofile    (resume_id)
+  applications_application_user_id_5dae3b8c           applications_application (user_id)
+  applications_application_job_id_c031177c            applications_application (job_id)
+  applications_application_tailored_resume_id_efba8386 applications_application (tailored_resume_id)
+  auth_user_groups_user_id_6a12ed8b                   auth_user_groups         (user_id)
+  auth_group_permissions_group_id_b120cbf9             auth_group_permissions   (group_id)
+  auth_permission_content_type_id_2f476e4b            auth_permission          (content_type_id)
+  django_admin_log_user_id_c564eba6                   django_admin_log         (user_id)
+  django_session_expire_date_a5c62663                 django_session           (expire_date)
+
+  The index NAMES above are Django-generated and carry a hash suffix for
+  multi-column indexes. Do not hard-code them in application queries -- they
+  are an implementation detail that changes if a field is renamed.
+
+5.3  NOTABLE ABSENCES (things you might expect and should not assume)
+--------------------------------------------------------------------------------
+  * No index on jobs_job.status, match_score, or created_at. Queries filter by
+    user_id first, so the user_id index is the one that matters at this scale.
+    If a cross-user "top matches" feature is added, add a composite
+    (user_id, match_score DESC) index at that point.
+  * No index on any JSON column. Correct as designed: nothing queries inside
+    the JSON payloads, they are always read whole.
+  * No index on resumes_resume.is_master. The master lookup goes through
+    user_id, and a user has a handful of resumes.
+  * No full-text index on jobs_job.description or any resume text. Job search
+    is performed by the ORM in Python today.
+
+================================================================================
+6.  CONSTRAINT CATALOGUE
+================================================================================
+
+6.1  PRIMARY KEYS
+--------------------------------------------------------------------------------
+  All 9 project tables use `id BigAutoField` as a surrogate primary key,
+  named <app_label>_<model_name>_pkey on PostgreSQL.
+  Rationale (from settings.py): an AutoField caps at ~2.1 billion rows, and CI
+  runs `makemigrations --check`, which fails while models.W042 is outstanding,
+  so the project-wide BigAutoField is load-bearing for the build, not cosmetic.
+
+6.2  FOREIGN KEY CONSTRAINTS
+--------------------------------------------------------------------------------
+  Child column                         -> Parent                   ON DELETE
+  -----------------------------------  ------------------------  ---------
+  users_userprofile.user_id                 auth_user.id          CASCADE
+  users_providercredential.user_id          auth_user.id          CASCADE
+  users_securityevent.user_id               auth_user.id          CASCADE
+  jobs_job.user_id                          auth_user.id          CASCADE
+  resumes_resume.user_id                    auth_user.id          CASCADE
+  applications_application.user_id          auth_user.id          CASCADE
+  automation_notification.user_id           auth_user.id          CASCADE
+  automation_notificationpreference.user_id auth_user.id          CASCADE
+  resumes_resume.source_resume_id           resumes_resume.id     SET NULL
+  resumes_resume.source_job_id              jobs_job.id            SET NULL
+  applications_application.job_id           jobs_job.id            CASCADE
+  applications_application.tailored_resume_id  resumes_resume.id  SET NULL
+  resumes_resumeprofile.resume_id           resumes_resume.id     CASCADE
+
+  On SQLite these are emitted as `DEFERRABLE INITIALLY DEFERRED` so migration
+  data operations can temporarily violate them mid-transaction. On PostgreSQL
+  they are plain NOT NULL foreign keys, each backed by an index.
+
+  Every project FK column is NOT NULL except the three that are explicitly
+  optional (source_resume_id, source_job_id, tailored_resume_id).
+
+6.3  UNIQUE CONSTRAINTS
+--------------------------------------------------------------------------------
+  Constraint                                 Table                    Columns
+  ----------------------------------------  -----------------------  --------------
+  auth_user_username_key                     auth_user                (username)
+  unique_job_url_per_user                    jobs_job                 (user_id, url)
+  uniq_user_provider_credential              users_providercredential (user_id, provider)
+  unique_application_per_user_job            applications_application (user_id, job_id)
+  uniq_notification_dedupe (partial)         automation_notification  (user_id, kind,
+                                                                       dedupe_key)
+                                                                   WHERE dedupe_key > ''
+  django_content_type_app_label_model_uniq  django_content_type      (app_label, model)
+  django_migrations (app, name)              django_migrations        (app, name)
+  plus 4 unique indexes on the auth M2M through-tables
+
+  Design intent behind the four project-level unique constraints
+    * unique_job_url_per_user          -- no duplicate analysis of the same
+      posting for one account, while still letting two different users
+      analyse the same URL independently.
+    * uniq_user_provider_credential    -- at most one key per provider, which
+      lets the save path be an unconditional UPDATE rather than
+      lookup-then-branch.
+    * unique_application_per_user_job  -- one live application per job per
+      account. Re-applying after a rejection is out of scope and would need
+      an explicit override.
+    * uniq_notification_dedupe         -- makes a duplicate-insert RACE a
+      no-op in the database, rather than something every call site has to
+      remember to check.
+
+6.4  CHECK CONSTRAINTS
+--------------------------------------------------------------------------------
+  Column                              Check
+  ----------------------------------  -------------------------------------
+  jobs_job.match_result               JSON_VALID(...) OR IS NULL
+  jobs_job.pipeline_steps             JSON_VALID(...) OR IS NULL
+  resumes_resume.profile_data         JSON_VALID(...) OR IS NULL
+  resumes_resume.tailoring_result     JSON_VALID(...) OR IS NULL
+  resumes_resumeprofile.skills        JSON_VALID(...) OR IS NULL
+  resumes_resumeprofile.experience    JSON_VALID(...) OR IS NULL
+  resumes_resumeprofile.qualities     JSON_VALID(...) OR IS NULL
+  users_userprofile.years_experience  years_experience >= 0
+  django_admin_log.action_flag        action_flag >= 0
+
+  IMPORTANT -- what is NOT a database constraint
+  ----------------------------------------------
+  Django `choices=` does NOT create a CHECK constraint on either backend. The
+  following are validated in Python only, and can be written by raw SQL, a
+  data import, or a future code path that bypasses the serializer:
+      Job.status, Job.decision, Job.source
+      Application.status
+      UserProfile.discipline, UserProfile.career_stage
+      Resume.resume_type
+      SecurityEvent.event
+      Notification.kind
+  Note also that only the MIN bound of years_experience becomes a CHECK; the
+  MaxValueValidator(60) is a form/serializer-level rule. Do not assume the
+  database will reject a value of 999.
+
+================================================================================
+7.  CASCADE / DELETION MATRIX AND TENANT ISOLATION
+================================================================================
+
+7.1  WHAT HAPPENS WHEN A ROW IS DELETED
+--------------------------------------------------------------------------------
+  Deleted row                     Cascades to                     Sets NULL in
+  ------------------------------  ------------------------------  -----------------
+  auth_user (an account)          users_userprofile              (nothing)
+                                  users_providercredential
+                                  users_securityevent
+                                  jobs_job
+                                  resumes_resume
+                                  applications_application
+                                  automation_notification
+                                  automation_notificationpreference
+                                  (django_session is not an FK --
+                                   rows are found by decoding
+                                   session_data and deleted by
+                                   security.py)
+
+  jobs_job                        applications_application        resumes_resume
+                                                                .source_job_id
+                                  (CASCADE)                       (SET NULL)
+
+  resumes_resume                  resumes_resumeprofile           resumes_resume
+                                                                .source_resume_id
+                                  (CASCADE)                       (SET NULL)
+
+                                                                applications_
+                                                                application
+                                                                .tailored_resume_id
+                                                                (SET NULL)
+
+  automation_notification         nothing
+  automation_notificationpref.    nothing
+
+  Reading the set of rules
+  ------------------------
+  Deleting a MASTER resume does NOT delete the tailored resumes made from it
+  -- it only clears their source_resume_id pointer. The tailored documents
+  survive as first-class resumes; only their provenance annotation is lost.
+
+  Deleting a JOB does NOT delete tailored resumes made for it -- it only
+  clears source_job_id. The generated content outlives the posting.
+
+  Deleting a JOB DOES delete its application rows, because an application
+  without a job is meaningless, and the job row only exists as long as its
+  owner does anyway.
+
+  Deleting an ACCOUNT removes everything belonging to it, in one statement.
+  There is no separate "anonymise" or "soft delete" path in the schema.
+
+7.2  THE TENANT-ISOLATION RULE
+--------------------------------------------------------------------------------
+  Every project table carries a `user_id` FK to auth_user, and every one of
+  those links is ON DELETE CASCADE. `user_id` is therefore simultaneously:
+
+    1. The authorisation boundary. API queries must ALWAYS be scoped by it.
+       A query that forgets the filter returns another candidate's private job
+       analysis, which is a data breach, not a display bug.
+    2. The deletion mechanism. Because it cascades, account removal is a
+       single DELETE and there is no orphan cleanup job to get wrong.
+
+  Tables that carry the boundary
+      users_userprofile                  (via user_id, 1:1)
+      users_providercredential           (via user_id)
+      users_securityevent                (via user_id)
+      jobs_job                           (via user_id)
+      resumes_resume                     (via user_id)
+      resumes_resumeprofile              (INDIRECTLY, via resume_id --
+                                          it has no user_id of its own)
+      applications_application           (via user_id)
+      automation_notification            (via user_id)
+      automation_notificationpreference  (via user_id)
+
+  IMPORTANT -- resumes_resumeprofile has NO user_id column.
+  It reaches a tenant only through resumes_resumeprofile.resume_id ->
+  resumes_resume.id -> resumes_resume.user_id. Any query against a profile
+  MUST traverse to the parent resume and filter on ITS user_id. Writing
+  `ResumeProfile.objects.all()` unscoped would return every user's parsed
+  resume content.
+
+  Deliberate secondary boundaries
+      jobs_job              (user_id, url) UNIQUE
+      applications_application (user_id, job_id) UNIQUE
+  These are scoped per account, NOT globally, so two users can independently
+  track the same job posting.
+
+7.3  THE `read_at` / `applied_at` WRITE RULES
+--------------------------------------------------------------------------------
+  Two timestamps are set by MODEL methods rather than by views, so the rule
+  holds no matter which endpoint caused the change:
+
+    Application.mark_applied(when=None)
+        Stamps applied_at on the transition into APPLIED / ASSESSMENT /
+        INTERVIEW / OFFER, guarded by `and not self.applied_at`, so the
+        ORIGINAL submission time is never overwritten by a later status edit.
+
+    Notification.mark_read()
+        Idempotent: returns False and does NOT touch read_at if already read,
+        so the per-row path and the "mark all read" path can both reach the
+        same row without the second clobbering the first read time.
+
+================================================================================
+8.  JSON PAYLOAD SCHEMAS
+================================================================================
+Six JSONField columns store structured documents. They are NOT queryable in
+this application -- always read whole. This section documents their shapes so
+a future change does not silently break a consumer.
+
+8.1  jobs_job.match_result  (nullable object)
+--------------------------------------------------------------------------------
+Written by apps/jobs/services/match_engine.py (MatchEngine.calculate).
+The complete, self-describing output of one match computation. Because it is
+the authority for the skill-gap view, the UI can never disagree with the score.
+
+  {
+    "score":       float,                    # 0-100, round(x, 2)
+    "skills":      { ... },                  # weighted 0.50
+    "experience":  { ... },                  # weighted 0.20
+    "requirements":{ ... },                  # weighted 0.20
+    "education":   { ... },                  # weighted 0.10
+    "qualities":   { ... },                  # REPORTED, NEVER SCORED
+    "decision":    "USE_MASTER"|"TAILOR"|"SKIP"|"REVIEW"
+  }
+
+  The four weights sum to 1.00. `qualities` is deliberately excluded from the
+  score: a user-asserted quality is not evidence, and letting it move the
+  number would make the score unfalsifiable.
+
+  skills       {"score": float,
+                "matched": [normalized skill names],
+                "missing": [normalized skill names]}
+              Names come from the ONE shared catalog in
+              apps/resumes/services/skill_catalog.py, normalized to
+              lowercase by SkillNormalizer. The UI displays the catalog's
+              display form, not the stored lowercase.
+
+  experience   {"score": float,
+                "required_years":  float,
+                "candidate_years": float,
+                "note": str}
+              An empty JD returns score 100.0 -- no requirement means no
+              penalty, not a zero.
+
+  requirements {"score": float,
+                "matched": [raw requirement LINES],
+                "partially_matched": [raw requirement LINES],
+                "unmatched": [raw requirement LINES]}
+              These are raw JD requirement lines (e.g. "3+ years with
+              Docker"), NOT catalog skills. Partial credit is recorded
+              against the sentence. apps/jobs/services/skill_gap.py reduces
+              partially_matched to catalog skills at READ time, because
+              showing the raw sentence in a panel titled "Skill analysis"
+              made non-skills appear as missing skills.
+
+  education    {"score": float, ...}
+
+  qualities    {"matched": [...], "selected": [...], "note": str}
+              When nothing is selected: matched=[], selected=[],
+              note="No qualities selected".
+
+  Known-fragility note: jobs/tests/test_job_search.py deliberately writes the
+  string "not-a-dict" into match_result and asserts the app survives it. The
+  READ path must tolerate a non-dict here (`job.match_result or {}` plus
+  .get() calls). Any new consumer of this column should do the same.
+
+8.2  resumes_resume.profile_data  (nullable object)
+--------------------------------------------------------------------------------
+Two different shapes depending on resume_type. There is no discriminator field
+inside the JSON -- use the `resume_type` COLUMN, not the payload, to tell them
+apart.
+
+  (a) resume_type = "MASTER" -- the output of ResumeProfileService.build(text),
+      i.e. what the parser extracted from the uploaded document:
+      {
+        "skills":         [normalized skill names],
+        "experience":     { ... }   # ExperienceParser output
+        "education":      str,
+        "projects":       str,
+        "certifications": str
+      }
+
+  (b) resume_type = "TAILORED" -- the AI payload verbatim (the same object
+      stored under tailoring_result["result"]). So for a tailored resume,
+      profile_data IS the generated content, which is why the existing
+      list/detail endpoints can serve a tailored version with no document
+      generator in the read path.
+
+8.3  jobs_job.pipeline_steps  (NOT NULL list, default [])
+--------------------------------------------------------------------------------
+Pipeline progress for the UI. Each element is {"name": str, "status": str}.
+
+  status is one of: "complete" | "running" | "pending"
+
+  The list is REPLACED WHOLESALE on each transition -- it is not appended to.
+  The analyse endpoint writes a 6-step list with steps 1-3 complete, step 4
+  running and steps 5-6 pending, then overwrites it with an 8-step all-complete
+  list on success.
+
+  Because the list is replaced rather than extended, a consumer must treat the
+  step NAMES as the contract, not their positions: the in-flight list has six
+  entries and the settled list has eight, and they are not aligned.
+
+8.4  resumes_resume.tailoring_result  (nullable object, TAILORED rows only)
+--------------------------------------------------------------------------------
+Written by the save-tailoring endpoint in apps/resumes/views.py.
+
+  {
+    "result":     { ... },   # the AI payload == profile_data for this row
+    "validation": { ... },   # the validation verdict
+    "source":     { ... }    # the re-derived source resume view
+  }
+
+  Why it is kept separately from profile_data, when the two overlap:
+  profile_data exists so the row behaves like a normal resume to the rest of
+  the app. tailoring_result exists so a saved version can ALWAYS be explained
+  after the fact -- including why the validator accepted it. The "source"
+  member is re-derived from the stored master rather than taken from the
+  request, so a saved version is self-describing and cannot be told to
+  believe a client-supplied "original".
+
+  A tailoring that FAILS validation is never written to the database at all:
+  the endpoint returns HTTP 422 with code "ai_validation_failed" and a
+  violations list. There are no rejected tailoring rows to clean up.
+
+8.5  resumes_resumeprofile JSON columns
+--------------------------------------------------------------------------------
+  skills       list[str]   default []
+      Normalized against the shared catalog by SkillNormalizer. PARSED
+      evidence -- whatever the extractor found in the document.
+
+  experience   object      default {}
+      Shape produced by ExperienceParser; consumed as
+      (profile["experience"] or {}).get("roles") -> [ ... ]. The stored
+      profile is the authority on HOW MANY roles exist; the tailoring only
+      ever rewrites them, by position, using ids of the form "exp-0",
+      "exp-1", ... So a consumer must index rather than match by id.
+
+  qualities    object      default {}
+      Group key -> list, e.g. {"technical": [...], "soft_skills": [...]}
+      CHOSEN claims, as opposed to the parsed `skills` above. Server-side
+      minimum of 7 from a 50-entry catalogue across 7 groups; the picker also
+      requires at least one from every group, so a selection cannot be seven
+      programming languages and nothing else. See apps/resumes/qualities.py.
+
+      NOTE: the KINDS in apps/resumes/qualities.py are
+      (programming, data_structures, problem_solving, soft_skills,
+       project_management, leadership, hr) -- SEVEN group keys -- while the
+      MODEL FIELD's docstring shows a three-key example
+      ({"technical", "project_management", "soft_skills"}). The docstring is
+      illustrative and out of date; the module-level KINDS tuple is the
+      authority. Treat the stored dict as "group key -> list" and do not
+      hard-code either list of group names when reading it.
+
+8.6  NOT STORED IN THE DATABASE (worth stating explicitly)
+--------------------------------------------------------------------------------
+  These all live on disk or in config, and someone will eventually ask:
+    * Uploaded resume FILES are on the filesystem under MEDIA_ROOT, referenced
+      only by resumes_resume.file (a relative path string).
+    * Generated DOCX/PDF documents are produced on demand from
+      profile_data + tailoring_result and are not persisted.
+    * The candidate's raw resume TEXT is not stored; only its parsed profile.
+    * AI provider API keys are stored ONLY in users_providercredential.
+      encrypted_key, as a Fernet token. No key is ever written to a job row,
+      a resume row, a notification, or a log line.
+    * The per-request "source" view sent to the AI is derived on the fly and
+      is not persisted, except where copied into tailoring_result["source"].
+
+
+================================================================================
+9.  MIGRATION HISTORY AND HOW TO EVOLVE THE SCHEMA SAFELY
+================================================================================
+
+9.1  MIGRATION LEDGER
+--------------------------------------------------------------------------------
+  App           Migration                                                  Key change
+  ------------  --------------------------------------------------------  ----------------
+  users         0001_initial                                              UserProfile
+  users         0002_providercredential                                   ProviderCredential
+  users         0003_userprofile_ai_setup_userprofile_career_stage_...   ai_setup,
+                                                                       career_stage,
+                                                                       years_experience
+  users         0004_securityevent                                        SecurityEvent
+  jobs          0001_initial                                              Job (url globally
+                                                                       unique)
+  jobs          0002_job_match_result                                     match_result
+  jobs          0003_job_error_message_job_pipeline_steps_and_more       error_message,
+                                                                       pipeline_steps,
+                                                                       status widened
+  jobs          0004_job_user_ownership                                   user FK + backfill
+  jobs          0005_job_source                                           source
+  resumes       0001_initial                                              Resume (file
+                                                                       required)
+  resumes       0002_resumeprofile                                        ResumeProfile
+  resumes       0003_resume_profile_data                                  profile_data
+  resumes       0004_resume_user_ownership                                user FK + backfill
+  resumes       0005_alter_resume_options_resume_ai_provider_and_more    provenance +
+                                                                       tailoring_result
+  resumes       0006_resume_updated_at                                    updated_at
+  resumes       0007_resumeprofile_qualities                              qualities
+  applications  0001_initial                                              Application
+  automation    0001_initial                                              Notification +
+                                                                       NotificationPreference
+
+  Cross-app dependency chain (why migration order is not free):
+      applications/0001  depends on jobs/0004 AND resumes/0006
+      resumes/0005        depends on jobs/0004
+  jobs/0004 (per-account job ownership) must therefore be applied before both
+  resumes/0005 and applications/0001.
+
+9.2  THE TWO DATA-PRESERVING OWNERSHIP MIGRATIONS -- read before touching
+--------------------------------------------------------------------------------
+  jobs/0004_job_user_ownership and resumes/0004_resume_user_ownership added
+  per-account ownership to tables that predated accounts. Both use the same
+  three-step shape, and the ordering is not optional:
+
+    1. AddField the FK as NULLABLE, so existing rows are untouched.
+    2. RunPython backfill: claim every pre-ownership row for a single "legacy"
+       holder account, created with get_or_create.
+    3. AlterField to NOT NULL, enforcing ownership.
+  plus, for jobs only: relax url from globally-unique to (user_id, url).
+
+  The legacy account is username/email "legacy@tailorup.local" with password
+  "!unusable-legacy-account". The leading "!" marks the hash unusable in
+  Django, so it can never be signed into until claimed manually.
+
+  Why backfill rather than delete: these rows are real user analyses and real
+  uploaded resumes. Deleting them would orphan historical work; claiming them
+  keeps everything intact and visible. Both migrations ship a REVERSE function
+  (clear_owner) that sets user back to NULL.
+
+9.3  THE ONE HAND-WRITTEN MIGRATION -- and why
+--------------------------------------------------------------------------------
+  resumes/0007_resumeprofile_qualities is deliberately NOT generated. Its own
+  comment records the reason:
+
+    `makemigrations` on the development machine also wanted to rewrite the
+    primary keys of Resume and ResumeProfile from BigAutoField down to
+    AutoField, because the local interpreter resolves the implicit `id`
+    differently from the pinned Django 6.1 that CI and Render run. Committing
+    that would silently narrow every id column in production on a live table.
+    Only the field this feature adds is wanted here; the primary keys stay as
+    0001_initial created them.
+
+  Practical consequence: if you regenerate migrations on a machine whose
+  Django version differs from the pinned 6.1.1, you will see spurious
+  AlterField operations for primary keys. Review generated migrations BEFORE
+  committing, and keep the pin in requirements.txt authoritative.
+
+9.4  SAFELY CHANGING THE SCHEMA
+--------------------------------------------------------------------------------
+  cd ai-job-agent/backend
+  python manage.py makemigrations                  # generate
+  python manage.py migrate                         # apply to dev SQLite
+  python manage.py makemigrations --check --dry-run   # what CI runs
+
+  Rules this project actually depends on:
+    * NEVER write a migration by hand that narrows a primary key.
+      BigAutoField -> AutoField on a live table is a silent production
+      regression, which is exactly what 9.3 exists to prevent.
+    * Widen, never narrow, a max_length. The project says this explicitly
+      where it sets DEFAULT_AUTO_FIELD.
+    * Adding a NOT NULL column to a populated table needs a default or a
+      three-step add-backfill-alter like 9.2. A bare AddField NOT NULL will
+      fail or lock a real PostgreSQL table.
+    * Adding a column with `choices=` requires a migration, because Django
+      records choices in migration state even though the DB has no CHECK.
+    * Deleting a column leaves the data in PostgreSQL until the column is
+      dropped for real. Write an explicit RemoveField.
+    * CI runs `makemigrations --check`; an uncommitted migration fails the
+      build, as does models.W042 (any model without an explicit primary key).
+
+
+================================================================================
+10.  SECURITY POSTURE ENFORCED IN THE DATA MODEL
+================================================================================
+
+10.1  CREDENTIALS AT REST
+--------------------------------------------------------------------------------
+  users_providercredential.encrypted_key holds a Fernet token produced by
+  apps/users/crypto.py. The plaintext key is never stored, never returned by
+  any API, and never logged. key_hint is a 4+4 character mask written once at
+  save time; it is not a secret and cannot be scaled back into a key.
+  `reveal_key()` deletes a row it cannot decrypt, because a key that looks
+  configured but silently fails at call time is worse than an honest
+  "not configured".
+
+  The `cryptography` pin is 50.0.1, deliberately: 44.x carries ten known
+  advisories, and this package guards every stored credential. The dependency
+  audit in CI fails the build on them.
+
+10.2  NO SECRET EVER REACHES ANOTHER COLUMN
+--------------------------------------------------------------------------------
+  AI keys live in exactly one place. They are not copied into
+  users_securityevent, automation_notification, jobs_job.error_message, or any
+  resume row. Key changes are recorded as an event TYPE (AI_KEY_CHANGED), and
+  a failed sign-in records NO row at all.
+
+10.3  NOTIFICATION LINKS CANNOT BECOME AN OPEN REDIRECT
+--------------------------------------------------------------------------------
+  automation_notification.link stores a PATH ("/app/jobs?job=12"), never a
+  full URL, and the frontend navigates client-side. An attacker who can write
+  a notification row therefore cannot turn it into an off-site redirect.
+  Anything you add to this column must preserve that property.
+
+10.4  UNTRUSTED INPUT IS STORED, NEVER INTERPRETED
+--------------------------------------------------------------------------------
+  users_securityevent.user_agent comes from a request header an attacker
+  controls. It is truncated to 300 characters, never rendered as markup, and
+  never used to build a link. Treat any new column in this table the same way.
+
+10.5  SESSION REVOCATION IS REAL, NOT BOOKKEEPING
+--------------------------------------------------------------------------------
+  "Sign out everywhere else" DELETES django_session rows. Because Django
+  consults the session store on every authenticated request, a stolen session
+  stops working IMMEDIATELY rather than at an expiry an attacker could wait
+  out. A row that fails to decode is skipped, never guessed at -- deleting
+  every unidentifiable session would be a denial-of-service lever, and
+  deleting every identifiable one is correct.
+
+  change_password() calls update_session_auth_hash() so the CURRENT session
+  survives, and the security page is explicit that a password change alone
+  does not tell a user whether another session was invalidated -- which is
+  the reason the session list exists at all.
+
+10.6  AUDIT SCOPE
+--------------------------------------------------------------------------------
+  users_securityevent is NOT a general audit log. It records
+  authentication-relevant events for THIS account only, and never another
+  account's IP address, a token value, or a key. NotificationPreference
+  booleans are preferences, not access control: nothing in the database
+  prevents a raw INSERT from creating a notification the user switched off.
+
+10.7  THE TENANT BOUNDARY IS THE MAIN CONTROL
+--------------------------------------------------------------------------------
+  There is no role model and no permission check in the data layer
+  (auth_user_groups and auth_user_user_permissions are always empty). All
+  authorization is ownership: filter by user_id, always. The
+  apps/users/tests/test_isolation.py suite exists specifically to prove that
+  one user can never read another's jobs, resumes, applications or
+  notifications.
+
+================================================================================
+11.  OPERATIONAL NOTES, KNOWN DRIFT, AND COMMON QUERIES
+================================================================================
+
+11.1  KNOWN DRIFT: THE CHECKED-IN DEV DATABASE IS STALE
+--------------------------------------------------------------------------------
+  backend/db.sqlite3 is a working file, not a schema reference. As inspected,
+  its django_migrations ledger stops at users/0003 and it has NO tables for:
+      automation_notification
+      automation_notificationpreference
+      users_securityevent
+  while the code and migrations in this document do. Anyone reading the schema
+  out of that file directly will get an incomplete picture.
+
+  Treat the models and migrations as the source of truth. To inspect the real
+  current schema, run migrate first:
+
+      cd ai-job-agent/backend
+      python manage.py migrate
+      python manage.py sqlmigrate <app> <migration>
+
+  The unrelated ai-job-agent/db.sqlite3 at the REPOSITORY ROOT is not this
+  project's database. settings.py resolves BASE_DIR to backend/, so the root
+  file (which contains only an empty auth_group) is a stray artefact.
+
+11.2  FILE STORAGE IS NOT IN THE DATABASE
+--------------------------------------------------------------------------------
+  resumes_resume.file holds a RELATIVE PATH, not the document. The bytes live
+  under MEDIA_ROOT (default backend/media/resumes/). This means:
+    * A database restore does NOT restore a user's uploaded documents. Back up
+      MEDIA_ROOT (or move to object storage) alongside the database.
+    * settings_test.py redirects MEDIA_ROOT to a temp dir, so a test run never
+      writes into the working tree.
+    * MEDIA_URL is "/media/". In DEBUG Django serves it; in production
+      Gunicorn has no front web server, so config/urls.py adds the static()
+      route explicitly and the platform is expected to serve it properly.
+
+11.3  SESSION AND LOG ROWS GROW UNBOUNDED
+--------------------------------------------------------------------------------
+  There is no scheduled purge. django_session accumulates rows until Django's
+  own clearsessions runs, and users_securityevent is append-only with no
+  retention policy. If either grows materially, add a management-command purge
+  rather than assuming the platform will do it. Note that purging security
+  events is a product decision (audit retention), not just housekeeping.
+
+11.4  ROW-COUNT EXPECTATIONS
+--------------------------------------------------------------------------------
+  users_userprofile          at most 1 per user
+  users_providercredential   at most N providers per user (currently gemini,
+                             groq); all rows deleted on sign-out
+  users_securityevent        unbounded, append-only
+  jobs_job                   bounded by unique_job_url_per_user
+  resumes_resume             unbounded; a master plus N tailored versions
+  resumes_resumeprofile      at most 1 per resume
+  applications_application   at most 1 per (user, job)
+  automation_notification    bounded per (user, kind) ONLY where dedupe_key is
+                             set; unbounded where it is blank
+  automation_notificationpref. at most 1 per user (0 is valid and means
+                             "all defaults on")
+
+11.5  COMMON DIAGNOSTIC QUERIES
+--------------------------------------------------------------------------------
+  Verify the schema matches the models (the command CI relies on):
+      python manage.py makemigrations --check --dry-run
+
+  Show which migrations are applied / pending:
+      python manage.py showmigrations
+      python manage.py showmigrations jobs
+      python manage.py showmigrations automation
+
+  List tables in the current database:
+      sqlite3 backend/db.sqlite3 "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
+
+  Per-user row counts (always scope by user_id):
+      Job.objects.filter(user=request.user).count()
+      Resume.objects.filter(user=request.user, is_master=True)
+
+  Jobs missing an analysis (match_result is NULL):
+      Job.objects.filter(user=u, match_result__isnull=True)
+
+  Unread notification count, served by notif_unread_idx:
+      Notification.objects.filter(user=u, is_read=False).count()
+
+  Active applications, served by app_user_status_idx:
+      Application.objects.filter(user=u, status__in=['APPLIED','ASSESSMENT','INTERVIEW'])
+
+  Tailored versions of one master, served by the source_resume_id index:
+      Resume.objects.filter(source_resume_id=master_id)
+
+  Find users holding an encrypted provider key (row count only -- never
+  select encrypted_key into a log or a response):
+      ProviderCredential.objects.values('user_id', 'provider', 'key_hint')
+
+11.6  ONBOARDING CHECKLIST FOR A NEW TABLE
+--------------------------------------------------------------------------------
+  Adding a table to this project means answering all of these, because each is
+  a rule the existing nine tables already follow:
+    1. Does it carry user_id FK -> auth_user, ON DELETE CASCADE?  (If it is
+       reachable from a user, yes. resumes_resumeprofile is the one exception,
+       and it is deliberately reachable only through its parent.)
+    2. Is the primary key an explicit BigAutoField, not a bare `id`?
+    3. Does it have created_at (auto_now_add) and updated_at (auto_now) where
+       "when did this last change" is meaningful?
+    4. Does it need Meta.ordering so list endpoints are deterministic?
+    5. Does anything in it have to be unique per user, and is that a
+       composite UniqueConstraint rather than a bare unique?
+    6. Are the read paths filtered by user_id, and is there an index that
+       serves them?
+    7. If it stores JSON, is the shape documented in Section 8, and does the
+       READ path tolerate a malformed or absent payload?
+    8. Does it hold anything a user would not want another user to see? If so,
+       it needs the ownership column, not just a foreign key to it.
+
+================================================================================
+END OF DOCUMENT
+================================================================================
+Verified against: backend/apps/{users,jobs,resumes,applications,automation}
+models and migrations, backend/config/settings.py, settings_test.py,
+apps/jobs/services/match_engine.py, apps/jobs/services/skill_gap.py,
+apps/resumes/services/resume_profile.py, apps/resumes/qualities.py,
+apps/users/security.py, apps/users/serializers.py, apps/users/crypto.py,
+and the live SQLite DDL for the tables the dev database has reached.
