@@ -33,7 +33,6 @@ from apps.ai.tailor import ResumeTailor, build_source_resume
 from apps.ai.validators import validate as validate_tailoring
 from apps.jobs.models import Job
 from apps.jobs.services.jd_profile import JDProfile
-from apps.users.crypto import CredentialCryptoError
 from apps.users.models import ProviderCredential
 
 from apps.resumes.services.document_service import render_resume_document
@@ -50,27 +49,17 @@ from apps.common.throttling import (
 logger = logging.getLogger(__name__)
 
 
-def _user_api_key(user) -> str:
-    """Decrypt the caller's own provider key, or return "" if they have none.
-
-    Returns a plain string rather than the model so that a caller cannot
-    accidentally keep a database object (and therefore the ciphertext) alive
-    past the request, and so the "no key" case needs no branching at the call
-    site.
-
-    Raises :class:`CredentialCryptoError` only when a row exists but cannot be
-    decrypted; ``reveal_key`` removes that row on the way out, so the next
-    request honestly reports "not configured".
+def _api_key_for(user, provider: str) -> str:
     """
-    credential = ProviderCredential.objects.filter(
-        user=user,
-        provider="gemini",
-    ).first()
+    The key to use for one tailoring call, or "" when there is none.
 
-    if credential is None:
-        return ""
-
-    return credential.reveal_key()
+    Thin wrapper over :func:`apps.ai.selection.resolve_api_key` kept so the
+    call site below reads as an intent ("get me a key for the provider I am
+    about to use") rather than as plumbing. The precedence -- the user's own
+    stored credential first, then the deployment's env fallback -- lives in
+    one place and is asserted in the AI tests.
+    """
+    return selection.resolve_api_key(user, provider)
 
 
 class InvalidResumeUpload(ValueError):
@@ -595,35 +584,29 @@ class TailorResumeView(APIView):
         if error is not None:
             return error
 
-        # The user's own key, decrypted here and now -- at the single moment it
-        # is needed -- rather than held in memory for the session. Absent for a
-        # keyless provider like Ollama, which simply ignores it.
-        try:
-            api_key = _user_api_key(request.user)
-        except CredentialCryptoError:
-            # reveal_key() has already dropped the undecryptable row, so the
-            # UI will fall back to "not configured" and ask for a re-paste.
-            return Response(
-                {
-                    "error": "Your saved API key could not be read and has been "
-                              "removed. Please add it again in Settings.",
-                    "code": "ai_key_unreadable",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         uid = request.user.pk
         progress.reset(uid)
         progress.emit(uid, "start", "Request received.")
         started = time.monotonic()
 
         try:
-            # Resolve this account's provider first. The deployment default is
-            # only a default: a user who chose differently gets their choice,
-            # and the key lookup below follows whichever provider was resolved
-            # rather than assuming Gemini.
+            # Resolve this account's provider first, then ask for a key *for
+            # that provider*. The order matters: resolving the key first would
+            # mean looking up a hardcoded provider, which is exactly the bug
+            # that made this view Gemini-only when Groq arrived.
+            #
+            # Both calls stay inside this try because both can fail with an
+            # AIError -- an unconfigured deployment raises AIConfigurationError
+            # from get_ai_provider() -- and the handler below turns that into a
+            # real response with a message instead of a bare 500.
             effective, _reason = selection.resolve_provider_name(request.user)
             provider = factory.get_ai_provider(effective)
+
+            # The key, resolved here and now -- at the single moment it is
+            # needed -- rather than held in memory for the session. Absent for
+            # a keyless provider like Ollama, which simply ignores it.
+            api_key = _api_key_for(request.user, effective)
+
             progress.emit(
                 uid,
                 "provider",
@@ -819,17 +802,21 @@ class AIProviderStatusView(APIView):
         described["selection_reason"] = reason
         described["deployment_default"] = selection.default_provider_name()
 
-        # Availability is per user, not global: the provider is configured
-        # globally, but Gemini is unusable until *this* account has a key. The
-        # button is therefore enabled per user, and the reason is specific
-        # enough to act on ("add your key") instead of a generic outage.
-        described["requires_user_key"] = bool(
-            described.get("provider") == "gemini"
-        )
+        # Availability is per user, not global. A hosted provider is unusable
+        # until a key exists -- but "a key exists" now means the user's own
+        # credential *or* the deployment's env fallback, so a deploy that sets
+        # GEMINI_API_KEY correctly reports itself ready instead of disabling
+        # tailoring for everyone who never pasted a key.
+        described["requires_user_key"] = selection.provider_needs_user_key(effective)
         described["user_key_configured"] = ProviderCredential.objects.filter(
             user=request.user,
-            provider="gemini",
+            provider=effective,
         ).exists()
+        # Reported separately so the UI can say "using the app's key" rather
+        # than silently changing whose quota is being spent. Never the value.
+        described["deployment_key_configured"] = selection.has_deployment_key(
+            effective
+        )
 
         return Response(described, status=status.HTTP_200_OK)
 

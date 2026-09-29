@@ -3,16 +3,30 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from './useAuth'
 import { BrandLoader } from '../components/BrandLoader'
 
-/** Full-screen spinner used while the session is being resolved. */
+/** Full-screen loader, used only where a decision genuinely cannot be deferred. */
 function Waiting() {
   return <BrandLoader label="Restoring your session" />
 }
 
-/** Gate for signed-out visitors: bounce an authenticated user to the workspace. */
+/**
+ * Gate for signed-out visitors: bounce an authenticated user to the workspace.
+ *
+ * Deliberately does **not** wait while the session is being resolved.
+ *
+ * The previous version returned <Waiting /> for `status === 'loading'`, which
+ * meant a cold backend put a full-screen spinner in front of the marketing
+ * site, the sign-in form and the legal pages -- pages that render perfectly
+ * well for a signed-out visitor, and that did not need the answer. The cost
+ * was a blank screen for up to a minute on a free-tier host waking from zero
+ * instances.
+ *
+ * Rendering immediately is safe: if the user turns out to be signed in, the
+ * redirect below fires a moment later. Worst case someone sees the landing
+ * page for a few hundred milliseconds before being sent to their dashboard,
+ * which is a far better failure than the reverse.
+ */
 export function RequireAnonymous() {
   const { status } = useAuth()
-
-  if (status === 'loading') return <Waiting />
 
   if (status === 'authenticated') {
     return <Navigate to="/app/dashboard" replace />

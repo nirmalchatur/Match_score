@@ -185,7 +185,19 @@ async function attempt<T>(
       // The session cookie is HttpOnly, so it must be sent explicitly.
       credentials: 'include',
     })
-  } catch {
+  } catch (error) {
+    // A timeout is not a CORS rejection and must not be reported as one. The
+    // generic message below blames the server or the browser's preflight
+    // handling, which is actively misleading when the real cause is that *we*
+    // gave up waiting -- and it would send someone to debug CORS headers for a
+    // request that was simply cancelled on schedule.
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      throw new ApiError(
+        'The server did not respond in time. It may be starting up — please try again.',
+        0,
+      )
+    }
+
     // A failed fetch is genuinely ambiguous: the browser reports a CORS
     // rejection exactly like a dead network, because it refuses to hand the
     // response to the page at all. Saying only "cannot reach the API" sends
@@ -245,8 +257,18 @@ async function attempt<T>(
 export const api = {
   /* ---------- Auth ---------- */
 
-  me(): Promise<MeResponse> {
-    return request<MeResponse>('/auth/me/')
+  /**
+   * The current account, or an unauthenticated marker.
+   *
+   * `timeoutMs` bounds the wait. The bootstrap call passes one because this
+   * endpoint gates first paint, and an unbounded request against a host that
+   * is waking from zero instances leaves the user staring at a spinner for
+   * the best part of a minute with no way out. Omit it for the background
+   * reconciliations, where there is nothing to protect the user from.
+   */
+  me(timeoutMs?: number): Promise<MeResponse> {
+    const init: RequestInit = timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}
+    return request<MeResponse>('/auth/me/', init)
   },
 
   login(email: string, password: string): Promise<AuthResponse> {

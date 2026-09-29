@@ -42,12 +42,23 @@ const OPTIONS: {
   },
   {
     value: 'gemini',
-    title: 'Use the free Gemini AI Studio tier',
-    body: 'No setup and no cost for normal use. You paste your own free API key, which is stored encrypted and deleted when you sign out.',
+    title: 'Use the hosted Gemini tier',
+    body: 'Fast and no cost for normal use. Uses this app’s key if you have not added your own, which you can paste in Settings → AI.',
     points: [
-      'Create a key at aistudio.google.com/apikey',
-      'Paste it in Settings → AI',
+      'Add your own key at aistudio.google.com/apikey',
+      'Otherwise the app’s key is used',
       'AI_PROVIDER=gemini on the server',
+    ],
+    docs: 'Full instructions: docs/AI_SETUP.md in the repository',
+  },
+  {
+    value: 'groq',
+    title: 'Use Groq (fastest)',
+    body: 'The quickest hosted option — the same rewrite usually returns in seconds rather than a minute. Uses this app’s key if you have not added your own.',
+    points: [
+      'Add your own key at console.groq.com/keys',
+      'Otherwise the app’s key is used',
+      'AI_PROVIDER=groq on the server',
     ],
     docs: 'Full instructions: docs/AI_SETUP.md in the repository',
   },
@@ -86,9 +97,11 @@ export function OnboardingAiPage() {
     setError('')
     try {
       await api.updateProfile({ ai_setup: choice })
-      // A local model needs no key, so there is nothing left to collect. The
-      // hosted option sends the user to Settings to paste theirs.
-      navigate(choice === 'gemini' ? '/app/settings' : '/app/dashboard')
+      // A local model needs no key, so there is nothing left to collect. A
+      // hosted option may work immediately on the deployment's own key, so
+      // Settings is offered rather than forced -- the user can add their own
+      // there and skip it entirely.
+      navigate(choice === 'ollama' ? '/app/dashboard' : '/app/settings')
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : 'Could not save your choice.',

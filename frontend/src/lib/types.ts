@@ -112,8 +112,14 @@ export interface Toast {
  */
 export type CareerStage = 'student' | 'fresher' | 'professional'
 
-/** Which AI setup the candidate picked during onboarding. */
-export type AiSetup = 'ollama' | 'gemini'
+/**
+ * Which AI setup the candidate picked during onboarding.
+ *
+ * `ollama` runs a local model. `gemini` and `groq` are hosted; both work with
+ * no key of your own when the deployment has one configured, and use yours in
+ * preference to it when you have saved one.
+ */
+export type AiSetup = 'ollama' | 'gemini' | 'groq'
 
 export interface UserProfile {
   headline: string
@@ -273,6 +279,15 @@ export interface TailoringStatus {
    */
   user_key_configured?: boolean
   server_key_configured?: boolean
+  /**
+   * Whether the deployment itself holds a key for this provider.
+   *
+   * When true, tailoring works with no key of the user's own -- their stored
+   * key simply takes precedence when they have one. The UI uses this to say
+   * "using the app's key" instead of prompting someone for a key they do not
+   * need in order to get anything working.
+   */
+  deployment_key_configured?: boolean
 }
 
 

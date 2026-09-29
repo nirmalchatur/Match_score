@@ -165,7 +165,7 @@ class ProviderCredentialView(APIView):
 
     #: Matches ProviderCredentialSerializer.provider. Kept adjacent so adding a
     #: provider in one place is visible as a failure in the other.
-    PROVIDERS = ("gemini",)
+    PROVIDERS = ("gemini", "groq")
 
     def _lookup(self, request, provider):
         """The caller's own row, or None.

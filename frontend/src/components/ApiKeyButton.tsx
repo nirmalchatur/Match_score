@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
-import type { AiKeyStatus } from '../lib/types'
+import type { AiKeyStatus, TailoringStatus } from '../lib/types'
 import { IconKey, IconLock } from './Icons'
 
 /**
@@ -23,6 +23,7 @@ import { IconKey, IconLock } from './Icons'
  */
 export function ApiKeyButton() {
   const [status, setStatus] = useState<AiKeyStatus | null>(null)
+  const [providerStatus, setProviderStatus] = useState<TailoringStatus | null>(null)
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
@@ -40,12 +41,26 @@ export function ApiKeyButton() {
            simply stays in its "unconfigured" state rather than blocking the
            page with an error nobody can act on. */
       })
+    api
+      .tailoringStatus()
+      .then((result) => {
+        if (!cancelled) setProviderStatus(result)
+      })
+      .catch(() => {
+        /* Same reasoning. The deployment-key state is an enhancement to the
+           copy here, not something the control depends on. */
+      })
     return () => {
       cancelled = true
     }
   }, [])
 
   const configured = Boolean(status?.configured)
+  // The deployment can pay for calls on this user's behalf. Their own key
+  // still wins when they have one -- see apps.ai.selection.resolve_api_key --
+  // so this is not "we are ignoring your key", it is "you do not have to
+  // provide one to use this".
+  const appKeyAvailable = Boolean(providerStatus?.deployment_key_configured)
 
   const save = useCallback(async () => {
     const key = value.trim()
@@ -90,11 +105,13 @@ export function ApiKeyButton() {
         title={
           configured
             ? `API key saved (${status?.key_hint ?? 'hidden'})`
-            : 'Add your Gemini API key'
+            : appKeyAvailable
+              ? 'Using the app’s key — add your own to use yours instead'
+              : 'Add your Gemini API key'
         }
       >
         {configured ? <IconKey size={15} /> : <IconLock size={15} />}
-        {configured ? 'Key saved' : 'Add API key'}
+        {configured ? 'Key saved' : appKeyAvailable ? 'App key' : 'Add API key'}
       </button>
 
       {open ? (
@@ -108,8 +125,8 @@ export function ApiKeyButton() {
             {configured ? (
               <>
                 <p className="stat-hint key-note">
-                  A key is saved ({status?.key_hint}). Tailoring uses it instead of
-                  the deployment&apos;s.
+                  A key is saved ({status?.key_hint}). It is used instead of the
+                  app’s.
                 </p>
                 <div className="key-actions">
                   <button type="button" className="btn btn-sm" onClick={() => void remove()} disabled={busy}>
@@ -123,8 +140,9 @@ export function ApiKeyButton() {
             ) : (
               <>
                 <p className="stat-hint key-note">
-                  Get a free key from Google AI Studio, then paste it here. Tailoring
-                  needs a model, and this is how the hosted version gets one.
+                  Get a free key from Google AI Studio, then paste it here. Your key
+                  is used in preference to the app’s, so nothing you run is billed
+                  to the app owner.
                 </p>
                 <input
                   type="password"

@@ -23,7 +23,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
     #: serializer is the boundary the wire format is defined at.
     CAREER_STAGES = ("student", "fresher", "professional")
 
-    AI_SETUPS = ("ollama", "gemini")
+    #: Mirrors ``apps.ai.selection.SELECTABLE``. Kept as a literal rather than
+    #: imported so the API contract is readable at the boundary; the two are
+    #: asserted to agree in apps.ai's tests.
+    AI_SETUPS = ("ollama", "gemini", "groq")
 
     class Meta:
         model = UserProfile
@@ -178,9 +181,9 @@ class ProviderCredentialSerializer(serializers.Serializer):
     """
 
     #: Restricted to a known set so this endpoint cannot be used to stash
-    #: arbitrary blobs against a user.
+    #: arbitrary blobs against a user. Mirrors ProviderCredentialView.PROVIDERS.
     provider = serializers.ChoiceField(
-        choices=["gemini"],
+        choices=["gemini", "groq"],
         default="gemini",
     )
 

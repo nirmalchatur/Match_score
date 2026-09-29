@@ -32,6 +32,16 @@
   color: var(--text-dim);
 }
 
+/* Explains *why* the screen is blank when the backend is slow, so a cold
+   Render instance reads as "starting" rather than "broken". */
+.boot-hint {
+  max-width: 34ch;
+  font-size: 12.5px;
+  line-height: 1.55;
+  text-align: center;
+  color: var(--text-dim);
+}
+
 /* ---------- Auth split (42% panel, matches the design) ---------- */
 .auth-shell {
   position: relative;

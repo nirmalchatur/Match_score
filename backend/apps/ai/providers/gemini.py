@@ -14,13 +14,13 @@ Configuration (environment only; nothing is hardcoded):
     AI_PROVIDER=gemini
     GEMINI_MODEL=gemini-3.8-flash # optional, this is the default
     GEMINI_TIMEOUT=120            # optional
+    GEMINI_API_KEY=...            # optional deployment fallback
 
-There is deliberately **no** ``GEMINI_API_KEY``. This provider is
-bring-your-own-key only: the user's key is stored encrypted in
-``apps.users.models.ProviderCredential``, decrypted by the tailoring view, and
-attached to the request for the duration of one call. A deployment therefore
-never spends the owner's quota on anyone else's behalf, and a leaked server
-secret cannot be used to call Gemini.
+Key resolution lives in :func:`apps.ai.selection.resolve_api_key`: the user's
+own stored key wins, and the deployment's ``GEMINI_API_KEY`` is used only when
+the user has none. That indirection is why this provider takes a plain string
+on the request and never reads an environment variable itself -- the choice of
+source belongs to one module, not to each provider.
 """
 
 from __future__ import annotations
@@ -83,11 +83,10 @@ class GeminiProvider(AIProvider):
         timeout: int | None = None,
         temperature: float | None = None,
     ):
-        # No api_key parameter and no server-wide key. This provider is
-        # bring-your-own-key only: the credential arrives on the request, from
-        # the user who typed it into the UI. There is deliberately no fallback
-        # to an environment variable, so a deployment can never end up quietly
-        # spending the owner's quota on someone else's behalf.
+        # No api_key parameter and no environment read. The credential arrives
+        # already resolved on the request, from the user who typed it into the
+        # UI or from the deployment fallback -- decide that in
+        # apps.ai.selection, not here, so every provider agrees on precedence.
         self.model = (
             model or getattr(settings, "GEMINI_MODEL", "") or DEFAULT_MODEL
         ).strip()
@@ -99,11 +98,12 @@ class GeminiProvider(AIProvider):
         )
 
     def _key_for(self, request) -> str:
-        """The user's own key, carried on the request.
+        """
+        The key resolved for this call, carried on the request.
 
-        This is the whole bring-your-own-key mechanism: the credential rides on
-        the request, is used for that one call, and is never written to a log
-        or included in an error detail.
+        Whichever source it came from -- the user's own stored credential or
+        the deployment's env fallback -- it is used for exactly one call, never
+        written to a log, and never included in an error detail.
         """
         return (getattr(request, "api_key", "") or "").strip()
 
@@ -170,10 +170,13 @@ class GeminiProvider(AIProvider):
     def tailor_resume(self, request) -> str:
         key = self._key_for(request)
         if not key:
+            # Reached only when neither the user nor the deployment has a key,
+            # because resolve_api_key() would otherwise have supplied one. The
+            # message therefore points only at the user-facing action.
             raise AIProviderUnavailableError(
                 "No Google AI Studio API key. Add one in Settings to use "
                 "tailoring.",
-                detail="the request carried no user api_key",
+                detail="no user credential and no GEMINI_API_KEY on the server",
             )
 
         body = {
@@ -278,14 +281,19 @@ class GeminiProvider(AIProvider):
         return self._extract_content(response)
 
     def health(self) -> tuple[bool, str]:
-        """Report whether a deployment-level key is configured.
-
-        With bring-your-own-key there is no server key, so this is normally
-        ``False`` and the message points at the user's own Settings entry
-        rather than at a server variable. ``/tailor/status/`` reports
-        availability per signed-in user, not globally, so the wording matters
-        more than the boolean.
         """
+        Report whether a key is available from *some* source.
+
+        True when the deployment set ``GEMINI_API_KEY``, because in that case
+        tailoring genuinely works for every user. ``/tailor/status/`` reports
+        availability per signed-in user and does not consult this for the
+        button's state, but Settings does, and returning a hard False here
+        would tell an operator their working deployment was broken.
+        """
+        from apps.ai.selection import has_deployment_key
+
+        if has_deployment_key(self.name):
+            return True, "A deployment-level Google AI Studio key is configured."
         return False, (
             "Add your own Google AI Studio API key in Settings to enable "
             "tailoring."
@@ -293,11 +301,16 @@ class GeminiProvider(AIProvider):
 
     def describe(self) -> dict:
         """Non-secret metadata. Never includes a key, or any part of one."""
+        from apps.ai.selection import has_deployment_key
+
+        configured = has_deployment_key(self.name)
         return {
             "provider": self.name,
             "display_name": self.display_name,
             "model": self.model,
-            # Always False: this provider has no server-side key by design.
-            "server_key_configured": False,
-            "requires_user_key": True,
+            # Whether the deployment can pay on a user's behalf. The UI uses
+            # this to say "using the app's key" instead of asking for one the
+            # user does not actually need to supply.
+            "server_key_configured": configured,
+            "requires_user_key": not configured,
         }
