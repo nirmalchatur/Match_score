@@ -428,11 +428,15 @@ body::before {
 }
 
 /* ---------- Brand mark ----------
-   Raised like a physical badge rather than a flat dark square. */
+   The document mark is a stroked outline, so it needs a *light* tile. The old
+   neumorphic rule forced the accent fill here for the filled bolt, which made
+   the new glyph invisible: a 1.6px stroke on near-black. The raise is kept,
+   the fill is not. */
 .brand-mark,
 .boot-mark {
-  background: var(--accent);
-  box-shadow: var(--neu-raised-sm);
+  background: var(--brand-accent-soft);
+  color: var(--brand-accent);
+  box-shadow: var(--neu-raised-sm), inset 0 0 0 1px var(--brand-accent-line);
 }
 
 /* ---------- Boot screen ----------

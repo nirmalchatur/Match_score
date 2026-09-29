@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from functools import lru_cache
 from typing import Iterable
 
@@ -48,7 +49,15 @@ DEFAULT_SKILL_CATALOG: tuple[str, ...] = (
     "Java",
     "JavaScript",
     "TypeScript",
+    "Go",
+    "Rust",
+    "PHP",
+    "Ruby",
+    "Kotlin",
+    "Swift",
+    "C",
     "C++",
+    "C#",
     "HTML",
     "CSS",
     "SQL",
@@ -169,13 +178,40 @@ def get_aliases() -> dict[str, str]:
     return get_catalog()[1]
 
 
+#: Substrings that are never a standalone mention of the skill.
+#:
+#: Without this, "Git" is found inside "GitHub", "C" inside "C++", and "Java"
+#: inside "JavaScript" -- so a resume listing only "GitHub" reported a "Git"
+#: skill it never claimed, and a "JavaScript" resume scored as knowing "Java".
+#: Both are wrong in the direction that flatters the candidate, which is the
+#: worst direction for a matching tool to be wrong in.
+_SUBSTRING_TRAPS: dict[str, tuple[str, ...]] = {
+    "git": ("github", "gitlab", "bitbucket"),
+    "java": ("javascript", "typescript"),
+    "c": ("c++", "c#", "css", "ci/cd"),
+    # "Go" is a two-letter English word, so it collides constantly. Without
+    # these it matches "going", "Google", "Django", "algorithm" and "good" --
+    # which put a phantom language skill on almost every resume.
+    "go": ("google", "django", "mongo", "algorithm", "algo", "good", "going",
+           "goes", "gone", "category", "categor", "ago", "logo"),
+    "r": ("rust",),
+    "sql": ("mysql", "postgresql", "sqlite", "nosql", "plsql", "tsql"),
+}
+
+
 def extract_skills(text: str, skills: Iterable[str] | None = None) -> list[str]:
     """
     Return every catalog skill mentioned in ``text``.
 
-    Matching is case-insensitive substring matching, mirroring the historical
-    behaviour of the profilers. Pass ``skills`` to restrict the vocabulary;
-    by default the full catalog is used.
+    Matching is **word-boundary aware**, not plain substring. That is the single
+    change that makes the difference between a useful skill list and a
+    confidently wrong one: plain ``"git" in text`` reports "Git" for every
+    resume that says "GitHub", and "Java" for every JavaScript developer.
+
+    The trailing boundary also excludes ``+`` and ``#``, which is what stops
+    "C" matching inside "C++" while still letting "C++" match on its own.
+
+    Pass ``skills`` to restrict the vocabulary; by default the full catalog.
     """
     if not text:
         return []
@@ -183,10 +219,61 @@ def extract_skills(text: str, skills: Iterable[str] | None = None) -> list[str]:
     haystack = str(text).lower()
     vocabulary = tuple(skills) if skills is not None else get_skills()
 
-    # Longest first, so "REST API" wins over a hypothetical shorter prefix.
+    # Longest first, so "REST API" wins over a hypothetical shorter prefix and
+    # a match on the longer phrase is not also reported as its parts.
     ordered = sorted(vocabulary, key=len, reverse=True)
 
-    return [skill for skill in ordered if skill.lower() in haystack]
+    found: list[str] = []
+
+    for skill in ordered:
+        needle = skill.lower()
+
+        pattern = re.compile(
+            r"(?<![A-Za-z0-9+#])" + re.escape(needle) + r"(?![A-Za-z0-9+#])"
+        )
+        if not pattern.search(haystack):
+            continue
+
+        # A skill is only suppressed when *every* occurrence in the text sits
+        # inside a longer catalog word. One standalone mention anywhere is
+        # enough to count, so a document that says both "GitHub Actions" and
+        # "Git" honestly reports both.
+        if _all_occurrences_are_trapped(needle, haystack, pattern):
+            continue
+
+        found.append(skill)
+
+    return found
+
+
+def _all_occurrences_are_trapped(
+    needle: str, haystack: str, pattern: "re.Pattern[str]"
+) -> bool:
+    """True when every standalone-shaped match is really part of a longer word.
+
+    Needed because the boundary regex above already rejects "Git" inside
+    "GitHub" (the trailing ``b`` is a word character). This exists for the
+    reverse case: catalog entries that genuinely *are* prefixes of each other
+    with a legal trailing boundary, such as "REST" and "REST API", where the
+    shorter one would otherwise double-count the longer phrase.
+    """
+    traps = _SUBSTRING_TRAPS.get(needle)
+    if not traps:
+        return False
+
+    for match in pattern.finditer(haystack):
+        start = match.start()
+        for trap in traps:
+            trap_start = start - len(trap)
+            if trap_start < 0:
+                continue
+            if haystack[trap_start:start] != trap:
+                continue
+            # The trap word is immediately before this match, so this mention
+            # is the tail of a longer skill rather than a use of its own.
+            return True
+
+    return False
 
 
 def reset_cache() -> None:

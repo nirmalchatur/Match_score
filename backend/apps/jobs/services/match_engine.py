@@ -1,5 +1,7 @@
 import re
 
+from apps.resumes.services import skill_catalog
+
 
 class MatchEngine:
 
@@ -233,12 +235,15 @@ class MatchEngine:
                 "unmatched": [],
             }
 
-        resume_skills = set(
-            resume_profile.get(
-                "skills",
-                [],
-            )
-        )
+        # Lower-cased because the skill-anchored requirement check below compares
+        # catalog entries ("python") against these, and the profile may carry
+        # either case. Comparing raw would silently report every named skill as
+        # missing when the resume happened to capitalise it.
+        resume_skills = {
+            str(skill).strip().lower()
+            for skill in resume_profile.get("skills", [])
+            if str(skill).strip()
+        }
 
         jd_skills = set(
             jd_profile.get(
@@ -378,6 +383,39 @@ class MatchEngine:
                 if isinstance(value, str)
             ).lower()
 
+            # A requirement that names catalog skills is scored on those skills
+            # and nothing else. Without this branch the engine fell back to
+            # "what fraction of the words in this sentence appear anywhere in
+            # the resume", which handed out credit for filler: "Comfort reading
+            # simple operational data (hours, targets, loss reasons)" scored a
+            # partial match on the words "comfort", "reading", "simple" and
+            # "reasons" being present somewhere, and the panel then displayed
+            # that whole sentence as if it were a skill the candidate lacked.
+            #
+            # A skill named in the requirement but absent from the resume is a
+            # real, actionable signal; the surrounding prose is not.
+            named_skills = skill_catalog.extract_skills(requirement_lower)
+
+            if named_skills:
+                hit = sum(1 for s in named_skills if s.lower() in resume_skills)
+
+                if hit == len(named_skills):
+                    credit = 1.0
+                elif hit:
+                    credit = 0.5
+                else:
+                    credit = 0.0
+
+                credits.append(credit)
+                if credit >= 1.0:
+                    matched.append(requirement)
+                elif credit > 0:
+                    partially_matched.append(requirement)
+                else:
+                    unmatched.append(requirement)
+                continue
+
+            # No catalog skill named: fall back to word overlap.
             words = [
                 word
                 for word in requirement_lower.split()

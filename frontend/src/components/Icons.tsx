@@ -23,20 +23,52 @@ function Svg({ size = 18, children, ...rest }: IconProps) {
 }
 
 /**
- * The TailorUp mark: a lightning bolt.
+ * The TailorUp mark: a resume sheet being fitted to a target.
  *
- * Replaces a four-pointed sparkle, which read as generic AI decoration and
- * had nothing to do with the product. A bolt says "fast, targeted, one hit" --
- * which is the actual claim: one resume, one job, sharpened for that posting.
+ * The previous mark was a lightning bolt. It was replaced once already (a
+ * four-pointed sparkle before it) and it was still the wrong idea: a bolt is
+ * the universal "AI/fast" glyph, so it said nothing about this product and
+ * competed with every other AI tool's favicon in a tab bar.
  *
- * Drawn as a filled path rather than a stroked outline because the two
- * diagonal strokes overlap; a stroke would show the seam at 16px. The tail is
- * squared off rather than tapered so the silhouette stays readable when the
- * mark is rendered as small as a favicon.
+ * What this actually needs to say is "your document, made to fit this role".
+ * So the mark is two parts:
+ *
+ *   - a document, the thing the user owns and uploads
+ *   - a fitted corner, the tailoring: the sheet is cut to the shape of a
+ *     posting, which is literally what the product does
+ *
+ * The cut corner is the only place a diagonal appears, which is what stops it
+ * reading as generic stationery. Everything else is a straight rule, so at
+ * 16px the silhouette is still a document and the detail reads as texture
+ * rather than as noise.
+ *
+ * Drawn stroked rather than filled, unlike the bolt: the mark is now made of
+ * separate parts that must not merge, and a filled path would weld the corner
+ * cut to the text rules at small sizes.
  */
 export const IconLogo = (p: IconProps) => (
-  <Svg {...p} strokeWidth={1.5} fill="currentColor" stroke="none">
-    <path d="M13.6 2 4.8 13.2h5.1L8.9 22 19.2 10.4h-5.4L15.1 2z" />
+  <Svg {...p} strokeWidth={1.6}>
+    {/* Document outline, with the top-right corner cut away. */}
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z" />
+    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+    {/* The two text rules, shortened to stop short of the fitted corner. */}
+    <path d="M8.5 12.5h7" />
+    <path d="M8.5 16h5" />
+  </Svg>
+)
+
+/**
+ * A matching "job posting" sheet, used beside the logo where the pairing is
+ * the point -- the tailoring view's before/after header. The asymmetric rule
+ * lengths mirror IconLogo so the two read as a set rather than as one icon
+ * twice.
+ */
+export const IconLogoTarget = (p: IconProps) => (
+  <Svg {...p} strokeWidth={1.6}>
+    <path d="M6 3h4l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+    <path d="M10 3v4a1 1 0 0 0 1 1h4" />
+    <path d="M7.5 13.5h4" />
+    <path d="M7.5 17h6" />
   </Svg>
 )
 
@@ -101,69 +133,78 @@ export const IconCheck = (p: IconProps) => (
 )
 
 /**
- * The TailorUp brand mark: an impossible tribar.
+ * The TailorUp brand mark: a resume sheet being cut to fit a posting.
  *
- * "Elusion" taken literally. A Penrose tribar cannot be built in flat space --
- * each joint is locally plausible, the whole is impossible, and the eye keeps
- * re-resolving which bar is in front. That is the product in one shape: a
- * resume presented as a whole that cannot be simultaneously true for every
- * posting. You are not being lied to; you are being shown a genuine
- * rearrangement.
+ * This replaces an impossible tribar, which was a genuinely interesting idea
+ * and the wrong mark. A Penrose tribar says "clever puzzle", which is a
+ * statement about the logo rather than about the product, and it is a shape
+ * several dozen brands already use. It also rendered as a dense dark shape
+ * with a small white inlay, so at sidebar size it read as a smudge rather than
+ * as a document.
  *
- * Drawn as three separate quads rather than one path, because the illusion
- * depends on each bar having its own consistent near/far tone. A single
- * continuous path flattens into an ordinary triangle and the effect is lost --
- * which is, in the end, exactly the point.
+ * What the product does is narrower and much more legible: one document, cut
+ * so it fits one role. That is drawn literally here --
  *
- * Deliberately not stroked. Outlines would add a visible seam at the joints
- * where the illusion is doing its work.
+ *   - the sheet outline, with a corner cut away (the "tailoring")
+ *   - two text rules, the resume's own content
+ *   - a dashed incoming edge on the right, the posting it is being fitted to
+ *
+ * The cut corner is the only diagonal, so the silhouette stays a document at
+ * 16px. Drawn stroked, not filled, because the parts must stay separate: a
+ * filled path welds them together and the mark becomes a blob.
+ *
+ * Rendered on a 64 grid with generous padding rather than 24, so the strokes
+ * land on whole pixels at the sizes it is actually used at (22px sidebar,
+ * 26px boot, favicon).
  */
 export const BrandMark = ({
   size = 28,
   className,
   ...rest
-}: SVGProps<SVGSVGElement> & { size?: number }) => {
-  const id = 'tailorup-tribar'
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 64 64"
-      fill="none"
-      className={className}
-      role="img"
-      aria-label="TailorUp"
-      {...rest}
-    >
-      <defs>
-        {/* One gradient across the whole mark, so the three bars read as a
-            single object seen from an impossible angle rather than three
-            unrelated shapes. */}
-        <linearGradient id={id} x1="8" y1="6" x2="56" y2="58">
-          <stop offset="0%" stopColor="var(--brand-accent, #245F73)" />
-          <stop offset="55%" stopColor="var(--brand-accent, #245F73)" />
-          <stop offset="100%" stopColor="var(--brand-warm, #733E24)" />
-        </linearGradient>
-      </defs>
-
-      {/* Three bars of a tribar. Each is a parallelogram-ish quad whose depth
-          ordering contradicts its neighbour: top-right reads as nearest, the
-          bottom bar as farthest. No consistent assignment exists. */}
-      <path d="M32 6 58 44 48 50 22 12z" fill={`url(#${id})`} />
-      <path d="M58 44 32 62 6 24 16 18z" fill={`url(#${id})`} opacity="0.82" />
-      <path d="M6 24 22 12 48 50 32 62z" fill={`url(#${id})`} opacity="0.64" />
-
-      {/* The single bright inlay that names the product: a needle drawing a
-          seam. It reads as lying on top of the mark, which is the one depth
-          cue the eye can actually resolve. */}
-      <path
-        d="M31 20.5 36.5 29 33.4 29 30.2 24.6 27.2 28.2 24.6 24.6z"
-        fill="var(--paper, #fff)"
-        opacity="0.92"
-      />
-    </svg>
-  )
-}
+}: SVGProps<SVGSVGElement> & { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 64 64"
+    fill="none"
+    className={className}
+    role="img"
+    aria-label="TailorUp"
+    {...rest}
+  >
+    {/* The sheet, top-right corner cut. */}
+    <path
+      d="M14 10h24l14 14v30a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2z"
+      stroke="var(--brand-accent, #245F73)"
+      strokeWidth="3.5"
+      strokeLinejoin="round"
+    />
+    {/* The fold that shows the corner was cut. */}
+    <path
+      d="M38 10v11a3 3 0 0 0 3 3h11"
+      stroke="var(--brand-accent, #245F73)"
+      strokeWidth="3.5"
+      strokeLinejoin="round"
+    />
+    {/* The resume's own lines, stopping short of the cut corner. */}
+    <path
+      d="M20 32h24M20 41h15"
+      stroke="var(--brand-accent, #245F73)"
+      strokeWidth="3.5"
+      strokeLinecap="round"
+    />
+    {/* The posting it is fitted to: a dashed edge, deliberately lighter, so the
+        two documents read as a pair without competing. */}
+    <path
+      d="M56 22v28"
+      stroke="var(--brand-warm, #733E24)"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeDasharray="1 7"
+      opacity="0.75"
+    />
+  </svg>
+)
 
 export default BrandMark
 
