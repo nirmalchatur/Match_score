@@ -3441,3 +3441,129 @@ textarea {
   background: var(--ok-surface);
   border-color: var(--ok-line);
 }
+
+/* ============================================================
+   Brand tile.
+
+   The mark on a rounded tile, so it is the same recognisable
+   object everywhere instead of a bare glyph that only reads
+   once the wordmark beside it has resolved.
+   ============================================================ */
+
+.brand-tile {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 22%;
+  transition: transform var(--t-fast) var(--ease);
+}
+
+.brand-tile-light {
+  background: var(--brand-accent);
+  color: var(--paper);
+}
+
+.brand-tile-dark {
+  background: var(--paper);
+  color: var(--brand-accent);
+}
+
+a:hover .brand-tile-light,
+a:hover .brand-tile-dark {
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+   Help panel, document styling.
+
+   The panel reads as a rendered Markdown file rather than a
+   settings dialog: a file-tab header, a numbered section
+   index down the left, and body copy set at a comfortable
+   measure. The numbers are the part that earns the layout --
+   they give the reader a sense of position and length, which
+   a list of bare tab labels does not.
+   ============================================================ */
+
+.help-panel {
+  background: var(--bg-elevated);
+}
+
+.help-head {
+  /* The tab sits flush against the top border, which is what makes it read as
+     a file tab and not as a title. */
+  border-radius: 12px 12px 0 0;
+  background: var(--surface-2);
+}
+
+.help-file {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.help-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.help-preview-tag {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+}
+
+.help-tab {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.help-tab-num {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.help-tab.active .help-tab-num {
+  color: var(--brand-accent);
+}
+
+.help-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-bottom: 4px;
+}
+
+.help-heading-num {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--brand-accent);
+  letter-spacing: 0.04em;
+}
+
+/* Body copy gets a hard measure. Prose set edge to edge across an 860px panel
+   is measurably harder to read, and the left edge of the text no longer lines
+   up with the content above it. */
+.help-content {
+  max-width: 62ch;
+}
+
+.help-content p,
+.help-content li {
+  line-height: 1.65;
+  color: var(--text-muted);
+}

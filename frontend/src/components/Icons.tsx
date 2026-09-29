@@ -96,6 +96,54 @@ export const IconLogoTarget = (p: IconProps) => (
   </Svg>
 )
 
+/**
+ * The mark on its rounded tile.
+ *
+ * The bare `IconLogo` is a stroked glyph that inherits `currentColor`, which is
+ * right inside a text run but wrong as a standalone brand object: at 17px in a
+ * sidebar it disappears into whatever it sits next to, and there is no shape to
+ * recognise before the wordmark resolves.
+ *
+ * This wraps it in the tile treatment used across the marketing pages and the
+ * footer, so the same mark is the same object everywhere it appears. The tile
+ * is sized by the same `size` prop as the glyph and the glyph is inset, so a
+ * caller does not have to know the ratio.
+ *
+ * The `tone` prop exists for one reason: on the dark marketing sections the
+ * brand tile has to invert with them, and a fixed dark tile on a dark
+ * background reads as a hole.
+ */
+export function BrandTile({
+  size = 40,
+  tone = 'light',
+  className,
+}: {
+  size?: number
+  tone?: 'light' | 'dark'
+  className?: string
+}) {
+  // The glyph is inset to roughly 62% of the tile, which leaves the padding the
+  // marketing pages already use by hand. BrandMark draws on a 64 grid, so it is
+  // the right primitive to wrap rather than the 24-grid IconLogo.
+  const glyph = Math.round(size * 0.62)
+
+  return (
+    <span
+      className={[
+        'brand-tile',
+        tone === 'dark' ? 'brand-tile-dark' : 'brand-tile-light',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+    >
+      <BrandMark size={glyph} />
+    </span>
+  )
+}
+
 export const IconDashboard = (p: IconProps) => (
   <Svg {...p}>
     <rect x="3" y="3" width="7" height="9" rx="1.5" />
@@ -180,6 +228,14 @@ export const IconCheck = (p: IconProps) => (
  * Rendered on a 64 grid with generous padding rather than 24, so the strokes
  * land on whole pixels at the sizes it is actually used at (22px sidebar,
  * 26px boot, favicon).
+ *
+ * The geometry below is the same sheet-plus-crosshair as `IconLogo`, lifted to
+ * a 64-unit grid. The previous version of this component still drew the old
+ * cut-corner document with a dashed edge, which is why the sidebar, the 404 and
+ * the thank-you page were showing a different mark from the one on the
+ * marketing pages and the favicon: the rebrand updated `IconLogo` and left this
+ * one behind. The stroke width is scaled to the 64 grid so it reads at the
+ * same weight as the 24-grid glyph.
  */
 export const BrandMark = ({
   size = 28,
@@ -196,36 +252,36 @@ export const BrandMark = ({
     aria-label="TailorUp"
     {...rest}
   >
-    {/* The sheet, top-right corner cut. */}
-    <path
-      d="M14 10h24l14 14v30a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2z"
+    {/* The resume sheet, as a rect. */}
+    <rect
+      x="7.5"
+      y="12.5"
+      width="32"
+      height="39"
+      rx="4"
       stroke="var(--brand-accent, #245F73)"
-      strokeWidth="3.5"
-      strokeLinejoin="round"
+      strokeWidth="4.5"
     />
-    {/* The fold that shows the corner was cut. */}
+    {/* The three rules, decreasing in width. */}
     <path
-      d="M38 10v11a3 3 0 0 0 3 3h11"
+      d="M15 25h16M15 36h16M15 47h9.5"
       stroke="var(--brand-accent, #245F73)"
-      strokeWidth="3.5"
-      strokeLinejoin="round"
-    />
-    {/* The resume's own lines, stopping short of the cut corner. */}
-    <path
-      d="M20 32h24M20 41h15"
-      stroke="var(--brand-accent, #245F73)"
-      strokeWidth="3.5"
+      strokeWidth="4.5"
       strokeLinecap="round"
     />
-    {/* The posting it is fitted to: a dashed edge, deliberately lighter, so the
-        two documents read as a pair without competing. */}
+    {/* The crosshair, centred on the sheet's right edge. */}
+    <circle
+      cx="48"
+      cy="32"
+      r="9"
+      stroke="var(--brand-accent, #245F73)"
+      strokeWidth="4.5"
+    />
     <path
-      d="M56 22v28"
-      stroke="var(--brand-warm, #733E24)"
-      strokeWidth="3"
+      d="M48 16v7M48 41v7"
+      stroke="var(--brand-accent, #245F73)"
+      strokeWidth="4.5"
       strokeLinecap="round"
-      strokeDasharray="1 7"
-      opacity="0.75"
     />
   </svg>
 )
