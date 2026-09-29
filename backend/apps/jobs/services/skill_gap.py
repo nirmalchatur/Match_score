@@ -93,19 +93,28 @@ def analyze_skill_gap(job) -> dict:
 
     partial = set(_skills_in(requirements.get("partially_matched")))
 
-    # Disjointness, with an order of precedence that matters.
+    # Disjointness, and it is a *reassignment*, not a plain subtraction.
     #
-    # A skill can be named by a half-matched requirement *and* be absent from
-    # the resume entirely -- "Strong Python and Kubernetes experience" against
-    # a Python-only resume puts "kubernetes" in both. Subtracting partial from
-    # missing (as a first attempt did) dropped it from every column, so a
-    # genuine partial match silently vanished from the panel.
+    # A skill can be named by a half-matched requirement and also be reported
+    # as missing by the skill pass. "Strong Python and Kubernetes experience"
+    # against a Python-only resume is exactly that: Python matches, Kubernetes
+    # does not, so the sentence earns partial credit AND Kubernetes appears in
+    # `missing`.
     #
-    # "Missing" is the stronger fact: the resume does not mention the skill at
-    # all, which is exactly what the panel exists to report. So partial yields
-    # to it. Partial only yields to "matched", where the resume demonstrably has
-    # the skill and the partial credit came from the sentence around it.
+    # Two earlier versions of this were both wrong:
+    #
+    #   - subtracting only `matched` left the skill in `partial` and `missing`
+    #     at once, which reads as the tool contradicting itself in one row;
+    #   - giving `missing` priority by *removing* the overlap deleted the
+    #     partial entirely, so a genuine half-matched signal vanished.
+    #
+    # The resolution is that a partial naming a missing skill is *redundant*
+    # rather than wrong: `missing` is the headline fact and already shows it,
+    # so the skill is not repeated under `partial`. Nothing is lost -- the
+    # panel still reports it, once -- and only `matched` is removed outright,
+    # because a skill the resume demonstrably has is never a gap.
     partial -= matched
+    partial -= missing
 
     matched, partial, missing = sorted(matched), sorted(partial), sorted(missing)
 
