@@ -441,3 +441,39 @@ export interface DashboardStats {
     job: { id: number; title: string; company: string; location: string; match_score: number | null }
   }>
 }
+
+/**
+ * One in-app notification.
+ *
+ * `kind` is a closed set matching the backend's `KIND_CHOICES`; the UI maps it
+ * to an icon and a tone, so an unrecognised value would render unstyled rather
+ * than fall back to a default. `link` is an in-app path, never a full URL.
+ */
+export type NotificationKind = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
+
+export interface Notification {
+  id: number
+  kind: NotificationKind
+  title: string
+  body: string
+  link: string
+  is_read: boolean
+  created_at: string
+  read_at: string | null
+}
+
+export interface NotificationListResponse {
+  results: Notification[]
+  /**
+   * Total unread, not the length of `results`. The list is capped server-side,
+   * so a large backlog and this number diverge by design.
+   */
+  unread_count: number
+}
+
+export interface NotificationPreferences {
+  job_updates: boolean
+  job_matches: boolean
+  application_updates: boolean
+}
+

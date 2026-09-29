@@ -18,6 +18,9 @@ import type {
   ApplicationStatus,
   ApplicationSummary,
   DashboardStats,
+  Notification,
+  NotificationListResponse,
+  NotificationPreferences,
 } from './types'
 
 /**
@@ -295,6 +298,50 @@ export const api = {
 
   updateProfile(patch: Partial<UserProfile>): Promise<UserProfile> {
     return request<UserProfile>('/auth/profile/', {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    })
+  },
+
+  /* ---------- Notifications ---------- */
+
+  /**
+   * This account's notifications and the unread count.
+   *
+   * `unread` is passed by the bell's popover so opening it does not require
+   * scrolling past a long read history; the count comes back either way
+   * because the badge needs the total, not the filtered length.
+   */
+  listNotifications(unreadOnly = false): Promise<NotificationListResponse> {
+    const suffix = unreadOnly ? '?unread=true' : ''
+    return request<NotificationListResponse>(`/notifications/${suffix}`)
+  },
+
+  /** Mark one read. Resolves to the updated row so the caller can drop the dot. */
+  markNotificationRead(id: number): Promise<Notification> {
+    return request<Notification>(`/notifications/${id}/read/`, { method: 'POST' })
+  },
+
+  /**
+   * Mark everything read.
+   *
+   * Returns the number the server changed rather than assuming the count it
+   * sent was accurate: the two tabs case, or a poll that landed mid-request,
+   * means the local list and the server can legitimately disagree.
+   */
+  markAllNotificationsRead(): Promise<{ updated: number }> {
+    return request<{ updated: number }>('/notifications/read-all/', { method: 'POST' })
+  },
+
+  /** Which notifications this account has opted into. */
+  getNotificationPreferences(): Promise<NotificationPreferences> {
+    return request<NotificationPreferences>('/notifications/preferences/')
+  },
+
+  updateNotificationPreferences(
+    patch: Partial<NotificationPreferences>,
+  ): Promise<NotificationPreferences> {
+    return request<NotificationPreferences>('/notifications/preferences/', {
       method: 'PATCH',
       body: JSON.stringify(patch),
     })

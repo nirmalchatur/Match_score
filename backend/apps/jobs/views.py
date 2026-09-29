@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.automation.tasks import job_analysed
 from apps.jobs.services import ats_registry
 from apps.jobs.services.job_collector import JobCollector
 from apps.jobs.services.job_processor import JobProcessor
@@ -83,6 +84,11 @@ class JobAnalyzeView(APIView):
                 {"name": "Match score calculated", "status": "complete"},
             ]
             job.save(update_fields=["status", "error_message", "pipeline_steps", "match_score", "match_result", "decision"])
+
+            # Tell the user the analysis landed. Emitted only on the completed
+            # branch, and keyed on (id, status) so a re-analysis is a new event
+            # while a repeated observation of the same one is not.
+            job_analysed(request.user, job)
 
             return Response(
                 {

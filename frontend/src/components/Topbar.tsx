@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { initials } from '../lib/format'
-import { IconBell, IconSearch } from './Icons'
+import NotificationBell from './NotificationBell'
+import { IconSearch } from './Icons'
 import ThemeToggle from './ThemeToggle'
 
 export function Topbar({
@@ -10,6 +11,7 @@ export function Topbar({
   onSearchChange,
   avatarLabel,
   actions,
+  onNavigate,
 }: {
   title?: string
   search?: string
@@ -17,6 +19,7 @@ export function Topbar({
   onSearchChange?: (value: string) => void
   avatarLabel?: string
   actions?: ReactNode
+  onNavigate?: (path: string) => void
 }) {
   return (
     <header className="topbar">
@@ -38,9 +41,7 @@ export function Topbar({
       <div className="topbar-actions">
         {actions}
         <ThemeToggle />
-        <span className="bell" role="img" aria-label="Notifications">
-          <IconBell size={18} />
-        </span>
+        <NotificationBell onNavigate={onNavigate} />
         <span className="topbar-avatar" aria-hidden="true">
           {initials(avatarLabel || '')}
         </span>
