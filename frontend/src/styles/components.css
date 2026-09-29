@@ -3282,3 +3282,162 @@ textarea {
   font-size: 11px;
   color: var(--text-dim);
 }
+
+/* ============================================================
+   Security panel.
+
+   Same token set as the rest of the shell. The "this device"
+   badge is a filled pill while other rows are plain, so the
+   distinction survives the monochrome palette and does not
+   depend on reading the label.
+   ============================================================ */
+
+.sec {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sec-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sec-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sec-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sec-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.sec-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  flex-wrap: wrap;
+}
+
+.sec-item + .sec-item {
+  border-top: 1px solid var(--border-soft);
+}
+
+.sec-item-current {
+  background: var(--accent-faint);
+}
+
+.sec-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.sec-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: var(--r-pill);
+  background: var(--accent-12);
+  border: 1px solid var(--accent-20);
+  color: var(--text);
+}
+
+.sec-item-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.sec-muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.sec-form {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.sec-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 180px;
+}
+
+.sec-field label {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.sec-field input {
+  padding: 9px 10px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--r-sm);
+  background: var(--input-bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.sec-field input:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: -1px;
+}
+
+.sec-error,
+.sec-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  border: 1px solid;
+}
+
+.sec-error {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+
+.sec-notice {
+  color: var(--ok-fg);
+  background: var(--ok-surface);
+  border-color: var(--ok-line);
+}

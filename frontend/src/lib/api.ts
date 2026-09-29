@@ -22,6 +22,7 @@ import type {
   NotificationListResponse,
   NotificationPreferences,
   JobSearchResponse,
+  SecurityOverview,
 } from './types'
 
 /**
@@ -325,6 +326,43 @@ export const api = {
 
     const suffix = query.toString() ? `?${query.toString()}` : ''
     return request<JobSearchResponse>(`/jobs/search/${suffix}`)
+  },
+
+  /* ---------- Security ---------- */
+
+  /** Live sessions and recent security events for the signed-in account. */
+  getSecurityOverview(): Promise<SecurityOverview> {
+    return request<SecurityOverview>('/auth/security/')
+  },
+
+  /**
+   * Sign out every session except this one.
+   *
+   * Named for what it does rather than "revoke all": the caller stays signed in
+   * on the tab that pressed the button, which is the behaviour that makes it
+   * safe to offer as a one-click remedy.
+   */
+  revokeOtherSessions(): Promise<{ revoked: number }> {
+    return request<{ revoked: number }>('/auth/security/revoke-others/', {
+      method: 'POST',
+    })
+  },
+
+  /**
+   * Change the password. Requires the current one, which is what stops a
+   * stolen session from becoming a permanent takeover.
+   */
+  changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>('/auth/security/password/', {
+      method: 'POST',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    })
   },
 
   /* ---------- Notifications ---------- */

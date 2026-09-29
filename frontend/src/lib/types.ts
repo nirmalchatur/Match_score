@@ -514,3 +514,34 @@ export interface JobSearchResponse {
   /** `no_skills` when the master resume has not been extracted yet. */
   reason: string
 }
+
+/* ---------- Security ---------- */
+
+/**
+ * Sessions and recent security events for the signed-in account.
+ *
+ * The current session is marked in the payload by the server, so the UI never
+ * has to guess which row is "this tab" -- a guess would be wrong on any machine
+ * with two tabs open, which is exactly the case the page exists to explain.
+ */
+export interface SecuritySession {
+  key: string
+  login_at: string | null
+  expires_at: string
+  user_agent: string
+  is_current: boolean
+}
+
+export interface SecurityEventRow {
+  id: number
+  event: string
+  label: string
+  user_agent: string
+  is_current_session: boolean
+  created_at: string
+}
+
+export interface SecurityOverview {
+  sessions: SecuritySession[]
+  events: SecurityEventRow[]
+}
