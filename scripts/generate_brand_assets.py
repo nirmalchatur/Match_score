@@ -5,10 +5,13 @@ Run from the repository root:  python scripts/generate_brand_assets.py
 
 Why a generator and not just committed binaries
 -----------------------------------------------
-The previous favicon was a purple gradient bolt -- a design-tool default, not
-TailorUp's mark, and the brand is teal (#245F73). Regenerating fixes that, but
-committing only the outputs means a colour change needs a drawing program. The
-sources live here as code instead, so it is a one-line edit and a re-run.
+The favicon outlived the mark it was drawn from. It shipped as a purple gradient
+bolt, then was regenerated as a teal bolt when the in-app IconLogo became a
+bolt, and the file outlived two subsequent mark changes as well. Committing only
+the outputs means a mark change needs a drawing program, and the raster set
+silently disagrees with the React component until someone notices. The sources
+live here as code instead, so a mark change is a one-line edit and a re-run, and
+the geometry below is the same numbers the component draws.
 
 Outputs, and why each exists
 ----------------------------
@@ -41,20 +44,37 @@ INK = (0x0A, 0x0A, 0x0A)
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "frontend" / "public"
 
-# The IconLogo bolt on its 24x24 viewBox, kept identical to the React
-# component's path so the favicon and the in-app mark cannot drift apart.
-BOLT_24 = [
-    (13.6, 2.0), (4.8, 13.2), (9.9, 13.2), (8.9, 22.0),
-    (19.2, 10.4), (13.8, 10.4), (15.1, 2.0),
-]
+# The IconLogo mark on its 24x24 viewBox, kept identical to the React
+# component so the favicon and the in-app mark cannot drift apart.
+#
+# This replaced a lightning bolt, which was itself the second mark in the
+# product's history (a four-pointed sparkle came before it). Both were generic
+# "AI product" glyphs. The current mark is a resume sheet beside a crosshair:
+# the document is what the user owns, the crosshair is what it is measured
+# against, and the two touching is the product in one image.
+#
+# The sheet is drawn as four stroked primitives rather than one filled outline
+# so the interior rules and the crosshair stay legible at 16px, where a filled
+# silhouette would weld them together.
+STROKE = max(1.0, 1.9)  # matches the React component's strokeWidth
+
+#: The resume sheet: (x, y, w, h, corner radius) on the 24x24 viewBox.
+SHEET = (2.75, 4.75, 12.0, 14.5, 1.5)
+
+#: The three text rules, as (x1, y, x2). Decreasing length reads as a filled
+#: document rather than a table.
+RULES = ((5.75, 9.0, 11.75), (5.75, 12.25, 11.75), (5.75, 15.5, 9.25))
+
+#: The crosshair: centre, radius, and the two tick lengths above and below.
+AIM_X, AIM_Y, AIM_R = 18.0, 12.0, 3.25
+AIM_TICK = 2.25
 
 
-def _scale(points, size: float, pad_ratio: float = 0.22):
-    """Scale the 24x24 bolt into a size x size box with padding."""
+def _to_px(value: float, size: float, pad_ratio: float) -> float:
+    """One coordinate from the 24x24 viewBox into a size x size canvas."""
     inner = size * (1 - pad_ratio * 2)
-    scale = inner / 24.0
-    offset = size * pad_ratio
-    return [(x * scale + offset, y * scale + offset) for x, y in points]
+    return value * (inner / 24.0) + size * pad_ratio
+
 
 
 def _rounded_gradient(size: int, radius_ratio: float = 0.22) -> Image.Image:
@@ -81,10 +101,54 @@ def _rounded_gradient(size: int, radius_ratio: float = 0.22) -> Image.Image:
     return out
 
 
-def _bolt_image(size: int) -> Image.Image:
-    """The mark alone, transparent background."""
+def _mark_image(size: int) -> Image.Image:
+    """
+    The mark alone, on the rounded teal tile, transparent outside it.
+
+    Stroked rather than filled, matching the React component. The stroke width
+    is scaled with the icon so a 16px favicon gets a proportionally heavier
+    line than a 512px PWA icon; a fixed pixel width would vanish at 16px and
+    swamp the drawing at 512px.
+    """
     img = _rounded_gradient(size)
-    ImageDraw.Draw(img).polygon(_scale(BOLT_24, size), fill=PAPER + (255,))
+    draw = ImageDraw.Draw(img)
+    ink = PAPER + (255,)
+    pad = 0.22
+    px = lambda v: _to_px(v, size, pad)  # noqa: E731
+    width = max(1, round(STROKE * (size * (1 - pad * 2)) / 24.0))
+
+    sx, sy, sw, sh, sr = SHEET
+    draw.rounded_rectangle(
+        [px(sx), px(sy), px(sx + sw), px(sy + sh)],
+        radius=px(sr),
+        outline=ink,
+        width=width,
+    )
+
+    for x1, y, x2 in RULES:
+        draw.line([(px(x1), px(y)), (px(x2), px(y))], fill=ink, width=width)
+
+    draw.ellipse(
+        [px(AIM_X - AIM_R), px(AIM_Y - AIM_R), px(AIM_X + AIM_R), px(AIM_Y + AIM_R)],
+        outline=ink,
+        width=width,
+    )
+    draw.line(
+        [
+            (px(AIM_X), px(AIM_Y - AIM_R - AIM_TICK)),
+            (px(AIM_X), px(AIM_Y - AIM_R)),
+        ],
+        fill=ink,
+        width=width,
+    )
+    draw.line(
+        [
+            (px(AIM_X), px(AIM_Y + AIM_R)),
+            (px(AIM_X), px(AIM_Y + AIM_R + AIM_TICK)),
+        ],
+        fill=ink,
+        width=width,
+    )
     return img
 
 
@@ -127,7 +191,7 @@ def og_image() -> Image.Image:
     draw.rectangle([0, 0, 18, h], fill=PRIMARY)
     draw.rectangle([18, 0, 26, h], fill=WARM)
 
-    mark = _bolt_image(132)
+    mark = _mark_image(132)
     img.paste(mark, (96, 84), mark)
 
     draw.text((96, 268), "TailorUp", font=_find_font(78), fill=PRIMARY)
@@ -158,12 +222,12 @@ def main() -> int:
         (192, "icon-192.png"),
         (512, "icon-512.png"),
     ):
-        save(_bolt_image(size), name, optimize=True)
+        save(_mark_image(size), name, optimize=True)
 
     # Multi-resolution ICO. A 16px ICO is unreadable as a single 512px image
     # downscaled by the OS, so the sizes are embedded explicitly.
     ico_sizes = [16, 32, 48]
-    _bolt_image(48).save(
+    _mark_image(48).save(
         OUT / "favicon.ico", format="ICO", sizes=[(s, s) for s in ico_sizes]
     )
     written.append(f"favicon.ico (sizes {ico_sizes})")

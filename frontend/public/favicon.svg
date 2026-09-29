@@ -1,9 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="TailorUp">
   <!--
-    Brand favicon. Replaces a purple gradient bolt left over from a design tool,
-    which was inconsistent with TailorUp's teal. Kept in step with the PNG set
-    produced by scripts/generate_brand_assets.py -- the geometry is the same
-    bolt on the same 24x24 viewBox as the in-app IconLogo.
+    Brand favicon. The geometry is the IconLogo mark on its 24x24 viewBox,
+    scaled into the 64px tile with the same 22% padding the raster generator
+    uses in scripts/generate_brand_assets.py. The two must agree: browsers
+    pick whichever of this and the PNGs they can read, so a mismatch shows
+    the old mark on some platforms and the new one on others.
+
+    The mark is a resume sheet and a crosshair. Two earlier marks -- a
+    lightning bolt and a four-pointed sparkle -- were generic "AI product"
+    glyphs that said nothing about what the product actually does.
   -->
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
@@ -12,5 +17,14 @@
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#g)"/>
-  <path fill="#F2F0EF" d="M36.3 5.3 12.8 35.2h13.6l-2.7 23.5 27.5-31.2H36.8l3.5-22.2z"/>
+  <g transform="translate(7.19 7.19) scale(2.065)" fill="none" stroke="#F2F0EF"
+     stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2.75" y="4.75" width="12" height="14.5" rx="1.5"/>
+    <path d="M5.75 9h6"/>
+    <path d="M5.75 12.25h6"/>
+    <path d="M5.75 15.5h3.5"/>
+    <circle cx="18" cy="12" r="3.25"/>
+    <path d="M18 6.5v2.25"/>
+    <path d="M18 15.25v2.25"/>
+  </g>
 </svg>
