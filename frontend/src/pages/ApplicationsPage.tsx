@@ -5,7 +5,7 @@ import {
   STATUS_LABELS,
   type Application,
   type ApplicationStatus,
-  type Job,
+  type JobSummary,
 } from '../lib/types'
 import { IconExternal, IconRefresh } from '../components/Icons'
 import { Alert, EmptyState, Pill, Skeleton } from '../components/primitives'
@@ -13,7 +13,7 @@ import { DownloadButtons } from '../components/DownloadButtons'
 
 type Props = {
   applications: Application[]
-  jobs: Job[]
+  jobs: JobSummary[]
   loading: boolean
   error: string
   onRefresh: () => void

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Job, ViewKey } from '../lib/types'
+import type { JobSummary, ViewKey } from '../lib/types'
 import { initials } from '../lib/format'
 import { DevTerminal } from './DevTerminal'
 import { HelpPanel } from './HelpPanel'
@@ -50,7 +50,7 @@ export function Sidebar({
   email: string
   displayName: string
   onLogout: () => void
-  jobs?: Job[]
+  jobs?: JobSummary[]
 }) {
   /**
    * Signing out used to be a two-click confirm: the first click rewrote the

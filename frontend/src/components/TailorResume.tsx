@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import type {
   TailoringResult,
-  Job,
+  JobSummary,
   Resume,
   TailoringResponse,
   TailoringViolation,
@@ -106,7 +106,7 @@ type Phase = 'idle' | 'loading' | 'review' | 'saving' | 'saved'
  * requirements list and the "needs review" warnings are always visible, and
  * nothing is written until the user chooses to save.
  */
-export function TailorResume({ job }: { job: Job }) {
+export function TailorResume({ job }: { job: JobSummary }) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [failure, setFailure] = useState<{ title: string; message: string } | null>(null)
   const [violations, setViolations] = useState<TailoringViolation[]>([])

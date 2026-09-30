@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { formatScore, scoreTone } from '../lib/format'
-import type { Application, ApplicationStatus, DashboardStats, Job, Resume } from '../lib/types'
+import type { Application, ApplicationStatus, DashboardStats, JobSummary, Resume } from '../lib/types'
 import {
   IconBriefcase,
   IconRefresh,
@@ -17,7 +17,7 @@ import { UrlForm } from '../components/UrlForm'
 import { Alert, EmptyState, JobRowSkeleton, Pill, Skeleton, StatCard } from '../components/primitives'
 
 type Props = {
-  jobs: Job[]
+  jobs: JobSummary[]
   loading: boolean
   error: string
   refreshing: boolean
@@ -59,7 +59,7 @@ export function DashboardPage({
     [jobs, selectedId],
   )
 
-  const handleSelectJob = useCallback((job: Job) => {
+  const handleSelectJob = useCallback((job: JobSummary) => {
     setSelectedId(job.id)
   }, [])
 

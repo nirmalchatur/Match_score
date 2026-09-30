@@ -1,5 +1,5 @@
 import { formatRelative, initials, statusLabel, statusTone } from '../lib/format'
-import type { Job } from '../lib/types'
+import type { JobSummary } from '../lib/types'
 import { IconClock, IconMapPin } from './Icons'
 import { AtsMark } from './AtsBadge'
 import { Pill, ScoreRing } from './primitives'
@@ -9,9 +9,9 @@ export function JobRow({
   selected = false,
   onSelect,
 }: {
-  job: Job
+  job: JobSummary
   selected?: boolean
-  onSelect: (job: Job) => void
+  onSelect: (job: JobSummary) => void
 }) {
   const tone = statusTone(job.status)
   const isLive = tone === 'warning'
