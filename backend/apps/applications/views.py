@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.automation.tasks import application_status_changed
+from apps.common.models import ActivityEvent
 
 from .dashboard import dashboard_stats
 from .models import Application
@@ -86,6 +87,21 @@ class ApplicationListView(APIView):
         # payload. `user` is not a serializer field at all, so a client-supplied
         # user id has nothing to bind to.
         application = serializer.save(user=request.user)
+
+        ActivityEvent.record(
+            request.user,
+            ActivityEvent.APPLICATION_CREATED,
+            object_type="application",
+            object_id=application.id,
+            summary="%s — %s" % (
+                getattr(application.job, "company", "Application"),
+                getattr(application.job, "title", ""),
+            ),
+            metadata={
+                "job": application.job_id,
+                "status": application.status,
+            },
+        )
 
         return Response(
             ApplicationSerializer(application).data,
@@ -234,6 +250,25 @@ class ApplicationStatusView(APIView):
         if previous_status != new_status:
             application_status_changed(
                 request.user, application, previous_status, new_status
+            )
+
+            # Recorded alongside the notification but not instead of it: a
+            # notification can be switched off or de-duplicated, and the
+            # history of where an application has been must survive both.
+            ActivityEvent.record(
+                request.user,
+                ActivityEvent.APPLICATION_STATUS_CHANGED,
+                object_type="application",
+                object_id=application.id,
+                summary="%s — %s" % (
+                    getattr(application.job, "company", "Application"),
+                    new_status.title(),
+                ),
+                metadata={
+                    "job": application.job_id,
+                    "from": previous_status,
+                    "to": new_status,
+                },
             )
 
         return Response(

@@ -53,6 +53,13 @@ SYSTEM_ROLE = (
     "not to manufacture new experience."
 )
 
+#: Version of the tailoring prompt contract, bumped whenever the instructions or
+#: the output shape below change. Recorded on every ``AIRun`` so a saved result
+#: can be traced to the prompt that produced it: a result generated under an
+#: older contract is not comparable with a newer one, and after the fact there
+#: is no other way to tell them apart. Not a secret and not user-visible.
+PROMPT_VERSION = "tailoring-1"
+
 OUTPUT_CONTRACT = """{
   "summary": {
     "original": "<source summary copied verbatim, or an empty string>",
