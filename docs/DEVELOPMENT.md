@@ -74,7 +74,7 @@ npm run lint
 npm run build
 ```
 
-The full backend suite is 674 tests and takes roughly 205 seconds.
+The full backend suite is 682 tests and takes roughly 250 seconds.
 
 There is no frontend test runner configured — `package.json` has no `test`
 script and `src` contains no test files. Frontend correctness is currently

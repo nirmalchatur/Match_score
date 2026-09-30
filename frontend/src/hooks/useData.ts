@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api } from '../lib/api'
-import type { Application, ApplicationStatus, DashboardStats, Job, Resume } from '../lib/types'
+import type { Application, ApplicationStatus, DashboardStats, JobSummary, Resume } from '../lib/types'
 
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback
@@ -88,7 +88,7 @@ const fetchResumes = async (): Promise<{ resumes: Resume[]; master: Resume | nul
 
 /** Jobs list plus API reachability, derived from the last request outcome. */
 export function useJobs() {
-  const { data, loading, error, refresh } = useResource<Job[]>(
+  const { data, loading, error, refresh } = useResource<JobSummary[]>(
     [],
     fetchJobs,
     'Unable to load jobs.',

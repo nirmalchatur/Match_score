@@ -1,14 +1,28 @@
-import type { Application, ApplicationStatus, Job } from '../lib/types'
+import { useEffect, useState } from 'react'
+import { api } from '../lib/api'
+import type { Application, ApplicationStatus, Job, JobSummary } from '../lib/types'
 import { formatDate, formatScore, scoreTone, sourceHost, statusLabel, statusTone } from '../lib/format'
 import { IconExternal, IconMapPin } from './Icons'
-import { Alert, Pill, ScoreRing } from './primitives'
+import { Alert, Pill, ScoreRing, Skeleton } from './primitives'
 import { StepList } from './StepList'
 import { TailorResume } from './TailorResume'
 import { SkillGapPanel } from './SkillGapPanel'
 import { ApplicationPanel } from './ApplicationPanel'
 
+/**
+ * Full rows already fetched, keyed by job id.
+ *
+ * Module scope rather than component state, so moving up and down the list does
+ * not refetch the same posting every time the user clicks back to it. The
+ * cached row carries ``updated_at`` and is only reused while that still matches
+ * the row in the list, so a re-analysis -- or the shell's own refresh -- 
+ * invalidates it with no cache-busting call to remember.
+ */
+const detailCache = new Map<number, Job>()
+
 type Props = {
-  job: Job
+  /** The compact list row. The posting itself is fetched on selection. */
+  job: JobSummary
   application?: Application | null
   onCreateApplication?: () => Promise<unknown>
   onApplicationStatus?: (id: number, status: ApplicationStatus) => Promise<unknown>
@@ -22,6 +36,51 @@ export function JobDetail({
   onApplicationStatus,
   onDeleteApplication,
 }: Props) {
+  const [detail, setDetail] = useState<Job | null>(() => detailCache.get(job.id) ?? null)
+  const [detailError, setDetailError] = useState('')
+  const [loadedId, setLoadedId] = useState(job.id)
+
+  // Reset to the newly selected job *during render*, which is React's documented
+  // pattern for state derived from a prop. Doing it in the effect instead would
+  // call setState synchronously on mount and start a second render for every
+  // selection -- and rendering the previous job's posting under the new job's
+  // title, even for one frame, is worse than a skeleton.
+  if (loadedId !== job.id) {
+    const cached = detailCache.get(job.id)
+    setLoadedId(job.id)
+    setDetail(cached && cached.updated_at === job.updated_at ? cached : null)
+    setDetailError('')
+  }
+
+  /**
+   * Fetch the full row for the selected job.
+   *
+   * The list no longer carries the posting, the stored analysis or the skill
+   * gap: sending those for every job made the dashboard's job payload 2.0 MB at
+   * 400 rows, which is what stalled the page. One row on selection is the same
+   * data for a request that costs a fraction.
+   */
+  useEffect(() => {
+    const cached = detailCache.get(job.id)
+    if (cached && cached.updated_at === job.updated_at) return
+
+    const controller = new AbortController()
+
+    api
+      .getJob(job.id, controller.signal)
+      .then((full) => {
+        if (controller.signal.aborted) return
+        detailCache.set(job.id, full)
+        setDetail(full)
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return
+        setDetailError(err instanceof Error ? err.message : 'Could not load this job.')
+      })
+
+    return () => controller.abort()
+  }, [job.id, job.updated_at])
+
   const tone = statusTone(job.status)
   const host = sourceHost(job.url)
 
@@ -72,7 +131,19 @@ export function JobDetail({
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <SkillGapPanel gap={job.skill_gap} />
+          {detail ? (
+            <SkillGapPanel gap={detail.skill_gap} />
+          ) : detailError ? (
+            <p className="stat-hint">
+              The skill gap for this job could not be loaded. Its score above is
+              unaffected.
+            </p>
+          ) : (
+            <div className="stack" style={{ gap: 8 }}>
+              <Skeleton width="30%" height={12} />
+              <Skeleton width="70%" height={12} />
+            </div>
+          )}
         </div>
 
         {/* Key facts */}
@@ -108,9 +179,9 @@ export function JobDetail({
           </div>
         </div>
 
-        {job.error_message ? (
+        {detail?.error_message ? (
           <div style={{ marginBottom: 20 }}>
-            <Alert variant="danger">{job.error_message}</Alert>
+            <Alert variant="danger">{detail.error_message}</Alert>
           </div>
         ) : null}
 
@@ -132,15 +203,28 @@ export function JobDetail({
           </>
         ) : null}
 
-        <StepList steps={job.pipeline_steps} updatedAt={job.updated_at} />
+        <StepList steps={detail?.pipeline_steps} updatedAt={job.updated_at} />
 
         <div className="divider" />
 
         <div className="section-title">Job information</div>
-        {job.description?.trim() ? (
-          <div className="prose prose-scroll">{job.description}</div>
+        {detail ? (
+          detail.description?.trim() ? (
+            <div className="prose prose-scroll">{detail.description}</div>
+          ) : (
+            <p className="stat-hint">No description was extracted for this posting.</p>
+          )
+        ) : detailError ? (
+          <p className="stat-hint">
+            The posting text could not be loaded. The analysis above was already
+            sent with the list and is not affected.
+          </p>
         ) : (
-          <p className="stat-hint">No description was extracted for this posting.</p>
+          <div className="stack" style={{ gap: 10 }}>
+            <Skeleton width="90%" height={12} />
+            <Skeleton width="80%" height={12} />
+            <Skeleton width="60%" height={12} />
+          </div>
         )}
 
         {job.created_at ? (

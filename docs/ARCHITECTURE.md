@@ -476,9 +476,31 @@ special-case each one:
 Ownership gaps return 404 rather than 403, because a 403 confirms that an id
 exists — and that distinction is asserted in the tests.
 
+### One list shape, one detail shape
+
+A payload that carries every row is not the same thing as a payload that carries
+*every field* of every row. `GET /api/jobs/` returns `JobListSerializer` — a
+compact row (title, company, location, source, score, decision, status,
+timestamps) — and `GET /api/jobs/<id>/` returns the full job: the posting text,
+the stored match analysis, the skill gap and the pipeline steps.
+
+That split exists because of a measurement, not a preference. With the full
+shape on the list endpoint, the dashboard's job payload was **262 KB for 50 jobs
+and 2.0 MB for 400**, and the shell fetched it on mount and again after every
+mutation. The compact row is the same list at **15.6 KB and 126 KB** — 17×
+smaller — and the detail view fetches one row for the one job the user opens.
+The list also no longer computes a `skill_gap` per row, which is derived CPU on
+every serialisation.
+
+`apps/jobs/tests/test_job_payload.py` pins both shapes, refuses a heavy field on
+the list, and bounds a realistic 25-posting response. It is a guard against
+exactly the one-line change that undoes this.
+
 On the frontend, API types live in one place (`src/lib/types.ts`) and requests go
 through one client (`src/lib/api.ts`). A duplicate type defined in a component is
-the thing that drifts when a response shape changes.
+the thing that drifts when a response shape changes: `JobSummary` is the list row
+and `Job extends JobSummary` is the detail row, so a component that needs the
+posting text cannot compile without fetching it.
 
 ---
 
@@ -505,6 +527,28 @@ src/
 
 Auth state lives in React memory and is refreshed from `/api/auth/me/`. Nothing
 sensitive is written to `localStorage`.
+
+### Where workspace state lives
+
+```
+Routes
+ └─ /app                    RequireMasterResume
+     └─ WorkspaceProvider   ← a layout route: mounted once per sign-in
+         ├─ fetch jobs (compact rows) · resumes · applications · dashboard stats
+         └─ AppShell        ← remounts per path, reads the data via useWorkspace()
+```
+
+`AppShell` was previously rendered *per path*, so every navigation unmounted it
+and the new mount refetched everything — including the whole job list, which was
+the largest response the app sent. That is what made moving between two pages
+feel like a full reload. The provider owns the server state and stays mounted
+while the pages swap; the refresh buttons still call the same `refresh`
+functions, so nothing that was fresh before is stale now.
+
+Deliberately not a caching library: four endpoints and an explicit refresh do not
+justify a dependency and a second way to think about server state. What such a
+library would add — de-duplication, background revalidation — was not the
+problem.
 
 ---
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ApiError, api } from '../lib/api'
-import type { Job } from '../lib/types'
+import type { JobSummary } from '../lib/types'
 import { IconRefresh, IconSearch } from '../components/Icons'
 import { JobDetail } from '../components/JobDetail'
 import { JobRow } from '../components/JobRow'
@@ -29,8 +29,8 @@ export function JobsPage() {
   const [status, setStatus] = useState('')
   const [sort, setSort] = useState('-created_at')
 
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [selected, setSelected] = useState<Job | null>(null)
+  const [jobs, setJobs] = useState<JobSummary[]>([])
+  const [selected, setSelected] = useState<JobSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 

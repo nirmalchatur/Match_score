@@ -29,14 +29,24 @@ export interface SkillGap {
   summary: string
 }
 
-export interface Job {
+/**
+ * The row the workspace holds for *every* job, as `GET /api/jobs/` sends it.
+ *
+ * Deliberately without the posting text, the stored match analysis, the skill
+ * gap or the pipeline steps: the list is fetched on every dashboard mount and
+ * holds the whole library, and carrying those fields made that response 2.0 MB
+ * at 400 jobs (measured). The compact row keeps a list from paying for detail
+ * nothing on it renders, and drops the per-row skill-gap recomputation the
+ * server used to do for each one.
+ *
+ * `JobDetail` fetches the full row for the one job the user selects.
+ */
+export interface JobSummary {
   id: number
-  skill_gap?: SkillGap
   url: string
   company: string
   title: string
   location: string
-  description: string
   /**
    * Which board this posting was read from: "greenhouse", "workday",
    * "generic", or a slug added later. Set by the server's ATS registry;
@@ -47,13 +57,23 @@ export interface Job {
    */
   source?: string
   match_score: number | null
-  match_result?: Record<string, unknown> | null
   decision?: string
   status: JobStatus
-  error_message?: string
-  pipeline_steps?: PipelineStep[]
   created_at?: string
   updated_at?: string
+}
+
+/**
+ * The full job, as `GET /api/jobs/<id>/` sends it.
+ *
+ * Everything `JobSummary` has, plus what only the detail view renders.
+ */
+export interface Job extends JobSummary {
+  description: string
+  match_result?: Record<string, unknown> | null
+  error_message?: string
+  pipeline_steps?: PipelineStep[]
+  skill_gap?: SkillGap
 }
 
 export interface Resume {

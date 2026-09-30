@@ -2,7 +2,7 @@
 import { api } from '../lib/api'
 import { atsLabel } from '../lib/format'
 import { IconTerminal, IconClose } from './Icons'
-import type { Job, TailoringStatus } from '../lib/types'
+import type { JobSummary, TailoringStatus } from '../lib/types'
 import { createPortal } from 'react-dom'
 
 /**
@@ -47,7 +47,7 @@ function formatElapsed(seconds: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`
 }
 
-export function DevTerminal({ jobs = [] }: { jobs?: Job[] }) {
+export function DevTerminal({ jobs = [] }: { jobs?: JobSummary[] }) {
   const [open, setOpen] = useState(false)
   const [lines, setLines] = useState<Line[]>(BANNER.map((text) => ({ text, tone: 'dim' })))
   const [input, setInput] = useState('')

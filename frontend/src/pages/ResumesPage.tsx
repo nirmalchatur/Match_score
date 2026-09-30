@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { formatDate, formatScore } from '../lib/format'
 import { ApiError, api } from '../lib/api'
-import type { Job, Resume } from '../lib/types'
+import type { JobSummary, Resume } from '../lib/types'
 import { IconExternal, IconFile, IconRefresh, IconUpload, IconZap } from '../components/Icons'
 import { Alert, EmptyState, Pill, Skeleton } from '../components/primitives'
 import { DownloadButtons } from '../components/DownloadButtons'
@@ -63,7 +63,7 @@ function ResumeCard({
 type Props = {
   resumes: Resume[]
   master: Resume | null
-  jobs?: Job[]
+  jobs?: JobSummary[]
   loading: boolean
   error: string
   onRefresh: () => void

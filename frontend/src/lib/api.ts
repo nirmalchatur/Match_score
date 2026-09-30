@@ -4,6 +4,7 @@ import type {
   AuthResponse,
   Job,
   JobQuery,
+  JobSummary,
   MasterResume,
   MeResponse,
   Resume,
@@ -446,14 +447,25 @@ export const api = {
 
   /* ---------- Jobs ---------- */
 
-  listJobs({ q, status, sort }: JobQuery = {}): Promise<Job[]> {
+  /**
+   * The compact job list. `JobSummary`, not `Job`: this response carries every
+   * job the account owns, and the full shape charged it for each posting's
+   * text and a per-row skill gap (2.0 MB at 400 jobs, measured). The detail
+   * view fetches the one row it needs.
+   */
+  listJobs({ q, status, sort }: JobQuery = {}): Promise<JobSummary[]> {
     const params = new URLSearchParams()
     if (q) params.set('q', q)
     if (status) params.set('status', status)
     if (sort) params.set('sort', sort)
 
     const qs = params.toString()
-    return request<Job[]>(`/jobs/${qs ? `?${qs}` : ''}`)
+    return request<JobSummary[]>(`/jobs/${qs ? `?${qs}` : ''}`)
+  },
+
+  /** The full job: posting text, stored analysis, skill gap, pipeline steps. */
+  getJob(id: number, signal?: AbortSignal): Promise<Job> {
+    return request<Job>(`/jobs/${id}/`, { signal })
   },
 
   analyzeJob(url: string): Promise<AnalyzeResponse> {

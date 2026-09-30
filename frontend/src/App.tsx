@@ -9,8 +9,8 @@ import {
   RequireMasterResume,
   RequireOnboardingSkills,
 } from './auth/guards'
-import { useApplications, useJobs, useResumes } from './hooks/useData'
-import { useToasts } from './hooks/useToasts'
+import { useWorkspace } from './workspace/useWorkspace'
+import { WorkspaceProvider } from './workspace/WorkspaceProvider'
 import type { Job, ViewKey } from './lib/types'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
@@ -72,25 +72,25 @@ function AppShell() {
   const [analyzeResult, setAnalyzeResult] = useState<Job | null>(null)
   const [shellSearch, setShellSearch] = useState('')
 
-  const { jobs, loading, error, refresh } = useJobs()
+  const { jobs, jobsLoading, jobsError, refreshJobs } = useWorkspace()
   const {
     resumes,
     master,
-    loading: resumesLoading,
-    error: resumesError,
-    refresh: refreshResumes,
-  } = useResumes()
-  const {
+    resumesLoading,
+    resumesError,
+    refreshResumes,
     applications,
     stats,
-    loading: applicationsLoading,
-    error: applicationsError,
-    refresh: refreshApplications,
-    create: createApplication,
-    setStatus: setApplicationStatus,
-    remove: removeApplication,
-  } = useApplications()
-  const { toasts, dismiss, notify } = useToasts()
+    applicationsLoading,
+    applicationsError,
+    refreshApplications,
+    createApplication,
+    setApplicationStatus,
+    removeApplication,
+    toasts,
+    dismissToast,
+    notify,
+  } = useWorkspace()
 
   const applicationForJob = useCallback(
     (jobId: number) => applications.find((item) => item.job === jobId) ?? null,
@@ -120,7 +120,7 @@ function AppShell() {
           'Analysis complete',
           `${data.job.company || 'Job'} — ${data.job.title || 'untitled role'}`,
         )
-        await refresh()
+        await refreshJobs()
       } catch (err) {
         // A 401/403 means the session lapsed: send the user to sign in rather
         // than showing a generic failure.
@@ -137,7 +137,7 @@ function AppShell() {
         setAnalyzing(false)
       }
     },
-    [markSessionExpired, navigate, notify, refresh],
+    [markSessionExpired, navigate, notify, refreshJobs],
   )
 
   return (
@@ -172,12 +172,12 @@ function AppShell() {
               <button
                 type="button"
                 className="btn btn-ghost btn-icon"
-                onClick={() => void refresh()}
-                disabled={loading}
+                onClick={() => void refreshJobs()}
+                disabled={jobsLoading}
                 aria-label="Refresh data"
                 title="Refresh"
               >
-                {loading ? <span className="spinner" /> : <IconRefresh size={16} />}
+                {jobsLoading ? <span className="spinner" /> : <IconRefresh size={16} />}
               </button>
               {view === 'jobs' ? (
                 <button
@@ -203,12 +203,12 @@ function AppShell() {
             stats={stats}
             applicationsLoading={applicationsLoading}
             jobs={jobs}
-            loading={loading}
-            error={error}
-            refreshing={loading}
+            loading={jobsLoading}
+            error={jobsError}
+            refreshing={jobsLoading}
             masterResume={master}
             analyzing={analyzing}
-            onRefresh={() => void refresh()}
+            onRefresh={() => void refreshJobs()}
             onAnalyze={(url) => void handleAnalyze(url)}
           />
         ) : null}
@@ -250,7 +250,7 @@ function AppShell() {
         {view === 'settings' ? <SettingsPage /> : null}
       </div>
 
-      <Toasts toasts={toasts} onDismiss={dismiss} />
+      <Toasts toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }
@@ -284,15 +284,23 @@ export default function App() {
           <Route path="/setup/ai" element={<OnboardingAiPage />} />
         </Route>
 
-        {/* Private workspace — requires a master resume to be useful */}
+        {/* Private workspace — requires a master resume to be useful.
+
+            WorkspaceProvider is a *layout* route, so it stays mounted while the
+            pages under it swap. It owns the jobs/resumes/applications state, and
+            without it every navigation unmounted AppShell, mounted a new one and
+            refetched everything — including the whole job list, the largest
+            response the app sends. See the provider's own comment. */}
         <Route element={<RequireAuth />}>
           <Route path="/app" element={<RequireMasterResume />}>
-            <Route path="dashboard" element={<AppShell />} />
-            <Route path="analyze" element={<AppShell />} />
-            <Route path="jobs" element={<AppShell />} />
-            <Route path="resumes" element={<AppShell />} />
-            <Route path="applications" element={<AppShell />} />
-            <Route path="settings" element={<AppShell />} />
+            <Route element={<WorkspaceProvider />}>
+              <Route path="dashboard" element={<AppShell />} />
+              <Route path="analyze" element={<AppShell />} />
+              <Route path="jobs" element={<AppShell />} />
+              <Route path="resumes" element={<AppShell />} />
+              <Route path="applications" element={<AppShell />} />
+              <Route path="settings" element={<AppShell />} />
+            </Route>
             <Route index element={<Navigate to="/app/dashboard" replace />} />
           </Route>
         </Route>
