@@ -43,6 +43,9 @@ Master Resume (stored)          Job + JD (stored)
 | `apps/ai/schemas.py` | Defensive parsing and normalisation into `TailoringResult`. |
 | `apps/ai/validators.py` | Deterministic factual checks. No model, no NLP. |
 | `apps/ai/tailor.py` | `ResumeTailor`: orchestration only. No HTTP, no model name, no provider type. |
+| `apps/ai/models.py` | `AIRun`: the audit row for one operation (see below). |
+| `apps/ai/runs.py` | `AIRunRecorder`: writes that row around the call. Never breaks the operation. |
+| `apps/resumes/services/tailoring_service.py` | The application service: ownership, provider + key resolution, audit, persistence. The views are thin wrappers over it. |
 | `apps/resumes/views.py` | Auth, ownership, error-to-HTTP mapping, persistence. |
 | `apps/resumes/services/document.py` | Resolves profile + approved tailoring into one renderer-agnostic model. |
 | `apps/resumes/services/docx_generator.py` | ATS-friendly DOCX via python-docx. |
@@ -204,11 +207,28 @@ its originals rather than disappearing.
 Documents are rendered on demand rather than cached, so a saved file can never
 go stale after an edit.
 
+## Audit: one `AIRun` per operation
+
+Every tailoring writes an `apps.ai.models.AIRun` row around the provider call, so
+"what happened when this result was generated?" is answerable after the fact:
+provider, model, status (`PENDING` → `RUNNING` → `SUCCEEDED` / `FAILED` /
+`CANCELLED`), the factual validator's verdict, a failure *bucket* and error
+*code*, the source resume and job, the artifact it produced, and how long it took.
+
+Two rules matter and are asserted in `apps/common/tests/test_architecture.py`:
+
+- **No secrets, no payloads.** Never the key, the prompt or the raw response. The
+  provider's *name* and *model* are recorded because they explain a result; its
+  base URL and credential are configuration and are not.
+- **A rejected result is a failure.** A fabrication is `FAILED` with
+  `validation_status=rejected`, never `SUCCEEDED` with no artifact.
+
+The writer is guarded: if the audit insert fails, the tailoring still succeeds and
+the failure is logged. Recording evidence must not be able to break the operation
+it records. See `docs/adr/ADR-005-ai-run-audit.md`.
+
 ## Known limitations
 
-- **No document generation.** There is no DOCX/PDF generator in the codebase, so
-  a saved tailoring is a structured `Resume` with no file attached. The flow is
-  ready for one: validated JSON is already stored in `profile_data`.
 - **Proper-noun detection is a heuristic.** It produces warnings, not rejections,
   because a wrong rejection would block legitimate tailoring.
 - **The projects section is flat text.** `ResumeProfile` stores it unstructured;

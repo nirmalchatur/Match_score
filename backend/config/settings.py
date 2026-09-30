@@ -159,6 +159,14 @@ INSTALLED_APPS = [
     'apps.jobs',
     'apps.resumes',
     'apps.users',
+    # The AI boundary and the shared activity record. Both became installed
+    # apps at the same time, and for the same reason: Django only creates a
+    # table for a model in an installed app. apps.ai owns AIRun (the audit of
+    # one provider call) and apps.common owns ActivityEvent (the durable record
+    # of user-initiated actions), neither of which could live in a feature app
+    # without making every other feature app depend on that app's models.
+    'apps.ai',
+    'apps.common',
     # In-app notifications. This app existed as a directory of three empty
     # files and was never installed, so the topbar's bell icon had no endpoint
     # behind it -- a static span with no click handler.

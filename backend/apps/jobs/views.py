@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.automation.tasks import job_analysed
+from apps.common.models import ActivityEvent
 from apps.jobs.services import ats_registry
 from apps.jobs.services import job_search
 from apps.jobs.services.job_collector import JobCollector
@@ -20,6 +21,24 @@ from .serializers import (
     JobMatchSerializer,
     JobSerializer,
 )
+
+
+def _record_analysis_failure(user, url, reason: str) -> None:
+    """
+    Note that an analysis failed, and roughly why.
+
+    ``reason`` is an exception *class name*, never a message. A message from
+    this pipeline can quote a stored job description or a resume field, and the
+    activity record is deliberately not a place a document gets copied into.
+    The class name is the part that is diagnostic and safe.
+    """
+    ActivityEvent.record(
+        user,
+        ActivityEvent.JOB_ANALYSIS_FAILED,
+        object_type="job",
+        summary=str(url or "")[:200],
+        metadata={"reason": reason},
+    )
 
 
 class JobAnalyzeView(APIView):
@@ -91,6 +110,19 @@ class JobAnalyzeView(APIView):
             # while a repeated observation of the same one is not.
             job_analysed(request.user, job)
 
+            ActivityEvent.record(
+                request.user,
+                ActivityEvent.JOB_ANALYSED,
+                object_type="job",
+                object_id=job.id,
+                summary="%s — %s" % (job.company or "Job", job.title or "Role"),
+                metadata={
+                    "source": job.source,
+                    "match_score": job.match_score,
+                    "decision": job.decision,
+                },
+            )
+
             return Response(
                 {
                     "job_id": job.id,
@@ -101,16 +133,19 @@ class JobAnalyzeView(APIView):
             )
 
         except (ValueError, TypeError) as exc:
+            _record_analysis_failure(request.user, url, exc.__class__.__name__)
             return Response(
                 {"error": str(exc), "status": "failed"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Resume.DoesNotExist:
+            _record_analysis_failure(request.user, url, "Resume.DoesNotExist")
             return Response(
                 {"error": "No master resume found", "status": "failed"},
                 status=status.HTTP_404_NOT_FOUND,
             )
         except Resume.MultipleObjectsReturned:
+            _record_analysis_failure(request.user, url, "Resume.MultipleObjectsReturned")
             return Response(
                 {
                     "error": "Multiple master resumes found. Please keep only one.",
@@ -119,6 +154,7 @@ class JobAnalyzeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as exc:
+            _record_analysis_failure(request.user, url, exc.__class__.__name__)
             return Response(
                 {"error": str(exc), "status": "failed"},
                 status=status.HTTP_400_BAD_REQUEST,

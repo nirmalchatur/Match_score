@@ -256,6 +256,7 @@ each side needs, is in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 | Document                                          | Covers                                    |
 | ------------------------------------------------- | ----------------------------------------- |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md)           | How the pieces fit together               |
+| [adr/](docs/adr/README.md)                        | Why each architectural decision was made  |
 | [AI_SETUP.md](docs/AI_SETUP.md)                   | Configuring a provider                    |
 | [AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md)     | The extraction and generation pipeline    |
 | [API.md](docs/API.md)                             | Every endpoint, with request and response |

@@ -5,20 +5,26 @@
 ```
 backend/          Django project (config/) and 8 apps under apps/
   config/         settings, urls, wsgi/asgi
-  apps/ai         provider abstraction, schemas, validators, tailor
+  apps/ai         provider abstraction, orchestration, schemas, validators, AIRun audit
   apps/applications  application tracker + dashboard aggregation
   apps/jobs       fetchers, parsers, MatchEngine, skill gap
-  apps/resumes    upload, parsing, tailoring, DOCX/PDF, versions
-  apps/users      auth, profile, encrypted provider credentials
-  apps/common     throttling, throttle handler
-  apps/automation greenhouse collection
+  apps/resumes    upload, parsing, tailoring service, DOCX/PDF, versions
+  apps/users      auth, profile, encrypted provider credentials, security events
+  apps/common     throttling, throttle handler, activity record, operation logging
+  apps/automation notifications and preferences
   apps/sheets     import
 frontend/         React + TypeScript + Vite
   src/pages       one file per route
   src/components  shared UI
   src/styles      layout, components, marketing, motion, auth
 docs/             this file and its neighbours
+  adr/            one short record per architectural decision
 ```
+
+`apps.ai` and `apps.common` are installed apps, not just packages: `AIRun` (the
+audit of one AI operation) and `ActivityEvent` (the append-only record of
+user-initiated actions) live in them, and Django creates a table only for a model
+in an installed app.
 
 ## Requirements
 
@@ -68,13 +74,42 @@ npm run lint
 npm run build
 ```
 
-The full backend suite is 507 tests and takes roughly 200 seconds.
+The full backend suite is 674 tests and takes roughly 205 seconds.
 
 There is no frontend test runner configured — `package.json` has no `test`
 script and `src` contains no test files. Frontend correctness is currently
 enforced by `tsc` and the production build only. Adding a runner is a
 reasonable next step, and the animation and theme code are the places that
 would most benefit.
+
+## Architecture rules and boundary tests
+
+`docs/ARCHITECTURE.md` describes the boundaries; `docs/adr/` records why each one
+exists. Neither is enforced by review alone — `backend/apps/common/tests/test_architecture.py`
+asserts them, so a shortcut fails CI:
+
+```bash
+cd backend
+..\venv\Scripts\python.exe manage.py test apps.common.tests.test_architecture   # ~7s
+..\venv\Scripts\python.exe manage.py test apps.ai.tests.test_airun apps.common.tests.test_observability
+```
+
+Four rules most likely to be broken by accident, and what each test does:
+
+- **The AI layer never touches a score or a decision.** Static (import graph and
+  attribute accesses, so a docstring naming `MatchEngine` is fine and a call to it
+  is not) plus behavioural: run a tailoring, then assert the job's score and match
+  analysis are unchanged and reproducible from the stored data.
+- **An audit write cannot break the operation it records.** `AIRun` and
+  `ActivityEvent` writers are guarded and log instead of raising; the tests drive
+  the failure paths.
+- **A credential never reaches a log line, an audit column or a response.** By field
+  *name* and by value *shape*, asserted against real key formats.
+- **Ownership is enforced in the query**, not after loading a row, so another
+  account's id produces the same 404 as a missing one.
+
+When you add a model, a service or an endpoint, the cheapest time to add the
+corresponding boundary assertion is in the same pull request.
 
 ## AI providers
 

@@ -4,11 +4,15 @@ Resume endpoints.
 Every query is scoped to the authenticated account. Uploads are validated
 (type, extension, size) and parsed through the existing ResumeParser so the
 master resume is a real, profiled document rather than a stored blob.
+
+This module is a thin HTTP layer. The tailoring decisions -- which resume and
+job are involved, which provider and key apply, what is recorded, what is
+persisted -- live in :mod:`apps.resumes.services.tailoring_service`, so they can
+be tested without a request and reused from a worker later.
 """
 
 import logging
 import os
-import time
 
 from django.conf import settings
 from django.http import FileResponse, HttpResponse
@@ -21,18 +25,12 @@ from rest_framework.views import APIView
 from . import qualities
 from .models import Resume, ResumeProfile
 from .serializers import ResumeSerializer
+from .services import tailoring_service
+from .services.tailoring_service import TailoringError
 
 from apps.ai import factory, progress, selection
-from apps.ai.exceptions import (
-    AIConfigurationError,
-    AIError,
-    AITailoringValidationError,
-)
-from apps.ai.schemas import normalise
-from apps.ai.tailor import ResumeTailor, build_source_resume
-from apps.ai.validators import validate as validate_tailoring
-from apps.jobs.models import Job
-from apps.jobs.services.jd_profile import JDProfile
+from apps.ai.exceptions import AITailoringValidationError, AIError
+from apps.common.models import ActivityEvent
 from apps.users.models import ProviderCredential
 
 from apps.resumes.services.document_service import render_resume_document
@@ -47,19 +45,6 @@ from apps.common.throttling import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _api_key_for(user, provider: str) -> str:
-    """
-    The key to use for one tailoring call, or "" when there is none.
-
-    Thin wrapper over :func:`apps.ai.selection.resolve_api_key` kept so the
-    call site below reads as an intent ("get me a key for the provider I am
-    about to use") rather than as plumbing. The precedence -- the user's own
-    stored credential first, then the deployment's env fallback -- lives in
-    one place and is asserted in the AI tests.
-    """
-    return selection.resolve_api_key(user, provider)
 
 
 class InvalidResumeUpload(ValueError):
@@ -188,7 +173,22 @@ class ResumeListView(APIView):
                 },
             )
 
-            # 5. Return resume
+            # 5. Record it, then return the resume. The activity row is written
+            #    before the response because it describes an upload that has
+            #    already succeeded; record() cannot raise, so a failed insert
+            #    costs a history row and not the user's upload.
+            ActivityEvent.record(
+                request.user,
+                ActivityEvent.RESUME_UPLOADED,
+                object_type="resume",
+                object_id=resume.id,
+                summary=resume.name,
+                metadata={
+                    "resume_type": resume.resume_type,
+                    "skills": len(profile_data.get("skills") or []),
+                },
+            )
+
             return Response(
                 ResumeSerializer(resume).data,
                 status=status.HTTP_201_CREATED,
@@ -346,6 +346,17 @@ class SetMasterResumeView(APIView):
             update_fields=["is_master", "resume_type"]
         )
 
+        # Recorded because "which resume is the master" changes every score the
+        # user sees from here on, and a support question about a sudden drop is
+        # usually this row.
+        ActivityEvent.record(
+            request.user,
+            ActivityEvent.MASTER_RESUME_CHANGED,
+            object_type="resume",
+            object_id=resume.id,
+            summary=resume.name,
+        )
+
         return Response(
             ResumeSerializer(resume).data,
             status=status.HTTP_200_OK,
@@ -377,28 +388,6 @@ def _ai_error_response(exc: AIError):
 
 def _get_master_resume(user):
     return Resume.objects.filter(user=user, is_master=True).first()
-
-
-def _stored_profile(resume) -> dict:
-    """The stored profile dict, in the shape ``build_source_resume`` expects."""
-    try:
-        profile = resume.profile
-    except ResumeProfile.DoesNotExist:
-        return {}
-
-    return {
-        "summary": "",
-        "skills": profile.skills or [],
-        "experience": profile.experience or {},
-        "education": profile.education or "",
-        "projects": profile.projects or "",
-        "certifications": profile.certifications or "",
-        # Chosen qualities ride along with the parsed profile so the tailoring
-        # prompt and the match analysis can both see them. Normalised on read
-        # as well as on write, because a row written before this field existed
-        # holds {} rather than the canonical three-key shape.
-        "qualities": qualities.normalize(profile.qualities),
-    }
 
 
 def _master_profile(user) -> ResumeProfile | None:
@@ -497,67 +486,15 @@ class QualitiesView(APIView):
         return Response(self._payload(profile), status=status.HTTP_200_OK)
 
 
-def _load_job(user, job_id):
+def _tailoring_error_response(exc: TailoringError) -> Response:
     """
-    Fetch a job **scoped to the requesting account**.
+    Map a service-level refusal onto HTTP.
 
-    Scoping by ``user`` in the query itself is what stops User A from tailoring
-    against User B's job: there is no id-guessing path here at all.
+    The service decides *what* went wrong; the status code it suggests is
+    honoured here rather than recomputed, so one place owns the mapping. Only
+    ``as_dict()`` is read, which carries no internals.
     """
-    try:
-        job_id = int(job_id)
-    except (TypeError, ValueError):
-        return None
-
-    return Job.objects.filter(user=user, id=job_id).first()
-
-
-def _tailoring_context(user, job_id):
-    """
-    Gather everything the tailoring needs, or return an error Response.
-
-    Returns ``(master_resume, job, jd_profile, error_response)``.
-    """
-    master = _get_master_resume(user)
-    if master is None:
-        return None, None, None, Response(
-            {
-                "error": "No master resume found. Upload one before tailoring.",
-                "code": "resume_missing",
-            },
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    job = _load_job(user, job_id)
-    if job is None:
-        return None, None, None, Response(
-            {"error": "Job not found.", "code": "job_missing"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    if not (job.description or "").strip():
-        return None, None, None, Response(
-            {
-                "error": "This job has no stored description to tailor against.",
-                "code": "job_description_missing",
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    # Reuse the existing JD analysis rather than re-deriving it, so the tailoring
-    # emphasis agrees with the match score already shown to the user.
-    try:
-        jd_profile = JDProfile.build(job.description)
-    except ValueError:
-        return None, None, None, Response(
-            {
-                "error": "This job has no usable description to tailor against.",
-                "code": "job_description_missing",
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    return master, job, jd_profile, None
+    return Response(exc.as_dict(), status=exc.status_code)
 
 
 class TailorResumeView(APIView):
@@ -577,72 +514,13 @@ class TailorResumeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-
-        master, job, jd_profile, error = _tailoring_context(
-            request.user, request.data.get("job_id")
-        )
-        if error is not None:
-            return error
-
-        uid = request.user.pk
-        progress.reset(uid)
-        progress.emit(uid, "start", "Request received.")
-        started = time.monotonic()
-
         try:
-            # Resolve this account's provider first, then ask for a key *for
-            # that provider*. The order matters: resolving the key first would
-            # mean looking up a hardcoded provider, which is exactly the bug
-            # that made this view Gemini-only when Groq arrived.
-            #
-            # Both calls stay inside this try because both can fail with an
-            # AIError -- an unconfigured deployment raises AIConfigurationError
-            # from get_ai_provider() -- and the handler below turns that into a
-            # real response with a message instead of a bare 500.
-            effective, _reason = selection.resolve_provider_name(request.user)
-            provider = factory.get_ai_provider(effective)
-
-            # The key, resolved here and now -- at the single moment it is
-            # needed -- rather than held in memory for the session. Absent for
-            # a keyless provider like Ollama, which simply ignores it.
-            api_key = _api_key_for(request.user, effective)
-
-            progress.emit(
-                uid,
-                "provider",
-                f"Provider: {effective or 'unconfigured'}, model "
-                f"{provider.describe().get('model') or 'unknown'}.",
-            )
-            progress.emit(uid, "prompt", "Building the tailoring prompt from your resume and this job.")
-
-            # Emitted immediately before the call. The wording matters: on a CPU
-            # this is minutes, and saying so up front is the difference between
-            # "it is working" and "it has hung".
-            progress.emit(
-                uid,
-                "generating",
-                "Waiting for the model. On CPU this can take several minutes. "
-                "The page may look idle; it is not.",
-            )
-
-            outcome = ResumeTailor.tailor_resume(
-                provider=provider,
-                resume=_stored_profile(master),
-                job={
-                    "title": job.title,
-                    "company": job.company,
-                    "location": job.location,
-                    "description": job.description,
-                },
-                # The match analysis already computed for this job, reused
-                # rather than recomputed.
-                match_analysis=job.match_result or {},
-                jd_profile=jd_profile,
-                api_key=api_key,
+            payload = tailoring_service.generate_tailoring(
+                request.user, request.data.get("job_id")
             )
         except AITailoringValidationError as exc:
             # Fabricated output is never returned as a suggestion. The
-            # violations are returned so the UI can explain the rejection.
+            # violations come back so the UI can explain the rejection.
             return Response(
                 {
                     "error": exc.message,
@@ -652,31 +530,9 @@ class TailorResumeView(APIView):
                 status=exc.status_code,
             )
         except AIError as exc:
-            progress.emit(uid, "error", f"Failed after {time.monotonic() - started:.0f}s: {exc.message}", level="error")
             return _ai_error_response(exc)
-
-        progress.emit(
-            uid,
-            "validating",
-            "Checking the result against your original resume for invented facts.",
-        )
-
-        elapsed = time.monotonic() - started
-        verdict = outcome.validation.status if hasattr(outcome.validation, "status") else "unknown"
-        progress.emit(
-            uid,
-            "done",
-            f"Finished in {elapsed:.0f}s. Factual check: {verdict}.",
-            level="done",
-        )
-
-        payload = outcome.as_dict()
-        payload["job"] = {
-            "id": job.id,
-            "title": job.title,
-            "company": job.company,
-        }
-        payload["master_resume_id"] = master.id
+        except TailoringError as exc:
+            return _tailoring_error_response(exc)
 
         return Response(payload, status=status.HTTP_200_OK)
 
@@ -697,83 +553,15 @@ class SaveTailoredResumeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-
-        master, job, jd_profile, error = _tailoring_context(
-            request.user, request.data.get("job_id")
-        )
-        if error is not None:
-            return error
-
-        raw_result = request.data.get("result")
-        if not isinstance(raw_result, dict):
-            return Response(
-                {"error": "A tailoring result is required.", "code": "result_missing"},
-                status=status.HTTP_400_BAD_REQUEST,
+        try:
+            tailored, _validation = tailoring_service.save_tailored_resume(
+                request.user,
+                request.data.get("job_id"),
+                request.data.get("result"),
+                provider_name=request.data.get("provider") or "",
             )
-
-        # Re-run the same normalisation and validation the service ran, against
-        # our own copy of the master resume.
-        parsed = normalise(raw_result)
-        source = build_source_resume(_stored_profile(master))
-        validation = validate_tailoring(parsed, source)
-
-        if validation.rejected:
-            return Response(
-                {
-                    "error": "This tailoring claims experience the master resume does "
-                              "not support, so it was not saved.",
-                    "code": "ai_validation_failed",
-                    "violations": [v.as_dict() for v in validation.violations],
-                },
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            )
-
-        payload = parsed.to_dict()
-        validation_payload = validation.as_dict()
-        provider_name = request.data.get("provider") or ""
-
-        tailored = Resume.objects.create(
-            user=request.user,
-            # Company + role reads naturally in the workspace and makes a
-            # sensible download filename. The master name is deliberately not
-            # folded in: it is already shown as the provenance link, and the
-            # download filename strips parentheses anyway, which turned
-            # "Acme - BE (Master Resume)" into "... BE Master Resume".
-            name="%s - %s" % (job.company or "Job", job.title or "Role"),
-            resume_type="TAILORED",
-            is_master=False,
-            source_resume=master,
-            source_job=job,
-                # The source view is re-derived from the stored master rather than
-            # taken from the request, so a saved version is self-describing and
-            # cannot be told to believe a client-supplied "original".
-            tailoring_result={
-                "result": payload,
-                "validation": validation_payload,
-                "source": source,
-            },
-            ai_provider=str(provider_name)[:50],
-            # The structured content, so the existing resume endpoints can serve
-            # this version without a document generator.
-            profile_data=payload,
-        )
-
-        # Mirror the master's profile so a tailored resume is a normal resume to
-        # the rest of the app. Deliberately the *full* master skill list, not
-        # the emphasised subset: emphasis reorders in build_document, and
-        # storing only the subset would silently drop every other skill from
-        # the generated document.
-        master_profile = _stored_profile(master)
-        ResumeProfile.objects.update_or_create(
-            resume=tailored,
-            defaults={
-                "skills": master_profile.get("skills") or [],
-                "experience": master_profile.get("experience") or {},
-                "education": master_profile.get("education") or "",
-                "projects": master_profile.get("projects") or "",
-                "certifications": master_profile.get("certifications") or "",
-            },
-        )
+        except TailoringError as exc:
+            return _tailoring_error_response(exc)
 
         return Response(
             ResumeSerializer(tailored).data,
