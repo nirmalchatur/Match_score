@@ -3,10 +3,10 @@
 python-docx==1.2.0
 reportlab==5.0.1
 
-asgiref==3.12.1
+asgiref==3.13.0
 beautifulsoup4==4.15.0
-certifi==2026.7.22
-charset-normalizer==3.5.1
+certifi==2026.10.23
+charset-normalizer==3.5.2
 # Fernet, for encrypting user-supplied third-party API keys at rest
 # (apps.users.crypto). Wheels bundle the native OpenSSL binding, so this
 # needs no system library on Render.
@@ -22,12 +22,12 @@ idna==3.20
 psycopg==3.3.6
 psycopg-binary==3.3.6
 pypdf==6.19.0
-python-dotenv==1.2.3
+python-dotenv==1.2.4
 requests==2.34.2
-soupsieve==2.10
+soupsieve==3.0.4
 sqlparse==0.6.0
 typing_extensions==4.16.0
-tzdata==2026.4
+tzdata==2026.6
 urllib3==2.8.0
 django-cors-headers==4.9.0
 
