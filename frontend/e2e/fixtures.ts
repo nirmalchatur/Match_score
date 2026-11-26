@@ -35,6 +35,22 @@ export class FakeApi {
     return this.json('GET', '/auth/me/', 200, { authenticated: false, user: null })
   }
 
+  /**
+   * A signed-in user with a master resume and an empty workspace: enough for
+   * the app shell to render. Anything else still answers 404 (not 401/403, so
+   * it never triggers the "session expired" redirect).
+   */
+  signedIn(): this {
+    return this.json('GET', '/auth/me/', 200, {
+      authenticated: true,
+      user: { id: 1, email: 'e2e@example.com', first_name: 'E2E', has_master_resume: true },
+    })
+      .json('GET', '/jobs/', 200, [])
+      .json('GET', '/resumes/', 200, [])
+      .json('GET', '/applications/', 200, [])
+      .json('GET', '/notifications/', 200, { results: [], unread_count: 0 })
+  }
+
   async install(): Promise<void> {
     await this.page.route(`${FAKE_API}/**`, async (route) => {
       const request = route.request()
