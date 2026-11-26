@@ -1,7 +1,7 @@
 # Resume document generation. DOCX via python-docx; PDF via reportlab
 # (pure Python, so no system binary or headless browser is required).
 python-docx==1.2.0
-reportlab==5.0.1
+reportlab==5.1.0
 
 asgiref==3.12.1
 beautifulsoup4==4.15.0
@@ -24,7 +24,7 @@ psycopg-binary==3.3.6
 # 6.21.4 clears 18 advisories against 6.19.0. Held on 6.x: 7.0 is a major
 # release and resume parsing (apps/resumes/services/parser.py) deserves its
 # own PR for that jump.
-pypdf==6.21.4
+pypdf==7.1.1
 python-dotenv==1.2.3
 requests==2.34.2
 # 2.10 -> 4.x for CVE-2026-126190/126191/126193. beautifulsoup4 accepts any
