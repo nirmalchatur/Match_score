@@ -12,10 +12,12 @@ from apps.jobs.services import ats_registry
 from apps.jobs.services import job_search
 from apps.jobs.services.job_collector import JobCollector
 from apps.jobs.services.job_processor import JobProcessor
-from apps.jobs.services.sources.greenhouse import GreenhouseCollector
+# Not called here, but re-exported on purpose: test_dashboard_api patches
+# ``apps.jobs.views.GreenhouseCollector.collect``. Removing it breaks those
+# patches, not this module.
+from apps.jobs.services.sources.greenhouse import GreenhouseCollector  # noqa: F401
 from apps.resumes.models import Resume
 
-from .models import Job
 from .models import Job
 from .serializers import (
     AnalyzeJobSerializer,

@@ -16,7 +16,7 @@ from django.urls import reverse
 from apps.ai.exceptions import AIProviderUnavailableError
 from apps.ai.providers.base import TailoringRequest
 from apps.ai.providers.gemini import GeminiProvider
-from apps.users.crypto import CredentialCryptoError, decrypt, encrypt, mask
+from apps.users.crypto import CredentialCryptoError, decrypt, encrypt
 from apps.users.models import ProviderCredential
 
 User = get_user_model()

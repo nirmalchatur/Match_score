@@ -8,7 +8,6 @@ that someone else applied to a company, so the filter is written into the
 query rather than applied afterwards.
 """
 
-from django.db.models import Count, Q
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response

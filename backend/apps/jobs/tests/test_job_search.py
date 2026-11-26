@@ -110,6 +110,14 @@ class SearchServiceTests(TestCase):
 
         result = job_search.search_jobs(self.user)
 
+        # This test used to end at the call above and assert nothing, so it
+        # passed whatever search_jobs returned. A stale stored 5.0 would sit
+        # below the useful threshold and the job would vanish; a fresh rescore
+        # against the Python/Django resume keeps it, with a real score.
+        rows = [row for row in result["results"] if row["job_id"] == job.id]
+        self.assertEqual(len(rows), 1)
+        self.assertNotEqual(rows[0]["score"], 5.0)
+        self.assertGreater(rows[0]["score"], 5.0)
 
     def test_free_text_filter_narrows_results(self):
         make_job(self.user, "Python Engineer", company="Acme", skills=["Python"])

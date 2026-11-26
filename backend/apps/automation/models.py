@@ -277,18 +277,3 @@ class NotificationPreference(models.Model):
             return self.job_updates or self.job_matches
         return self.job_updates
 
-
-    def __str__(self):
-        return "%s: %s" % (self.user_id, self.title)
-
-    def mark_read(self) -> bool:
-        """Stamp ``read_at`` if unread. Returns True when it changed."""
-        from django.utils import timezone
-
-        if self.is_read:
-            return False
-        self.is_read = True
-        self.read_at = timezone.now()
-        self.save(update_fields=["is_read", "read_at"])
-        return True
-

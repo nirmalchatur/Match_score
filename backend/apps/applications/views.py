@@ -7,7 +7,7 @@ account's applications, and a guessed id resolves to 404 rather than 403 so the
 API never confirms that an id exists.
 """
 
-from django.db.models import Count, Q
+from django.db.models import Count
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response

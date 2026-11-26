@@ -20,7 +20,7 @@ from apps.ai.providers.fake import FakeAIProvider
 from apps.ai.schemas import extract_json, parse_tailoring_response
 from apps.ai.tailor import ResumeTailor
 
-from .fixtures import JOB, JD_PROFILE, MATCH, SOURCE_PROFILE, valid_payload
+from .fixtures import JOB, MATCH, SOURCE_PROFILE, valid_payload
 
 
 def _request() -> TailoringRequest:

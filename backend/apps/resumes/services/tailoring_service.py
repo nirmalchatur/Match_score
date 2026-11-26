@@ -323,7 +323,7 @@ def generate_tailoring(user, job_id) -> dict:
                     jd_profile=jd_profile,
                     api_key=api_key,
                 )
-            except AITailoringValidationError as exc:
+            except AITailoringValidationError:
                 # Fabricated output is never returned as a suggestion. Recorded
                 # as a validation failure, then re-raised so the API can return
                 # the violations for the review screen.

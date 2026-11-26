@@ -9,7 +9,7 @@ component names, not brand, and are not being renamed.
 
 ## Getting set up
 
-**Requirements:** Python 3.12 (CI and Render) and Node 20.
+**Requirements:** Python 3.12 (CI and Render) and Node 22 (CI).
 
 ```bash
 git clone https://github.com/nirmalchatur/Match_score.git
@@ -38,29 +38,80 @@ trailing `/api`**. The build refuses to run without it, because a missing
 value silently produces a bundle that calls its own origin. For a deliberate
 same-origin build, set `ALLOW_RELATIVE_API=1`.
 
+For lint and coverage tooling, install `requirements-dev.txt` instead of
+`requirements.txt` (it includes it):
+
+```bash
+pip install -r backend/requirements-dev.txt
+```
+
+**Adding a feature?** Read [docs/ADDING_A_FEATURE.md](docs/ADDING_A_FEATURE.md)
+first. It covers where code goes, which tests a feature PR needs, and how to
+fake the API in frontend tests.
+
 ## What must pass before a PR
+
+```bash
+make check      # everything below except e2e
+make e2e        # Playwright smoke tests
+```
+
+Or by hand:
 
 ```bash
 # Backend
 cd backend
+ruff check .
 python manage.py check
 python manage.py makemigrations --check --dry-run
-python manage.py test
+coverage run manage.py test && coverage report   # fails under the coverage floor
 
 # Frontend
 cd ../frontend
-npx tsc -b
 npm run lint
-npm run build
+npm test                 # Vitest unit + component tests
+npm run build            # includes tsc
+npm run test:e2e         # Playwright, against the production bundle
 ```
 
-All of these are CI gates. A PR that fails them will not merge, and there is
-no override. If a check fails, fix the cause rather than relaxing the check.
+All of these are CI gates, rolled up into a single **CI status** check. A PR
+that fails them will not merge, and there is no override. If a check fails,
+fix the cause rather than relaxing the check.
 
-There is currently **no frontend test runner** — no `test` script and no test
-files. Frontend correctness is enforced by `tsc` and the production build. If
-you add a runner, that is a welcome contribution and it does not need to be
-introduced as a framework.
+### Tests
+
+| Layer | Tool | Lives in |
+| --- | --- | --- |
+| Django models, services, API | `manage.py test` | `backend/apps/<app>/tests/` |
+| Architecture boundaries | `manage.py test` | `backend/apps/common/tests/test_architecture.py` |
+| API contract | Newman | `scripts/build_postman_collection.py` |
+| Frontend logic and components | Vitest + Testing Library | `frontend/src/**/*.test.ts(x)`, next to the code |
+| Routing, guards, the built bundle | Playwright | `frontend/e2e/` |
+
+A PR that changes behaviour adds or changes a test. A bug fix starts with a
+test that fails without the fix.
+
+**Coverage** is measured for the backend in CI, with a floor set in
+`backend/pyproject.toml` (`fail_under`). If your PR raises coverage, you're
+welcome to raise the floor. Never lower it to make a PR pass.
+
+**Lint** for the backend is ruff with bug-finding rules only (pyflakes and
+syntax errors; see `backend/pyproject.toml`). Style isn't gated. If you need
+an unused import on purpose, for example a name a test patches, keep it with
+`# noqa: F401` and a comment saying why.
+
+Optionally, `pip install pre-commit && pre-commit install` runs ruff and a
+private-key check on every commit.
+
+## Finding something to work on
+
+- Issues labelled **`good first issue`** are scoped to be finishable without
+  knowing the whole codebase. **`help wanted`** marks larger ones the
+  maintainer would welcome help on.
+- Comment on the issue to say you're taking it, so two people don't build the
+  same thing.
+- For a new idea, open a **Feature request** first. The template asks the
+  questions a reviewer would.
 
 ## Branching and PRs
 
@@ -69,8 +120,10 @@ introduced as a framework.
   reused branches: PRs #17 through #25 all came from a handful of branch
   names, and commits pushed after a merge silently went nowhere. Create a
   fresh branch per change and delete it once merged.
-- Open a PR against `main` with a description of *why*, not just *what*.
+- Open a PR against `main` with a description of *why*, not just *what*. The
+  PR template has a short checklist.
 - Reference the issue it closes, if there is one.
+- Review is requested automatically from the owners in `.github/CODEOWNERS`.
 
 ## Code style
 
@@ -110,7 +163,9 @@ Please do **not** open a public issue for a vulnerability. See
 
 ## Code of conduct
 
-Be decent. Critique the code, not the person. Assume good faith.
+Be decent. Critique the code, not the person. Assume good faith. The full
+version, including how to report a problem, is in
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## Licence
 

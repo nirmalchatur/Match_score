@@ -5,7 +5,7 @@ Tests the pipeline:
     URL → JobFetcher.fetch(url) → JDParser.parse(html) → JobData
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from django.test import TestCase
 import requests

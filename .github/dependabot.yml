@@ -34,6 +34,9 @@ updates:
         patterns: [cryptography]
       database:
         patterns: [psycopg, psycopg-binary, dj-database-url]
+      # requirements-dev.txt: lint and coverage, never deployed.
+      dev-tooling:
+        patterns: [ruff, coverage]
       # Everything unremarkable: TLS, parsing, small utilities. One PR.
       maintenance:
         patterns: ['*']
@@ -48,6 +51,8 @@ updates:
           - psycopg
           - psycopg-binary
           - dj-database-url
+          - ruff
+          - coverage
 
   # --- JavaScript: React, the router, the build toolchain ---
   - package-ecosystem: npm
@@ -67,7 +72,7 @@ updates:
       react-core:
         patterns: ['react', 'react-dom', 'react-router-dom', '@types/react*']
       testing:
-        patterns: [vitest, '@testing-library/*', 'jsdom', eslint, 'eslint-*']
+        patterns: [vitest, '@vitest/*', '@testing-library/*', 'jsdom', '@playwright/test', eslint, 'eslint-*']
 
   # --- CI itself ---
   # Actions are third-party code with write access to the repository. This is

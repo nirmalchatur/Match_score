@@ -17,7 +17,6 @@ from under the running test session and corrupt every other test.
 """
 
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path

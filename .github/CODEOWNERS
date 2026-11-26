@@ -1,0 +1,12 @@
+# Owners are requested for review automatically on every PR that touches
+# their paths. With branch protection's "Require review from Code Owners"
+# switched on, their approval is also required to merge.
+#
+# Later rules win. Add yourself to a path once you maintain it.
+
+*                         @nirmalchatur
+
+# Security-sensitive: credentials, auth, throttling, CI and its secrets.
+/backend/apps/users/      @nirmalchatur
+/backend/config/          @nirmalchatur
+/.github/                 @nirmalchatur

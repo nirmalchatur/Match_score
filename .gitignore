@@ -81,7 +81,14 @@ desktop.ini
 
 .pytest_cache/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
+.ruff_cache/
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
 
 # =========================
 # Build

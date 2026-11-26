@@ -18,7 +18,6 @@ from rest_framework.test import APIClient
 
 from .security import (
     SecurityEvent,
-    change_password,
     list_sessions,
     revoke_other_sessions,
 )

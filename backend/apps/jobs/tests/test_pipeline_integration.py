@@ -229,7 +229,6 @@ class GreenhouseJobProcessorPipelineTest(TestCase):
 
         # Act & Assert: Should raise RelatedObjectDoesNotExist
         # (Django raises this when related object doesn't exist)
-        from django.core.exceptions import ObjectDoesNotExist
 
         with self.assertRaises(ObjectDoesNotExist):
             JobProcessor.process(job_data, self.user)

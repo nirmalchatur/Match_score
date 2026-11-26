@@ -285,7 +285,11 @@ class MatchEngine:
             )
         )
 
-        candidate_years = float(
+        # TODO: computed but never compared against a "N+ years" requirement
+        # in this loop, so a stated years requirement does not affect the
+        # requirements score. Kept (not deleted by the linter) because it marks
+        # a known gap; see the experience factor for where years do count.
+        candidate_years = float(  # noqa: F841
             resume_experience.get(
                 "total_years",
                 0,

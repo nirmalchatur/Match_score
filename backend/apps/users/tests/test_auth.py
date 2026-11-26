@@ -168,6 +168,10 @@ class CsrfTokenTests(TestCase):
             content_type="application/json",
         )
 
+        # Previously this test made the request and asserted nothing.
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(User.objects.filter(email="weak@example.com").exists())
+
 
 class LoginTests(TestCase):
     def setUp(self):

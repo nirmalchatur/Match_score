@@ -62,25 +62,35 @@ bundle, set `ALLOW_RELATIVE_API=1`.
 
 ## Checks
 
+`make check` runs all of the following from the repo root. By hand:
+
 ```bash
-# backend
+# backend (pip install -r requirements-dev.txt first)
+ruff check .
 python manage.py check
 python manage.py makemigrations --check --dry-run
-python manage.py test
+coverage run manage.py test && coverage report
 
 # frontend
-npx tsc -b
 npm run lint
-npm run build
+npm test            # Vitest
+npm run build       # includes tsc -b
+npm run test:e2e    # Playwright; `npx playwright install chromium` once
 ```
 
-The full backend suite is 682 tests and takes roughly 250 seconds.
+The full backend suite is about 680 tests. On a modern machine it runs in under
+a minute; older hardware has been measured at several minutes.
 
-There is no frontend test runner configured — `package.json` has no `test`
-script and `src` contains no test files. Frontend correctness is currently
-enforced by `tsc` and the production build only. Adding a runner is a
-reasonable next step, and the animation and theme code are the places that
-would most benefit.
+Frontend tests come in two kinds:
+
+- **Vitest** (`src/**/*.test.ts(x)`, jsdom): pure logic in `src/lib`, the
+  session cache, the API client's CSRF and error handling, and components
+  rendered with Testing Library. `fetch` is stubbed, so no backend is needed.
+- **Playwright** (`e2e/`): builds the production bundle against a fake API host
+  and drives it in Chromium, intercepting every API call. It checks routing, the
+  auth guards, and that the bundle boots. Still no backend needed.
+
+See [ADDING_A_FEATURE.md](ADDING_A_FEATURE.md) for which to write when.
 
 ## Architecture rules and boundary tests
 
