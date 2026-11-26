@@ -19,8 +19,8 @@ cryptography==50.0.1
 Django==6.1.1
 djangorestframework==3.18.3
 idna==3.20
-psycopg==3.3.6
-psycopg-binary==3.3.6
+psycopg==3.3.9
+psycopg-binary==3.3.9
 # 6.21.4 clears 18 advisories against 6.19.0. Held on 6.x: 7.0 is a major
 # release and resume parsing (apps/resumes/services/parser.py) deserves its
 # own PR for that jump.
