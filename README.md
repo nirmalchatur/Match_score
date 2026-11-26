@@ -1,5 +1,11 @@
 # TailorUp
 
+[![CI](https://github.com/nirmalchatur/Match_score/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nirmalchatur/Match_score/actions/workflows/ci.yml)
+[![API tests](https://github.com/nirmalchatur/Match_score/actions/workflows/api-tests.yml/badge.svg?branch=main)](https://github.com/nirmalchatur/Match_score/actions/workflows/api-tests.yml)
+[![CodeQL](https://github.com/nirmalchatur/Match_score/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/nirmalchatur/Match_score/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 Open-source job analysis. Point it at a job posting, score the posting against
 your master resume, see the specific skill gap, and generate a tailored version
 of the resume for that role.
@@ -209,11 +215,18 @@ are in [docs/SECURITY.md](docs/SECURITY.md).
 ## Testing
 
 ```bash
-cd backend
-python manage.py test
+make check   # lint, Django suite + coverage, Vitest, type-check + build
+make e2e     # Playwright smoke tests against the production bundle
 ```
 
-605 tests. Run one app or one module with a path:
+| Suite | Command | What it covers |
+| --- | --- | --- |
+| Django (~680 tests) | `cd backend && python manage.py test` | Models, services, API, tenant isolation, architecture boundaries |
+| Frontend unit | `cd frontend && npm test` | Formatting, session cache, API client (CSRF, errors), components |
+| E2E smoke | `cd frontend && npm run test:e2e` | The built bundle in Chromium: routing, auth guards, sign-in |
+| API contract | `python scripts/run_api_tests.py` | Newman against a live Django ([scripts/README.md](scripts/README.md)) |
+
+Run one Django app or one module with a path:
 
 ```bash
 python manage.py test apps.jobs
@@ -224,8 +237,8 @@ The suite is weighted towards the properties that fail silently rather than
 loudly: cross-tenant isolation, idempotency of de-duplicated writes, and the
 cases where a result is empty for a reason the caller has to be told about.
 
-Continuous integration runs the suite, a dependency audit, and a CodeQL scan on
-every push. `main` requires both the CI status and the secret-scan check to pass
+Continuous integration runs all of the above, ruff, a backend coverage floor, a
+dependency audit, and a CodeQL scan on every push. `main` requires both the CI status and the secret-scan check to pass
 before a pull request can merge, and the branch does not allow force pushes.
 
 ## Configuration
@@ -261,6 +274,7 @@ each side needs, is in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 | [AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md)     | The extraction and generation pipeline    |
 | [API.md](docs/API.md)                             | Every endpoint, with request and response |
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md)             | Conventions and the local loop            |
+| [ADDING_A_FEATURE.md](docs/ADDING_A_FEATURE.md)   | Where code goes, which tests to write     |
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md)               | Production setup                          |
 | [SECURITY.md](docs/SECURITY.md)                   | Threat model and trust boundaries         |
 | [SKILL_GAP.md](docs/SKILL_GAP.md)                 | The skill-gap analysis                    |
@@ -269,11 +283,13 @@ each side needs, is in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Contributing
 
-Issues and pull requests are welcome. Before opening a pull request:
+Issues and pull requests are welcome. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md), and if you're building a feature,
+[docs/ADDING_A_FEATURE.md](docs/ADDING_A_FEATURE.md). Look for issues labelled
+`good first issue`. Before opening a pull request:
 
 ```bash
-cd backend && python manage.py test
-cd frontend && npm run build
+make check
 ```
 
 Branch protection on `main` requires the CI status and the secret scan, so a

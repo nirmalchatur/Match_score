@@ -1,0 +1,45 @@
+name: Feature request
+description: Propose something new, or a change to how something works.
+labels: [enhancement, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Agreeing on the idea before writing code saves rework. If you plan to build it yourself, say so below.
+        docs/ADDING_A_FEATURE.md explains where code goes and what tests a feature PR needs.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that is hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should happen? Rough UI sketches or example API payloads help.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: Needs a backend change (model, endpoint, or service)
+        - label: Needs a frontend change
+        - label: Changes an architectural boundary (may need an ADR)
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Will you work on this?
+      options:
+        - Yes, I'd like to open the PR
+        - Maybe, with some guidance
+        - No, just suggesting it
+    validations:
+      required: true
