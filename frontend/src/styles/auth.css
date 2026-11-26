@@ -186,8 +186,16 @@
   border-radius: var(--r-lg);
 }
 
+.auth-proof-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .auth-proof-label {
-  margin-bottom: 2px;
+  margin: 0 0 2px;
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.12em;

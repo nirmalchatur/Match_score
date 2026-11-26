@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
+import { usePageMeta } from '../hooks/usePageMeta'
+import { privateSeo } from '../lib/seo'
 import { useAuth } from '../auth/useAuth'
 import { formatDate } from '../lib/format'
 import type { Resume } from '../lib/types'
@@ -10,6 +12,7 @@ import { IconCheck, IconFile, IconLogo, IconUpload, IconZap } from '../component
 const MAX_BYTES = 10 * 1024 * 1024
 
 export function OnboardingPage() {
+  usePageMeta(privateSeo('Set up: your resume', '/setup/resume'))
   const { user, refresh } = useAuth()
   const navigate = useNavigate()
   const fileInput = useRef<HTMLInputElement>(null)

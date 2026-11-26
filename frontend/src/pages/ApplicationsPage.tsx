@@ -118,7 +118,7 @@ export function ApplicationsPage({
 
       <section className="card">
         <div className="card-head">
-          <h3>Applications</h3>
+          <h2>Applications</h2>
           <div className="card-head-actions">
             <span className="pill">{loading ? '—' : visible.length}</span>
             <button

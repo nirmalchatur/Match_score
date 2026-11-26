@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import type { JobSummary } from '../lib/types'
 import { IconRefresh, IconSearch } from '../components/Icons'
@@ -24,8 +25,12 @@ const SORTS = [
 ]
 
 export function JobsPage() {
-  const [search, setSearch] = useState('')
-  const [debounced, setDebounced] = useState('')
+  // `?q=` is how the topbar search on other pages hands a query over, and
+  // writing it back keeps a search shareable and alive across a refresh.
+  const [params, setParams] = useSearchParams()
+  const initialQuery = params.get('q') ?? ''
+  const [search, setSearch] = useState(initialQuery)
+  const [debounced, setDebounced] = useState(initialQuery.trim())
   const [status, setStatus] = useState('')
   const [sort, setSort] = useState('-created_at')
 
@@ -39,6 +44,16 @@ export function JobsPage() {
     const timer = window.setTimeout(() => setDebounced(search.trim()), 300)
     return () => window.clearTimeout(timer)
   }, [search])
+
+  useEffect(() => {
+    const current = params.get('q') ?? ''
+    if (current === debounced) return
+    const next = new URLSearchParams(params)
+    if (debounced) next.set('q', debounced)
+    else next.delete('q')
+    // replace, not push: one history entry per page, not one per keystroke.
+    setParams(next, { replace: true })
+  }, [debounced, params, setParams])
 
   useEffect(() => {
     let cancelled = false
@@ -158,7 +173,7 @@ export function JobsPage() {
       <section className="grid-dashboard">
         <div className="card sticky-col">
           <div className="card-head">
-            <h3>Jobs</h3>
+            <h2>Jobs</h2>
             <div className="card-head-actions">
               <span className="pill">{jobs.length}</span>
             </div>

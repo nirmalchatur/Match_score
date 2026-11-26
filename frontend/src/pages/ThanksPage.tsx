@@ -26,7 +26,7 @@ export function ThanksPage() {
 
   return (
     <div className="mk-landing-shell">
-      <div className="notfound thanks">
+      <main className="notfound thanks">
         <BrandMark size={40} className="notfound-mark" />
         <h1 className="notfound-title">Your account is ready</h1>
         <p className="notfound-body">
@@ -58,7 +58,7 @@ export function ThanksPage() {
             Skip for now
           </Link>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

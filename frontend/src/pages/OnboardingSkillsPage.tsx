@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Alert } from '../components/primitives'
 import { IconCheck, IconLogo } from '../components/Icons'
 import { ApiError, api } from '../lib/api'
+import { usePageMeta } from '../hooks/usePageMeta'
+import { privateSeo } from '../lib/seo'
 import type { QualityKind, QualitiesResponse, QualitySelection } from '../lib/types'
 
 /**
@@ -16,6 +18,7 @@ import type { QualityKind, QualitiesResponse, QualitySelection } from '../lib/ty
  * courtesy so the user is not made to discover the rule by being rejected.
  */
 export function OnboardingSkillsPage() {
+  usePageMeta(privateSeo('Set up: your skills', '/setup/skills'))
   const navigate = useNavigate()
 
   const [data, setData] = useState<QualitiesResponse | null>(null)

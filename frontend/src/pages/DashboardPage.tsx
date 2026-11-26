@@ -139,7 +139,7 @@ export function DashboardPage({
 
       <section className="card">
         <div className="card-head">
-          <h3>Recent applications</h3>
+          <h2>Recent applications</h2>
           <div className="card-head-actions">
             <span className="pill">{applicationsLoading ? '—' : applications.length}</span>
           </div>
@@ -194,7 +194,7 @@ export function DashboardPage({
       <section className="grid-dashboard">
         <div className="card sticky-col">
           <div className="card-head">
-            <h3>Recent jobs</h3>
+            <h2>Recent jobs</h2>
             <div className="card-head-actions">
               <button
                 type="button"

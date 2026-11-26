@@ -25,7 +25,7 @@ export function AuthLayout({
       <div className="bg-fx" aria-hidden="true" />
 
       <aside className="auth-aside">
-        <Link to="/" className="auth-brand">
+        <Link to="/" className="auth-brand" aria-label="TailorUp home">
           <span className="brand-mark">
             <IconLogo size={19} />
           </span>
@@ -42,20 +42,24 @@ export function AuthLayout({
           Your career workspace is waiting. Sign in to keep analysing, matching, and improving.
         </p>
 
-        <ul className="auth-proof">
-          <div className="auth-proof-label">What you get</div>
-          {PROOF.map((item) => (
-            <li key={item}>
-              <span className="auth-proof-dot" />
-              {item}
-            </li>
-          ))}
-        </ul>
+        {/* The label sits outside the list: a <ul> may only contain <li>,
+            and screen readers announce the item count from it. */}
+        <div className="auth-proof">
+          <p className="auth-proof-label" id="auth-proof-label">What you get</p>
+          <ul className="auth-proof-list" aria-labelledby="auth-proof-label">
+            {PROOF.map((item) => (
+              <li key={item}>
+                <span className="auth-proof-dot" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
       </aside>
 
       <main className="auth-main">
         <div className="auth-card">
-          <Link to="/" className="auth-mobile-brand">
+          <Link to="/" className="auth-mobile-brand" aria-label="TailorUp home">
             <span className="brand-mark">
               <IconLogo size={17} />
             </span>

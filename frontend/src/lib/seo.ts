@@ -22,7 +22,7 @@ export const SITE_URL =
   (import.meta.env.VITE_SITE_URL as string | undefined) ?? 'https://match-score-delta.vercel.app'
 
 /** ~60 chars is where Google truncates; longer reads as a wall of grey text. */
-type Seo = { title: string; description: string; path: string; noindex?: boolean }
+export type Seo = { title: string; description: string; path: string; noindex?: boolean }
 
 /**
  * Find-or-create a meta tag and set its content.
@@ -105,3 +105,18 @@ export const SEO = {
 
 /** Every route behind a session. `noindex` is set for all of them. */
 export const PRIVATE_SEO = { noindex: true } as const
+
+/** Generic description for signed-in pages; they are noindex, so it is only for the tab. */
+const APP_DESCRIPTION = 'Your TailorUp workspace.'
+
+/**
+ * Title + noindex for a signed-in or onboarding route.
+ *
+ * Until this existed, every /app and /setup page kept whatever title and
+ * robots value the previous page left behind -- usually the landing page's,
+ * with `index, follow` -- so a browser tab read "TailorUp · Job Matching…" on
+ * every screen and the history menu was a list of identical entries.
+ */
+export function privateSeo(title: string, path: string): Seo {
+  return { title, description: APP_DESCRIPTION, path, ...PRIVATE_SEO }
+}

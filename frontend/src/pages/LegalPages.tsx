@@ -29,6 +29,7 @@ export function LegalShell({
 
   return (
     <div className="mk-landing-shell">
+      <main>
       <article className="legal">
         <p className="legal-eyebrow">Last updated {updated}</p>
         <h1 className="legal-title">{title}</h1>
@@ -42,6 +43,7 @@ export function LegalShell({
           </p>
         </footer>
       </article>
+      </main>
     </div>
   )
 }
