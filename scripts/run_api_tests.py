@@ -281,7 +281,11 @@ def resolve_newman() -> list[str]:
     back to whatever is on PATH. Keeping this in one place means the rest of
     the script never has to care which one is used.
     """
-    local = REPO_ROOT.parent / "node_modules" / ".bin"
+    # REPO_ROOT is already the checkout root (scripts/..), which is where the
+    # workflow's `npm install` puts node_modules. This used to read
+    # REPO_ROOT.parent -- the directory *above* the checkout -- so the local
+    # install was never found and CI failed with FileNotFoundError: 'newman'.
+    local = REPO_ROOT / "node_modules" / ".bin"
     for name in ("newman.cmd", "newman"):
         candidate = local / name
         if candidate.exists():

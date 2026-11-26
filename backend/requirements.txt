@@ -5,7 +5,7 @@ reportlab==5.0.1
 
 asgiref==3.12.1
 beautifulsoup4==4.15.0
-certifi==2026.7.22
+certifi==2026.11.20
 charset-normalizer==3.5.1
 # Fernet, for encrypting user-supplied third-party API keys at rest
 # (apps.users.crypto). Wheels bundle the native OpenSSL binding, so this
@@ -17,14 +17,20 @@ charset-normalizer==3.5.1
 # package guards every stored credential.
 cryptography==50.0.1
 Django==6.1.1
-djangorestframework==3.18.1
+djangorestframework==3.18.3
 idna==3.20
 psycopg==3.3.6
 psycopg-binary==3.3.6
-pypdf==6.19.0
+# 6.21.4 clears 18 advisories against 6.19.0. Held on 6.x: 7.0 is a major
+# release and resume parsing (apps/resumes/services/parser.py) deserves its
+# own PR for that jump.
+pypdf==6.21.4
 python-dotenv==1.2.3
 requests==2.34.2
-soupsieve==2.10
+# 2.10 -> 4.x for CVE-2026-126190/126191/126193. beautifulsoup4 accepts any
+# soupsieve >= 1.6.1, and the job-page scrapers' CSS selectors are covered by
+# apps/jobs/tests/test_generic_source.py and test_greenhouse_collector.py.
+soupsieve==4.1.3
 sqlparse==0.6.0
 typing_extensions==4.16.0
 tzdata==2026.4
