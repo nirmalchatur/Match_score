@@ -429,7 +429,9 @@ class QualitiesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def _payload(self, profile) -> dict:
-        selected = qualities.normalize(profile.qualities)
+        # Lenient on read: a row saved before a catalogue change must not 500
+        # the Settings page. Writes still go through the strict validator.
+        selected = qualities.normalize_stored(profile.qualities)
         return {
             "qualities": selected,
             "selected_count": qualities.count(selected),

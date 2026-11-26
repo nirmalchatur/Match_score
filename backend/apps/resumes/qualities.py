@@ -39,7 +39,10 @@ courtesy, never the control -- a PATCH sent by hand must fail the same way.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 #: The seven groups a candidate picks from, in the order the picker presents
@@ -174,8 +177,9 @@ def normalize(raw: Any) -> dict[str, list[str]]:
 
     if not isinstance(raw, dict):
         raise QualityError(
-            "Qualities must be an object with 'technical', 'project_management' "
-            "and 'soft_skills' lists."
+            "Qualities must be an object with a list for each of: "
+            + ", ".join(KINDS)
+            + "."
         )
 
     unknown_kinds = set(raw) - set(KINDS)
@@ -209,6 +213,59 @@ def normalize(raw: Any) -> dict[str, list[str]]:
         # Catalogue order, not alphabetical, and not the order the client sent.
         out[kind] = [value for value in CATALOGUE[kind] if value.lower() in seen]
 
+    return out
+
+
+def normalize_stored(raw: Any) -> dict[str, list[str]]:
+    """
+    The canonical shape of a value *read from the database*. Never raises.
+
+    :func:`normalize` is strict because it guards writes: a user who picks an
+    option that does not exist should be told. A stored row is different. It
+    can predate a catalogue change -- the categories were renamed from
+    ``technical``/``project_management``/``soft_skills`` to the current seven
+    -- and raising on it made the Settings page and the tailoring flow return
+    500 for every account that had saved qualities before the rename, with no
+    way for the user to fix it from the UI.
+
+    So on read: keep every entry that is still valid, drop the rest, and log a
+    warning naming what was dropped so it is visible in operations. The user
+    sees a selection with gaps and the picker asks them to fill them, which is
+    recoverable; a 500 is not.
+    """
+    if raw in (None, ""):
+        return {kind: [] for kind in KINDS}
+
+    if not isinstance(raw, dict):
+        logger.warning(
+            "qualities.unreadable_row: expected a mapping, got %s; reading as empty",
+            type(raw).__name__,
+        )
+        return {kind: [] for kind in KINDS}
+
+    dropped: list[str] = [f"{kind}/*" for kind in sorted(set(raw) - set(KINDS))]
+    out: dict[str, list[str]] = {}
+    for kind in KINDS:
+        values = raw.get(kind) or []
+        if not isinstance(values, (list, tuple)):
+            dropped.append(f"{kind}/*")
+            values = []
+        seen = set()
+        for value in values:
+            if isinstance(value, str) and value.strip().lower() in _ALLOWED[kind]:
+                seen.add(value.strip().lower())
+            elif isinstance(value, str) and not value.strip():
+                continue
+            else:
+                dropped.append(f"{kind}/{value!r}")
+        out[kind] = [value for value in CATALOGUE[kind] if value.lower() in seen]
+
+    if dropped:
+        # Names of catalogue entries only -- never resume content -- so this is
+        # safe to log.
+        logger.warning(
+            "qualities.dropped_on_read: %s", ", ".join(dropped)
+        )
     return out
 
 

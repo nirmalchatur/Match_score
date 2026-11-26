@@ -171,8 +171,9 @@ def _qualities_list(raw) -> list:
     """
     Flatten a stored ``qualities`` value to a plain list of strings.
 
-    Tolerant of the three shapes this field has held over time: the canonical
-    ``{"technical": [...], ...}`` mapping, a bare list, and nothing at all.
+    Tolerant of the shapes this field has held over time: the canonical
+    ``{kind: [...]}`` mapping (see ``apps.resumes.qualities.KINDS``), the
+    pre-rename ``{"technical": [...], ...}`` mapping, a bare list, and nothing.
     Normalisation failures are swallowed into an empty list on purpose -- a
     malformed row must not stop a tailoring run, and the worst case of dropping
     the list is that the prompt simply omits an optional hint.
@@ -180,7 +181,7 @@ def _qualities_list(raw) -> list:
     from apps.resumes import qualities as qualities_module
 
     try:
-        return qualities_module.as_list(qualities_module.normalize(raw))
+        return qualities_module.as_list(qualities_module.normalize_stored(raw))
     except Exception:  # pragma: no cover - defensive, see docstring
         logger.warning(
             "ai.qualities_unusable: stored qualities could not be normalised; "

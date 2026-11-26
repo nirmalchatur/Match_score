@@ -195,6 +195,77 @@ class AsListTests(SimpleTestCase):
         )
 
 
+#: A row saved before the categories were renamed (commit 0bc1467): the old
+#: three-key shape, plus one value that is valid in a current kind and one
+#: that is in no catalogue at all.
+LEGACY = {
+    "technical": ["Python", "Django"],
+    "project_management": ["Agile"],
+    "soft_skills": ["Communication"],
+}
+
+
+class NormalizeStoredTests(SimpleTestCase):
+    """
+    Reading a stored row must never raise.
+
+    ``normalize`` is strict on purpose -- it guards writes. Stored rows can
+    predate a catalogue change, and raising on them turned the Settings page
+    and the tailoring flow into a 500 for every account that saved qualities
+    before the rename.
+    """
+
+    def test_legacy_kinds_read_as_empty_instead_of_raising(self):
+        with self.assertLogs("apps.resumes.qualities", level="WARNING") as logs:
+            self.assertEqual(q.normalize_stored(LEGACY), {k: [] for k in q.KINDS})
+        self.assertIn("technical", logs.output[0])
+
+    def test_keeps_the_valid_part_of_a_partly_valid_row(self):
+        kind = q.KINDS[0]
+        good = q.CATALOGUE[kind][0]
+        stored = {kind: [good, "Not An Option"], "retired_kind": ["x"]}
+        with self.assertLogs("apps.resumes.qualities", level="WARNING"):
+            result = q.normalize_stored(stored)
+        self.assertEqual(result[kind], [good])
+
+    def test_garbage_reads_as_empty(self):
+        for raw in (["a", "b"], "text", 42, {"programming": "not-a-list"}):
+            with self.subTest(raw=raw), self.assertLogs("apps.resumes.qualities", level="WARNING"):
+                self.assertEqual(q.normalize_stored(raw), {k: [] for k in q.KINDS})
+
+    def test_a_valid_row_is_unchanged_and_silent(self):
+        with self.assertNoLogs("apps.resumes.qualities", level="WARNING"):
+            self.assertEqual(q.normalize_stored(VALID), q.normalize(VALID))
+
+
+class LegacyQualitiesApiTests(TestCase):
+    """The two read paths that used to 500 on a pre-rename row."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="old@example.test", email="old@example.test", password="pw-12345"
+        )
+        master = Resume.objects.create(
+            user=self.user, name="Master", resume_type="MASTER", is_master=True
+        )
+        ResumeProfile.objects.create(
+            resume=master, skills=["python"], experience={}, qualities=LEGACY
+        )
+        self.client.force_login(self.user)
+
+    def test_settings_page_loads_with_a_legacy_row(self):
+        response = self.client.get("/api/resumes/qualities/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["selected_count"], 0)
+
+    def test_tailoring_profile_loads_with_a_legacy_row(self):
+        from apps.resumes.services import tailoring_service
+
+        master = tailoring_service.mastered_resume(self.user)
+        profile = tailoring_service.stored_profile(master)
+        self.assertEqual(profile["qualities"], {k: [] for k in q.KINDS})
+
+
 class QualitiesApiTests(TestCase):
     """
     GET/PUT /api/resumes/qualities/ over HTTP.

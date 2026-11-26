@@ -79,9 +79,11 @@ class MatchEngine:
         different state from "matched none of them".
         """
         try:
-            from apps.resumes.qualities import as_list, normalize
+            from apps.resumes.qualities import as_list, normalize_stored
 
-            selected = as_list(normalize(raw_qualities))
+            # normalize_stored keeps the still-valid part of an old row instead
+            # of raising and losing the whole selection.
+            selected = as_list(normalize_stored(raw_qualities))
         except Exception:  # pragma: no cover - defensive
             selected = []
 
