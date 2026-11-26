@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import re
 
-from apps.resumes.models import Resume
 
 from .document import build_document
 from .docx_generator import ResumeDocxGenerator

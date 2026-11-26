@@ -184,6 +184,15 @@ class NotificationPreferenceTests(TestCase):
 
         self.assertEqual(Notification.objects.filter(user=self.user).count(), 1)
 
+    def test_str_describes_the_preference_row(self):
+        # Regression: Notification's __str__/mark_read were once pasted into
+        # this class as well. The second __str__ silently won and read
+        # ``self.title``, which this model does not have, so the admin list
+        # (and any log line that formatted a preference) raised AttributeError.
+        prefs = NotificationPreference.for_user(self.user)
+        self.assertEqual(str(prefs), f"notification preferences for {self.user.pk}")
+        self.assertFalse(hasattr(prefs, "mark_read"))
+
 
 class EmitTests(TestCase):
     def setUp(self):

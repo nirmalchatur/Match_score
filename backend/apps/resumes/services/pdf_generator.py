@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import io
 
-from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch

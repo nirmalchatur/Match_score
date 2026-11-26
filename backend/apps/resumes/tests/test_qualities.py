@@ -14,7 +14,7 @@ not a control, and a request sent by hand has to fail identically.
 import json
 
 from django.contrib.auth.models import User
-from django.test import Client, SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase
 
 from apps.resumes import qualities as q
 from apps.resumes.models import Resume, ResumeProfile

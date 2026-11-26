@@ -9,18 +9,15 @@ one that produces nothing.
 
 import io
 import json
-import re
 import time
 import zipfile
 
-from django.contrib.auth.models import User
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase
 from docx import Document as ReadDocx
 from pypdf import PdfReader
 
 from apps.ai.tailor import build_source_resume
 from apps.ai.tests.fixtures import SOURCE_PROFILE, valid_payload
-from apps.resumes.models import Resume, ResumeProfile
 from apps.resumes.services.document import build_document, extract_links
 from apps.resumes.services.docx_generator import ResumeDocxGenerator
 from apps.resumes.services.pdf_generator import ResumePdfGenerator

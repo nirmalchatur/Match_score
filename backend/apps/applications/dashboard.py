@@ -12,7 +12,7 @@ and does not issue one query per tile.
 
 from __future__ import annotations
 
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count
 
 from apps.jobs.models import Job
 from apps.resumes.models import Resume

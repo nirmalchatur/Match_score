@@ -12,11 +12,6 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from apps.ai import factory
-from apps.ai.exceptions import (
-    AIConfigurationError,
-    AIProviderTimeoutError,
-    AIProviderUnavailableError,
-)
 from apps.ai.providers.fake import FakeAIProvider
 from apps.ai.providers.gemini import GeminiProvider
 from apps.ai.tests.fixtures import SOURCE_PROFILE, valid_payload

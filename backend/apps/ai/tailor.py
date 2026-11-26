@@ -76,7 +76,6 @@ def _split_projects(text: str) -> list:
             continue
 
         if _BULLET_RE.match(line):
-            marker = _BULLET_RE.match(line).group(0)
             if current is None:
                 current = {"name": "", "bullets": []}
                 blocks.append(current)
