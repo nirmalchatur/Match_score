@@ -1,0 +1,44 @@
+# Tool configuration only. Dependencies stay in requirements.txt (runtime) and
+# requirements-dev.txt (lint, coverage), which is what Render and CI install.
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+# Deliberately narrow: pyflakes (F) and syntax errors (E9) are the rules that
+# find *bugs* -- undefined names, unused results, shadowed definitions. When
+# this was introduced they found a copy-pasted __str__ that crashed the admin
+# and two tests that asserted nothing. Style rules (import order, quotes,
+# %-formatting) are left off so the gate never fails a PR over taste.
+#
+# To widen it, add a family here and fix the findings in the same PR.
+select = ["E9", "F"]
+
+[tool.coverage.run]
+source = ["apps", "config"]
+branch = true
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/tests.py",
+    "*/test_*.py",
+    "config/asgi.py",
+    "config/wsgi.py",
+]
+
+[tool.coverage.report]
+# The CI floor. Measured at introduction and set a little below so normal
+# churn does not trip it; raise it when coverage goes up, never lower it to
+# make a PR pass. See CONTRIBUTING.md.
+fail_under = 80
+show_missing = true
+skip_covered = true
+skip_empty = true
+precision = 1
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

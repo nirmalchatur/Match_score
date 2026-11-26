@@ -1,0 +1,22 @@
+# Optional local hooks: catch in a second what CI would catch in five minutes.
+#
+#   pip install pre-commit && pre-commit install
+#
+# Only the checks CI enforces are here, using the same config, so a commit that
+# passes these will not fail CI on them. Nothing here reformats code.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6
+    hooks:
+      - id: ruff
+        name: ruff (backend)
+        files: ^backend/
+        args: [--config, backend/pyproject.toml]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
