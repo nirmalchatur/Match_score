@@ -259,6 +259,7 @@ export function DevTerminal({ jobs = [] }: { jobs?: JobSummary[] }) {
         className="nav-item devterm-toggle"
         onClick={() => setOpen(true)}
         title="Developer console"
+        aria-label="Developer console"
       >
         <IconTerminal size={17} />
         <span>Dev console</span>

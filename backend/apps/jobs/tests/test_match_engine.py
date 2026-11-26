@@ -2,6 +2,7 @@ from django.test import TestCase
 
 from apps.jobs.services.jd_profile import JDProfile
 from apps.jobs.services.match_engine import MatchEngine
+from apps.resumes import qualities as q
 
 
 class MatchEngineTest(TestCase):
@@ -308,16 +309,24 @@ class QualityMatchTests(TestCase):
             self.assertEqual(result["qualities"]["matched"], [])
             self.assertIn("score", result)
 
-    def test_a_retired_skill_is_treated_as_no_selection(self):
+    def test_retired_options_are_dropped_and_valid_ones_kept(self):
         """
-        The 96-option catalogue was replaced by 25 curated options.
+        The 96-option catalogue was replaced by a curated one.
 
-        An old row holding "Docker" or "Scrum" must normalise to nothing
-        rather than raise, so a profile saved before the change still scores.
+        An old row holding "Docker" or "Scrum" must not raise, so a profile
+        saved before the change still scores. This used to assert the whole
+        selection became empty -- one retired entry threw away the user's
+        still-valid picks too. normalize_stored now drops only what is retired.
         """
+        self.assertIn("Rust", q.CATALOGUE["programming"])
         result = self.calculate(
             {"programming": ["Docker", "Rust"], "project_management": ["Scrum"]}
         )
+        self.assertEqual(result["qualities"]["selected"], ["Rust"])
+        self.assertIn("score", result)
+
+    def test_a_row_with_only_retired_options_is_no_selection(self):
+        result = self.calculate({"programming": ["Docker"], "technical": ["Scrum"]})
         self.assertEqual(result["qualities"]["selected"], [])
         self.assertEqual(result["qualities"]["matched"], [])
 

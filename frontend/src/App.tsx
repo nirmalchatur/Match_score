@@ -1,5 +1,8 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { usePageMeta } from './hooks/usePageMeta'
+import { privateSeo } from './lib/seo'
 import { ApiError, api } from './lib/api'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
@@ -35,12 +38,21 @@ import { ThanksPage } from './pages/ThanksPage'
 import { PrivacyPage, TermsPage } from './pages/LegalPages'
 import { Analytics, CookieBanner } from './components/Analytics'
 
+/**
+ * `search` is the topbar search placeholder, or '' to hide it.
+ *
+ * The box searches jobs from every page: it opens the Jobs view with the
+ * query. It used to say "Search resumes…" on Resumes and "Search
+ * applications…" on Applications while searching nothing at all, so every
+ * placeholder now says what it does. Hidden on Jobs, which has its own
+ * filters, and on Settings, where a search box has no meaning.
+ */
 const HEADINGS: Record<ViewKey, { title: string; search: string }> = {
-  dashboard: { title: 'Dashboard', search: 'Search jobs, companies…' },
-  analyze: { title: 'Analyze a New Job', search: 'Search jobs, companies…' },
-  jobs: { title: 'Jobs', search: 'Search jobs…' },
-  resumes: { title: 'Resumes', search: 'Search resumes…' },
-  applications: { title: 'Applications', search: 'Search applications…' },
+  dashboard: { title: 'Dashboard', search: 'Search your jobs…' },
+  analyze: { title: 'Analyze a New Job', search: 'Search your jobs…' },
+  jobs: { title: 'Jobs', search: '' },
+  resumes: { title: 'Resumes', search: 'Search your jobs…' },
+  applications: { title: 'Applications', search: 'Search your jobs…' },
   settings: { title: 'Settings', search: '' },
 }
 
@@ -70,7 +82,8 @@ function AppShell() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeError, setAnalyzeError] = useState('')
   const [analyzeResult, setAnalyzeResult] = useState<Job | null>(null)
-  const [shellSearch, setShellSearch] = useState('')
+  const [navOpen, setNavOpen] = useState(false)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
 
   const { jobs, jobsLoading, jobsError, refreshJobs } = useWorkspace()
   const {
@@ -99,12 +112,28 @@ function AppShell() {
 
   const view = (PATH_TO_VIEW[location.pathname] ?? 'dashboard') as ViewKey
   const heading = HEADINGS[view] ?? HEADINGS.dashboard
+  usePageMeta(privateSeo(heading.title, PATHS[view]))
 
   const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(' ')
 
+  // Closing the drawer hands focus back to the button that opened it, so a
+  // keyboard user is not dropped at the top of the document.
+  const closeNav = useCallback(() => {
+    setNavOpen(false)
+    menuButtonRef.current?.focus()
+  }, [])
+
   const handleNavigate = useCallback(
     (key: ViewKey) => {
+      setNavOpen(false)
       navigate(PATHS[key] ?? '/app/dashboard')
+    },
+    [navigate],
+  )
+
+  const handleSearch = useCallback(
+    (query: string) => {
+      navigate(`${PATHS.jobs}?q=${encodeURIComponent(query)}`)
     },
     [navigate],
   )
@@ -142,6 +171,9 @@ function AppShell() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <div className="bg-fx" aria-hidden="true" />
 
       <Sidebar
@@ -152,14 +184,18 @@ function AppShell() {
         displayName={displayName}
         jobs={jobs}
         onLogout={() => { void logout() }}
+        open={navOpen}
+        onClose={closeNav}
       />
 
       <div className="main-panel">
         <Topbar
           title={heading.title}
           search={heading.search || undefined}
-          searchValue={shellSearch}
-          onSearchChange={setShellSearch}
+          onSearch={handleSearch}
+          onMenu={() => setNavOpen(true)}
+          menuOpen={navOpen}
+          menuButtonRef={menuButtonRef}
           avatarLabel={displayName || user?.email}
           // Notification links are in-app paths from the backend, not view
           // keys, so they go straight to the router. Passing handleNavigate
@@ -193,6 +229,9 @@ function AppShell() {
           }
         />
 
+        {/* The one <main> landmark: lets screen-reader users jump straight
+            past the sidebar and topbar, and is the skip link's target. */}
+        <main id="main-content" className="main-content" tabIndex={-1}>
         {view === 'dashboard' ? (
           <DashboardPage
             applicationForJob={applicationForJob}
@@ -248,6 +287,7 @@ function AppShell() {
         ) : null}
 
         {view === 'settings' ? <SettingsPage /> : null}
+        </main>
       </div>
 
       <Toasts toasts={toasts} onDismiss={dismissToast} />
@@ -256,8 +296,13 @@ function AppShell() {
 }
 
 export default function App() {
+  const location = useLocation()
+
   return (
     <AuthProvider>
+      {/* Keyed on the path so a crash on one page clears when the user
+          navigates away, instead of trapping them on the error screen. */}
+      <ErrorBoundary resetKey={location.pathname}>
       <Routes>
         {/* Public marketing + auth */}
         <Route element={<RequireAnonymous />}>
@@ -314,6 +359,7 @@ export default function App() {
         */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      </ErrorBoundary>
       <Analytics />
       <CookieBanner />
     </AuthProvider>

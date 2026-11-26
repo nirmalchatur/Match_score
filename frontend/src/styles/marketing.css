@@ -632,7 +632,9 @@
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.45);
+  /* 0.45 measured 4.48:1 on #0a0a0a -- just under WCAG AA's 4.5:1 for 12px
+     text. 0.6 is ~7:1 and still reads as secondary next to the titles. */
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .mk-step-title {
@@ -764,7 +766,7 @@
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.6); /* 0.45 failed WCAG AA (4.48:1) */
 }
 
 .mk-config-row {
@@ -874,7 +876,7 @@
   font-weight: 500;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.6); /* 0.45 failed WCAG AA (4.48:1) */
 }
 
 .mk-footer-col a {
@@ -900,7 +902,7 @@
   padding-bottom: 30px;
   border-top: 1px solid rgba(255, 255, 255, 0.16);
   font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.6); /* 0.45 failed WCAG AA (4.48:1) */
 }
 
 /* ---------- Responsive ---------- */

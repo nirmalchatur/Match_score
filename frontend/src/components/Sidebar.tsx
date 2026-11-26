@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { JobSummary, ViewKey } from '../lib/types'
 import { initials } from '../lib/format'
 import { DevTerminal } from './DevTerminal'
 import { HelpPanel } from './HelpPanel'
+import ThemeToggle from './ThemeToggle'
 import {
   BrandMark,
   IconBriefcase,
+  IconClose,
   IconDashboard,
   IconFile,
   IconHelp,
@@ -43,6 +45,8 @@ export function Sidebar({
   displayName,
   onLogout,
   jobs,
+  open = false,
+  onClose,
 }: {
   view: ViewKey
   onNavigate: (view: ViewKey) => void
@@ -51,7 +55,27 @@ export function Sidebar({
   displayName: string
   onLogout: () => void
   jobs?: JobSummary[]
+  /**
+   * Drawer state on narrow screens. On wide screens the sidebar is always
+   * visible and these do nothing; the CSS decides which mode applies.
+   */
+  open?: boolean
+  onClose?: () => void
 }) {
+  const closeRef = useRef<HTMLButtonElement>(null)
+
+  // Drawer behaviour: move focus in when it opens (so keyboard and screen
+  // reader users land on it rather than behind it) and close on Escape.
+  useEffect(() => {
+    if (!open) return
+    closeRef.current?.focus()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose?.()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
   /**
    * Signing out used to be a two-click confirm: the first click rewrote the
    * label to "Click again to sign out", the second acted on it.
@@ -80,6 +104,9 @@ export function Sidebar({
       className={`nav-item${view === key ? ' active' : ''}`}
       onClick={() => onNavigate(key)}
       aria-current={view === key ? 'page' : undefined}
+      // The visible label is hidden in the icon rail (721-1024px). aria-label
+      // keeps the accessible name there; `title` alone is only a fallback.
+      aria-label={label}
       title={label}
     >
       <Icon size={17} />
@@ -89,12 +116,23 @@ export function Sidebar({
   )
 
   return (
-    <aside className="sidebar">
+    <>
+    {open ? <div className="sidebar-scrim" onClick={onClose} aria-hidden="true" /> : null}
+    <aside id="app-sidebar" className={`sidebar${open ? ' is-open' : ''}`}>
       <div className="sidebar-brand">
         <span className="brand">
           <BrandMark size={22} className="brand-emblem" />
           <span className="brand-name">TailorUp</span>
         </span>
+        <button
+          ref={closeRef}
+          type="button"
+          className="btn btn-ghost btn-icon sidebar-close"
+          onClick={onClose}
+          aria-label="Close navigation"
+        >
+          <IconClose size={16} />
+        </button>
       </div>
 
       <nav className="nav" aria-label="Main navigation">
@@ -115,6 +153,8 @@ export function Sidebar({
           onClick={() => setHelpOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={helpOpen}
+          aria-label="Help"
+          title="Help"
         >
           <IconHelp size={17} />
           <span>Help</span>
@@ -123,6 +163,11 @@ export function Sidebar({
       </nav>
 
       <div className="sidebar-footer">
+        {/* The topbar has no room for the theme switch on a phone, so the
+            drawer carries it there. Hidden by CSS on wider screens. */}
+        <div className="sidebar-theme">
+          <ThemeToggle />
+        </div>
         <div className="user-chip">
           <span className="user-avatar">{initials(displayName || email)}</span>
           <span className="user-meta">
@@ -186,6 +231,7 @@ export function Sidebar({
 
       <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />
     </aside>
+    </>
   )
 }
 

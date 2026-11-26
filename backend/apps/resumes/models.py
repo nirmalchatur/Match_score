@@ -131,9 +131,12 @@ class ResumeProfile(models.Model):
     #: parser found in the document, while these are claims the user has
     #: deliberately made about themselves.
     #:
-    #: The shape is ``{"technical": [...], "project_management": [...],
-    #: "soft_skills": [...]}`` -- see :mod:`apps.resumes.qualities` for the
+    #: The shape is ``{kind: [...]}`` with one key per entry in
+    #: :data:`apps.resumes.qualities.KINDS` -- see that module for the
     #: canonical form, the minimum count, and the catalogue the UI offers.
+    #: Rows saved before the category rename may still hold the old
+    #: ``technical``/``project_management``/``soft_skills`` keys; read them
+    #: with ``qualities.normalize_stored``, never the strict ``normalize``.
     #:
     #: A JSONField rather than a table: the set is small, always read and
     #: written whole, and never queried relationally. A table would buy

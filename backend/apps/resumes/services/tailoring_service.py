@@ -163,8 +163,10 @@ def stored_profile(resume: Resume) -> dict:
         # Chosen qualities ride along with the parsed profile so the tailoring
         # prompt and the match analysis can both see them. Normalised on read
         # as well as on write, because a row written before this field existed
-        # holds {} rather than the canonical three-key shape.
-        "qualities": qualities.normalize(profile.qualities),
+        # holds {} rather than the canonical shape. normalize_stored, not
+        # normalize: a row from before the category rename must not 500 the
+        # tailoring flow.
+        "qualities": qualities.normalize_stored(profile.qualities),
     }
 
 

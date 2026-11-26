@@ -237,7 +237,7 @@ export function ResumesPage({ resumes, master, jobs = [], loading, error, onRefr
         <>
           <section className="card">
             <div className="card-head">
-              <h3>Master resume</h3>
+              <h2>Master resume</h2>
               <div className="card-head-actions">
                 <span className="pill">{master ? 1 : 0}</span>
               </div>
@@ -254,7 +254,7 @@ export function ResumesPage({ resumes, master, jobs = [], loading, error, onRefr
 
           <section className="card">
             <div className="card-head">
-              <h3>Tailored resumes</h3>
+              <h2>Tailored resumes</h2>
               <div className="card-head-actions">
                 <span className="pill">{tailored.length}</span>
                 <button

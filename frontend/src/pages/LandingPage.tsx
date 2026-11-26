@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { HelpPanel } from '../components/HelpPanel'
+import { usePageMeta } from '../hooks/usePageMeta'
+import { SEO } from '../lib/seo'
 import {
   IconArrowRight,
   IconBriefcase,
@@ -247,6 +249,7 @@ export function LandingPage() {
   const primaryTo = signedIn ? '/app/dashboard' : '/signup'
   // reads correctly if the observer never runs.
   const [helpOpen, setHelpOpen] = useState(false)
+  usePageMeta(SEO.home)
 
   return (
     <div className="landing mk-animate">
@@ -254,7 +257,9 @@ export function LandingPage() {
 
       <header className="mk-nav">
         <div className="mk-nav-inner">
-          <Link to="/" className="brand">
+          {/* aria-label: the wordmark text is hidden on phones, which left
+              this link with no accessible name there. */}
+          <Link to="/" className="brand" aria-label="TailorUp home">
             <span className="brand-mark">
               <IconLogo size={18} />
             </span>
@@ -521,7 +526,7 @@ export function LandingPage() {
       <footer className="mk-footer">
         <div className="mk-footer-inner">
           <div className="mk-footer-brand">
-            <Link to="/" className="brand">
+            <Link to="/" className="brand" aria-label="TailorUp home">
               <BrandTile size={34} tone="dark" />
               <span className="brand-name">TailorUp</span>
             </Link>

@@ -102,6 +102,7 @@ export function ApiKeyButton() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
+        aria-label={configured ? 'API key saved' : appKeyAvailable ? 'Using the app key' : 'Add API key'}
         title={
           configured
             ? `API key saved (${status?.key_hint ?? 'hidden'})`
@@ -111,7 +112,10 @@ export function ApiKeyButton() {
         }
       >
         {configured ? <IconKey size={15} /> : <IconLock size={15} />}
-        {configured ? 'Key saved' : appKeyAvailable ? 'App key' : 'Add API key'}
+        {/* Hidden on phones to fit the topbar; aria-label above keeps the name. */}
+        <span className="key-btn-label">
+          {configured ? 'Key saved' : appKeyAvailable ? 'App key' : 'Add API key'}
+        </span>
       </button>
 
       {open ? (

@@ -25,7 +25,7 @@ export function NotFoundPage() {
 
   return (
     <div className="mk-landing-shell">
-      <div className="notfound">
+      <main className="notfound">
         <BrandMark size={40} className="notfound-mark" />
         <p className="notfound-code">404</p>
         <h1 className="notfound-title">This page does not exist</h1>
@@ -42,7 +42,7 @@ export function NotFoundPage() {
             Open my dashboard
           </Link>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

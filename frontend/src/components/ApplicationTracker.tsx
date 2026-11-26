@@ -173,6 +173,9 @@ export function ApplicationTracker() {
               : 'No applications match this filter.'}
           </p>
         ) : (
+          // Scrolls sideways on a phone instead of pushing the page wider than
+          // the screen. Focusable and labelled so keyboard users can scroll it.
+          <div className="table-scroll" role="region" aria-label="Application tracker" tabIndex={0}>
           <table className="apps-table">
             <caption className="visually-hidden">
               Your job applications and their current stage
@@ -236,6 +239,7 @@ export function ApplicationTracker() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </section>

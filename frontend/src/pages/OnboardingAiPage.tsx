@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Alert } from '../components/primitives'
 import { IconCheck, IconLogo } from '../components/Icons'
 import { ApiError, api } from '../lib/api'
+import { usePageMeta } from '../hooks/usePageMeta'
+import { privateSeo } from '../lib/seo'
 import type { AiSetup } from '../lib/types'
 
 /**
@@ -65,6 +67,7 @@ const OPTIONS: {
 ]
 
 export function OnboardingAiPage() {
+  usePageMeta(privateSeo('Set up: AI provider', '/setup/ai'))
   const navigate = useNavigate()
 
   const [choice, setChoice] = useState<AiSetup | ''>('')

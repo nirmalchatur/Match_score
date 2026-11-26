@@ -5,8 +5,11 @@ import { useAuth } from '../auth/useAuth'
 import { AuthLayout } from './AuthLayout'
 import { Alert } from '../components/primitives'
 import { IconLogo } from '../components/Icons'
+import { usePageMeta } from '../hooks/usePageMeta'
+import { SEO } from '../lib/seo'
 
 export function SignupPage() {
+  usePageMeta(SEO.signup)
   const { register } = useAuth()
   const navigate = useNavigate()
 

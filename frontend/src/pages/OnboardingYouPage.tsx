@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Alert } from '../components/primitives'
 import { IconCheck, IconLogo } from '../components/Icons'
 import { ApiError, api } from '../lib/api'
+import { usePageMeta } from '../hooks/usePageMeta'
+import { privateSeo } from '../lib/seo'
 import type { CareerStage } from '../lib/types'
 
 /**
@@ -35,6 +37,7 @@ const STAGES: { value: CareerStage; title: string; body: string }[] = [
 ]
 
 export function OnboardingYouPage() {
+  usePageMeta(privateSeo('Set up: about you', '/setup/you'))
   const navigate = useNavigate()
 
   const [stage, setStage] = useState<CareerStage | ''>('')
