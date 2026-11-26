@@ -54,16 +54,23 @@ export function stepIcon(status: StepStatus): 'check' | 'spinner' | 'pending' {
   return 'pending'
 }
 
-const UNITS: Array<[number, Intl.RelativeTimeFormatUnit]> = [
-  [60, 'second'],
-  [3600, 'minute'],
-  [86400, 'hour'],
-  [604800, 'day'],
-  [2629800, 'week'],
-  [31557600, 'month'],
+/**
+ * [seconds per unit, use this unit while the gap is below N seconds, unit].
+ *
+ * The size and the unit name must be on the same row. They used to be
+ * offset by one -- size 3600 was labelled 'minute' -- so a job analysed three
+ * hours ago read "3 minutes ago" and every relative time was one unit too
+ * small. format.test.ts pins the boundaries.
+ */
+const UNITS: Array<[number, number, Intl.RelativeTimeFormatUnit]> = [
+  [60, 3600, 'minute'],
+  [3600, 86400, 'hour'],
+  [86400, 604800, 'day'],
+  [604800, 2629800, 'week'],
+  [2629800, 31557600, 'month'],
 ]
 
-/** "3h ago" style relative time. */
+/** "3 hours ago" style relative time. */
 export function formatRelative(iso: string | undefined): string {
   if (!iso) return ''
   const timestamp = Date.parse(iso)
@@ -75,9 +82,9 @@ export function formatRelative(iso: string | undefined): string {
 
   if (magnitude < 60) return formatter.format(Math.round(seconds), 'second')
 
-  for (const [limit, unit] of UNITS) {
-    if (magnitude < limit * 60) {
-      return formatter.format(Math.round(seconds / limit), unit)
+  for (const [size, below, unit] of UNITS) {
+    if (magnitude < below) {
+      return formatter.format(Math.round(seconds / size), unit)
     }
   }
 
